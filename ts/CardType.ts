@@ -4,4 +4,5 @@ export enum CardType {
 	Evidence = "Evidence",
 	Inspector = "Inspector",
 	Lead = "Lead",
+	LeadReverse = "LeadReverse",
 }

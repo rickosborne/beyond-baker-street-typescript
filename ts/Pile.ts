@@ -1,7 +1,4 @@
-import { Card } from "./Card";
-import { CardType } from "./CardType";
-
-export class Pile<C extends Card<CardType>> {
+export class Pile<C> {
 	private readonly cards: C[] = [];
 
 	public addAt(card: C, index: number): void {

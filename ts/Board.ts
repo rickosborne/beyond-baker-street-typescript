@@ -7,12 +7,12 @@ import { EvidenceValue } from "./EvidenceValue";
 import { EvidenceType } from "./EvidenceType";
 import { VisibleBoard, VisibleLead } from "./VisibleBoard";
 import { toRecord } from "./toRecord";
+import { ImpossibleCard } from "./Impossible";
 
 export const LEAD_PILE_START_COUNT = 3;
 
 class BoardLead implements VisibleLead {
 	private _confirmed = false;
-	private _leadCard: LeadCard;
 	private readonly bad = new Pile<EvidenceCard>();
 	private readonly good = new Pile<EvidenceCard>();
 
@@ -20,7 +20,6 @@ class BoardLead implements VisibleLead {
 		public readonly leadType: LeadType,
 		private readonly leadCards: LeadCard[] = randomLeadCards(leadType),
 	) {
-		this._leadCard = leadCards[0];
 	}
 
 	public addBad(evidenceCard: EvidenceCard) {
@@ -47,6 +46,10 @@ class BoardLead implements VisibleLead {
 		return this._confirmed;
 	}
 
+	public get empty(): boolean {
+		return this.leadCards.length === 0;
+	}
+
 	public get evidenceCards(): EvidenceCard[] {
 		return this.good.toArray();
 	}
@@ -56,13 +59,25 @@ class BoardLead implements VisibleLead {
 	}
 
 	public get leadCard(): LeadCard {
-		return this._leadCard;
+		return this.leadCards[0];
+	}
+
+	public removeAllEvidence(): EvidenceCard[] {
+		const allEvidence = this.good.toArray();
+		allEvidence.push(...this.bad.toArray());
+		this.good.empty();
+		this.bad.empty();
+		return allEvidence;
+	}
+
+	public removeLead(): void {
+		this.leadCards.splice(0, 1);
 	}
 }
 
 export class Board implements VisibleBoard {
 	private holmesValue: number;
-	private readonly impossible: Pile<EvidenceCard> = new Pile<EvidenceCard>();
+	private readonly impossible: Pile<ImpossibleCard> = new Pile<ImpossibleCard>();
 	private investigationValue: number;
 	public readonly leads: Record<LeadType, BoardLead>;
 	private readonly remainingEvidence: Pile<EvidenceCard> = new Pile<EvidenceCard>();
@@ -84,8 +99,16 @@ export class Board implements VisibleBoard {
 		this.leads[leadType].addEvidence(evidence);
 	}
 
-	public addImpossible(evidence: EvidenceCard): void {
-		this.impossible.addToTop(evidence);
+	public addImpossible(card: ImpossibleCard): void {
+		this.impossible.addToTop(card);
+	}
+
+	public get allConfirmed(): boolean {
+		return LEAD_TYPES.find(leadType => !this.leads[leadType].confirmed) != null;
+	}
+
+	public get anyEmptyLeads(): boolean {
+		return LEAD_TYPES.find(leadType => this.leads[leadType].empty) != null;
 	}
 
 	public calculateBadFor(leadType: LeadType): number {
@@ -116,6 +139,10 @@ export class Board implements VisibleBoard {
 		return this.holmesValue;
 	}
 
+	public get impossibleCards(): ImpossibleCard[] {
+		return this.impossible.toArray();
+	}
+
 	public get impossibleCount(): number {
 		return this.impossible.count;
 	}
@@ -137,7 +164,7 @@ export class Board implements VisibleBoard {
 		return this.leads[leadType].confirmed;
 	}
 
-	protected leadFor(leadType: LeadType): LeadCard {
+	public leadFor(leadType: LeadType): LeadCard {
 		return this.leads[leadType].leadCard;
 	}
 
@@ -145,8 +172,28 @@ export class Board implements VisibleBoard {
 		this.holmesValue += delta;
 	}
 
+	public moveInvestigationMarker(delta: number): number {
+		this.investigationValue += delta;
+		return this.investigationValue;
+	}
+
 	public get remainingEvidenceCount(): number {
 		return this.remainingEvidence.count;
+	}
+
+	public removeEvidenceFor(leadType: LeadType): EvidenceCard[] {
+		return this.leads[leadType].removeAllEvidence();
+	}
+
+	public removeLead(leadType: LeadType): void {
+		this.leads[leadType].removeLead();
+	}
+
+	public returnEvidence(evidence: EvidenceCard[]): void {
+		for (const evidenceCard of evidence) {
+			this.remainingEvidence.addToBottom(evidenceCard);
+		}
+		this.remainingEvidence.shuffle();
 	}
 
 	public targetForLead(leadType: LeadType): EvidenceValue {

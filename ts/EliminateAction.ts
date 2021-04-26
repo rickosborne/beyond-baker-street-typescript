@@ -1,14 +1,15 @@
 import { Action, isAction } from "./Action";
 import { ActionType } from "./ActionType";
-import { EvidenceCard } from "./EvidenceCard";
+import { Outcome } from "./Outcome";
+import { ImpossibleCard } from "./Impossible";
 
 export interface EliminateAction extends Action<ActionType.Eliminate> {
 	actionType: ActionType.Eliminate;
 	handIndex: number;
 }
 
-export interface EliminateOutcome {
-	impossibleCards: EvidenceCard[];
+export interface EliminateOutcome extends Outcome {
+	impossibleCards: ImpossibleCard[];
 	impossibleFaceDownCount: number;
 	investigationMarker: number;
 }

@@ -14,15 +14,9 @@ export interface OtherPlayer extends Player {
 
 export interface ActivePlayer extends Player {
 	sawOutcome(outcome: Outcome): void;
+	setHandCount(handCount: number): void;
 	takeTurn(turnStart: TurnStart): Action<ActionType>;
 }
-
-export const PLAYER_NAMES: string[] = [
-	"Alice",
-	"Bryce",
-	"Chuck",
-	"Daisy",
-];
 
 export function isPlayer(maybe: unknown): maybe is Player {
 	const p = maybe as Player;

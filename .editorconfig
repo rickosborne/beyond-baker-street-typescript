@@ -9,3 +9,8 @@ trim_trailing_whitespace = true
 
 [*.ts]
 ij_typescript_spaces_within_imports = true
+ij_typescript_import_sort_members = true
+ij_typescript_method_parameters_new_line_after_left_paren = true
+ij_typescript_method_parameters_right_paren_on_new_line = true
+ij_typescript_prefer_explicit_types_function_returns = true
+ij_typescript_prefer_explicit_types_function_expression_returns = true

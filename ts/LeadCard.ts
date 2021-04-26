@@ -48,3 +48,11 @@ export const LEAD_CARDS_BY_LEADTYPE: Record<LeadType, LeadCard[]> = groupBy(LEAD
 export function randomLeadCards(leadType: LeadType): LeadCard[] {
 	return randomItems(LEAD_CARDS_BY_LEADTYPE[leadType], LEAD_PILE_START_COUNT);
 }
+
+export interface LeadReverseCard extends Card<CardType.LeadReverse> {
+	cardType: CardType.LeadReverse;
+}
+
+export function isLeadReverseCard(maybe: unknown): maybe is LeadReverseCard {
+	return isCardOfType<CardType.LeadReverse>(maybe, CardType.LeadReverse);
+}
