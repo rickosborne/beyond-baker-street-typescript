@@ -1,0 +1,29 @@
+{
+	"compileOnSave": true,
+	"compilerOptions": {
+		"allowJs": false,
+		"alwaysStrict": true,
+		"charset": "utf-8",
+		"checkJs": false,
+		"declaration": true,
+		"downlevelIteration": true,
+		"lib": [
+			"ESNext"
+		],
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitAny": true,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
+		"pretty": true,
+		"sourceMap": true,
+		"strict": true,
+		"strictBindCallApply": true,
+		"strictFunctionTypes": true,
+		"strictNullChecks": true,
+		"strictPropertyInitialization": true,
+		"target": "ES6"
+	},
+	"include": [
+		"ts/**/*.ts"
+	]
+}

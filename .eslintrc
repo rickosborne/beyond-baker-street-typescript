@@ -1,0 +1,66 @@
+{
+	"extends": [
+		"eslint:recommended",
+		"plugin:@typescript-eslint/eslint-recommended",
+		"plugin:@typescript-eslint/recommended",
+		"plugin:json/recommended"
+	],
+	"parser": "@typescript-eslint/parser",
+	"plugins": [
+		"@typescript-eslint",
+		"json"
+	],
+	"root": true,
+	"rules": {
+		"@typescript-eslint/member-ordering": [
+			"error",
+			{
+				"default": {
+					"memberTypes": "never",
+					"order": "alphabetically"
+				},
+				"classes": {
+					"memberTypes": [
+						"field",
+						"constructor",
+						"method"
+					],
+					"order": "alphabetically"
+				}
+			}
+		],
+		"array-bracket-spacing": [
+			"error",
+			"always",
+			{
+				"singleValue": false
+			}
+		],
+		"comma-dangle": [
+			"error",
+			"always-multiline"
+		],
+		"comma-style": [
+			"error",
+			"last"
+		],
+		"object-curly-spacing": [
+			"error",
+			"always"
+		],
+		"semi": [
+			"error",
+			"always"
+		],
+		"sort-keys": [
+			"error",
+			"asc",
+			{
+				"caseSensitive": true,
+				"minKeys": 2,
+				"natural": false
+			}
+		],
+		"sort-vars": "error"
+	}
+}
