@@ -1,11 +1,10 @@
 import { ActionType, isActionType } from "./ActionType";
 
-export interface Action<A extends ActionType> {
-	actionType: A;
+export interface Action {
+	actionType: ActionType;
 }
 
-export function isAction<A extends ActionType>(maybe: unknown, actionType: A): maybe is Action<A> {
-	const a = maybe as Action<A>;
-	return (maybe != null)
-		&& (a.actionType === actionType);
+export function isActionOfType(maybe: unknown, actionType: ActionType): maybe is Action {
+	const a = maybe as Action;
+	return (maybe != null) && (a.actionType === actionType);
 }

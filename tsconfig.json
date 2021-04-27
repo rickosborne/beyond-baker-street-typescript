@@ -8,8 +8,11 @@
 		"declaration": true,
 		"downlevelIteration": true,
 		"lib": [
+			"dom",
 			"ESNext"
 		],
+		"module": "CommonJS",
+		"moduleResolution": "Node",
 		"noFallthroughCasesInSwitch": true,
 		"noImplicitAny": true,
 		"noImplicitReturns": true,

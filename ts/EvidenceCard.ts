@@ -31,3 +31,7 @@ export const EVIDENCE_CARDS: EvidenceCard[] = EVIDENCE_CARD_VALUES
 		evidenceType,
 		evidenceValue,
 	})));
+
+export function formatEvidence(evidence: EvidenceCard): string {
+	return `${evidence.evidenceType}-${evidence.evidenceValue}`;
+}

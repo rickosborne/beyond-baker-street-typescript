@@ -18,7 +18,8 @@
   "name": "beyond-baker-street-typescript",
   "scripts": {
 		"compile": "tsc -p tsconfig.json",
-    "lint": "eslint . --fix --ext .ts,.json"
+    "lint": "eslint . --fix --ext .ts,.json",
+		"start": "ts-node index.ts"
   },
   "version": "1.0.0"
 }

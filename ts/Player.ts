@@ -1,8 +1,8 @@
 import { Action } from "./Action";
-import { ActionType } from "./ActionType";
 import { EvidenceCard } from "./EvidenceCard";
 import { TurnStart } from "./TurnStart";
 import { Outcome } from "./Outcome";
+import { OtherHand } from "./OtherHand";
 
 export interface Player {
 	readonly name: string;
@@ -13,9 +13,12 @@ export interface OtherPlayer extends Player {
 }
 
 export interface ActivePlayer extends Player {
+	addCard(index: number, evidenceCard: EvidenceCard | undefined): void;
+	readonly otherHand: OtherHand;
+	removeCardAt(index: number): void;
 	sawOutcome(outcome: Outcome): void;
 	setHandCount(handCount: number): void;
-	takeTurn(turnStart: TurnStart): Action<ActionType>;
+	takeTurn(turnStart: TurnStart): Action;
 }
 
 export function isPlayer(maybe: unknown): maybe is Player {

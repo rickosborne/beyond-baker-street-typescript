@@ -56,3 +56,7 @@ export interface LeadReverseCard extends Card<CardType.LeadReverse> {
 export function isLeadReverseCard(maybe: unknown): maybe is LeadReverseCard {
 	return isCardOfType<CardType.LeadReverse>(maybe, CardType.LeadReverse);
 }
+
+export function formatLeadCard(leadCard: LeadCard): string {
+	return `${leadCard.leadType}-${leadCard.evidenceType}-${leadCard.evidenceTarget}`;
+}

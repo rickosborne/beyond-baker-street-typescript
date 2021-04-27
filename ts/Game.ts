@@ -1,25 +1,42 @@
 import { Board } from "./Board";
 import { ActivePlayer, isSamePlayer, OtherPlayer, Player } from "./Player";
-import { CaseFileCard } from "./CaseFileCard";
+import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
 import { EvidenceCard } from "./EvidenceCard";
 import { Action } from "./Action";
-import { ActionType } from "./ActionType";
 import { TurnStart } from "./TurnStart";
-import { AssistAction, AssistOutcome, AssistType, isTypeAssistAction, isValueAssistAction } from "./AssistAction";
-import { EliminateAction, EliminateOutcome, isEliminateAction } from "./EliminateAction";
 import {
-	BadInvestigateOutcome, DeadLeadInvestigateOutcome, GoodInvestigateOutcome,
+	AssistAction,
+	AssistOutcome,
+	formatAssistOutcome,
+	isTypeAssistAction,
+	isValueAssistAction,
+} from "./AssistAction";
+import { EliminateAction, EliminateOutcome, formatEliminateOutcome, isEliminateAction } from "./EliminateAction";
+import {
+	BadInvestigateOutcome,
+	DeadLeadInvestigateOutcome,
+	formatBadInvestigateOutcome,
+	formatDeadLeadInvestigateOutcome,
+	formatGoodInvestigateOutcome,
+	GoodInvestigateOutcome,
 	InvestigateAction,
 	InvestigateOutcome,
 	InvestigateOutcomeType,
 	isInvestigateAction,
 } from "./InvestigateAction";
-import { isPursueAction, PursueAction, PursueOutcome } from "./PursueAction";
-import { ConfirmAction, ConfirmOutcome, isConfirmAction } from "./ConfirmAction";
-import { Outcome } from "./Outcome";
+import { formatPursueOutcome, isPursueAction, PursueAction, PursueOutcome } from "./PursueAction";
+import { ConfirmAction, ConfirmOutcome, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
+import { Outcome, OutcomeType } from "./Outcome";
 import { LEAD_TYPES, LeadType } from "./LeadType";
-import { isLeadReverseCard } from "./LeadCard";
+import { formatLeadCard, isLeadReverseCard } from "./LeadCard";
 import { CardType } from "./CardType";
+import { OtherHand } from "./OtherHand";
+
+export const CARDS_PER_PLAYER: Record<number, number> = {
+	2: 6,
+	3: 4,
+	4: 3,
+};
 
 export enum GameState {
 	Lost = "Lost",
@@ -34,6 +51,14 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 	) {
 	}
 
+	public addCard(index: number, evidenceCard: EvidenceCard | undefined, playerSawCard = false): void {
+		if (evidenceCard == null) {
+			throw new Error(`Expected evidence card at ${index}`);
+		}
+		this._hand.splice(index, 0, evidenceCard);
+		this.player.addCard(index, playerSawCard ? evidenceCard : undefined);
+	}
+
 	public get hand(): EvidenceCard[] {
 		return this._hand.slice();
 	}
@@ -42,9 +67,14 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 		return this.player.name;
 	}
 
+	public get otherHand(): OtherHand {
+		return this.player.otherHand;
+	}
+
 	public removeCardAt(index: number): EvidenceCard {
 		const card = this._hand[index];
 		this._hand.splice(index, 1);
+		this.player.removeCardAt(index);
 		return card;
 	}
 
@@ -52,13 +82,19 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 		this.player.sawOutcome(outcome);
 	}
 
-	public takeTurn(turnStart: TurnStart): Action<ActionType> {
+	public setHandCount(handCount: number): void {
+		this.player.setHandCount(handCount);
+	}
+
+	public takeTurn(turnStart: TurnStart): Action {
 		return this.player.takeTurn(turnStart);
 	}
 }
 
 export const HOLMES_GOAL = 0;
 export const INVESTIGATION_MARKER_GOAL = 20;
+export const HOLMES_MOVE_ASSIST = -1;
+export const HOLMES_MOVE_CONFIRM = 1;
 
 export class Game {
 	private activePlayerNum = -1;
@@ -72,10 +108,24 @@ export class Game {
 	) {
 		this.board = new Board(caseFile);
 		this.players = players.map(p => new GamePlayer(p));
+		const cardsPerPlayer = CARDS_PER_PLAYER[players.length];
+		if (isNaN(cardsPerPlayer)) {
+			throw new Error(`Invalid number of players: ${players.length}`);
+		}
+		for (let i = 0; i < cardsPerPlayer; i++) {
+			for (const player of this.players) {
+				const evidence = this.board.dealEvidence();
+				if (evidence == null) {
+					throw new Error(`Could not deal out all cards`);
+				}
+				player.addCard(i, evidence, false);
+			}
+		}
+		console.log(`Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
 	}
 
 	private applyAction(
-		action: Action<ActionType>,
+		action: Action,
 		activePlayer: GamePlayer,
 	): void {
 		let outcome: Outcome;
@@ -95,7 +145,7 @@ export class Game {
 		this.broadcastOutcome(outcome);
 	}
 
-	private applyAssist(action: AssistAction<AssistType>, activePlayer: GamePlayer): AssistOutcome {
+	private applyAssist(action: AssistAction, activePlayer: GamePlayer): AssistOutcome {
 		if (isSamePlayer(activePlayer, action.player)) {
 			throw new Error(`Cannot assist yourself, ${activePlayer.name}`);
 		}
@@ -108,13 +158,18 @@ export class Game {
 		} else {
 			throw new Error(`Unknown assist type: ${action}`);
 		}
-		return {
+		this.board.moveHolmes(HOLMES_MOVE_ASSIST);
+		const outcome: AssistOutcome = {
 			action,
 			activePlayer,
+			holmesLocation: this.board.holmesLocation,
 			identifiedHandIndexes: assistedPlayer.hand
 				.map((card, index) => cardMatcher(card) ? index : -1)
 				.filter(index => index >= 0),
+			outcomeType: OutcomeType.Assist,
 		};
+		console.log(formatAssistOutcome(outcome));
+		return outcome;
 	}
 
 	private applyConfirm(action: ConfirmAction, activePlayer: GamePlayer): ConfirmOutcome {
@@ -125,14 +180,17 @@ export class Game {
 			throw new Error(`Cannot confirm that lead: ${action}`);
 		}
 		this.board.confirm(action.leadType);
-		this.board.moveHolmes(-1);
-		return {
+		this.board.moveHolmes(HOLMES_MOVE_CONFIRM);
+		const outcome: ConfirmOutcome = {
 			action,
 			activePlayer,
 			confirmedLeadTypes: LEAD_TYPES.filter(leadType => this.board.isConfirmed(leadType)),
 			holmesLocation: this.board.holmesLocation,
+			outcomeType: OutcomeType.Confirm,
 			unconfirmedLeadTypes: LEAD_TYPES.filter(leadType => !this.board.isConfirmed(leadType)),
 		};
+		console.log(formatConfirmOutcome(outcome));
+		return outcome;
 	}
 
 	private applyDeadLead(leadType: LeadType): EvidenceCard[] {
@@ -144,24 +202,28 @@ export class Game {
 	}
 
 	private applyEliminate(action: EliminateAction, activePlayer: GamePlayer): EliminateOutcome {
-		const card = activePlayer.removeCardAt(action.handIndex);
-		if (card == null) {
+		const evidenceCard = activePlayer.removeCardAt(action.handIndex);
+		if (evidenceCard == null) {
 			throw new Error(`Unknown card index for ${activePlayer}: ${action.handIndex}`);
 		}
-		this.board.addImpossible(card);
-		const investigationMarker = this.board.moveInvestigationMarker(card.evidenceValue);
+		this.board.addImpossible(evidenceCard);
+		const investigationMarker = this.board.moveInvestigationMarker(evidenceCard.evidenceValue);
 		const impossibleCards = this.board.impossibleCards;
 		const impossibleFaceDownCount = impossibleCards.filter(c => isLeadReverseCard(c)).length;
-		return {
+		const outcome: EliminateOutcome = {
 			action,
 			activePlayer,
+			evidenceCard,
 			impossibleCards,
 			impossibleFaceDownCount,
 			investigationMarker,
+			outcomeType: OutcomeType.Eliminate,
 		};
+		console.log(formatEliminateOutcome(outcome));
+		return outcome;
 	}
 
-	private applyInvestigate(action: InvestigateAction, activePlayer: GamePlayer): InvestigateOutcome<InvestigateOutcomeType> {
+	private applyInvestigate(action: InvestigateAction, activePlayer: GamePlayer): InvestigateOutcome {
 		const evidenceCard = activePlayer.removeCardAt(action.handIndex);
 		const evidenceType = this.board.evidenceTypeFor(action.leadType);
 		if (evidenceCard == null) {
@@ -171,51 +233,65 @@ export class Game {
 			this.board.addBad(action.leadType, evidenceCard);
 			const badValue = this.board.calculateBadFor(action.leadType);
 			const targetValue = this.board.targetForLead(action.leadType);
-			return <BadInvestigateOutcome> {
+			const accumulatedValue = this.board.calculateEvidenceValueFor(action.leadType);
+			const outcome: BadInvestigateOutcome = {
+				accumulatedValue,
 				action,
 				activePlayer,
 				badValue,
 				evidenceCard,
 				investigateOutcomeType: InvestigateOutcomeType.Bad,
+				outcomeType: OutcomeType.BadInvestigate,
 				targetValue,
 				totalValue: badValue + targetValue,
 			};
+			console.log(formatBadInvestigateOutcome(outcome));
+			return outcome;
 		}
 		this.board.addEvidence(action.leadType, evidenceCard);
 		const gap = this.board.calculateGapFor(action.leadType);
 		if (gap < 0) {
 			const returnedEvidence = this.applyDeadLead(action.leadType);
-			return <DeadLeadInvestigateOutcome> {
+			const outcome: DeadLeadInvestigateOutcome = {
 				action,
 				activePlayer,
 				evidenceCard,
 				impossibleCount: this.board.impossibleCount,
 				investigateOutcomeType: InvestigateOutcomeType.DeadLead,
 				nextLead: this.board.leadFor(action.leadType),
+				outcomeType: OutcomeType.DeadLead,
 				returnedEvidence,
 			};
+			console.log(formatDeadLeadInvestigateOutcome(outcome));
+			return outcome;
 		}
-		return <GoodInvestigateOutcome> {
+		const outcome: GoodInvestigateOutcome = {
 			accumulatedValue: this.board.calculateEvidenceValueFor(action.leadType),
 			action,
 			activePlayer,
 			badValue: this.board.calculateBadFor(action.leadType),
 			evidenceCard,
 			investigateOutcomeType: InvestigateOutcomeType.Good,
+			outcomeType: OutcomeType.GoodInvestigate,
 			targetValue: this.board.targetForLead(action.leadType),
 			totalValue: this.board.calculateTotalFor(action.leadType),
 		};
+		console.log(formatGoodInvestigateOutcome(outcome));
+		return outcome;
 	}
 
 	private applyPursue(action: PursueAction, activePlayer: GamePlayer): PursueOutcome {
 		const returnedEvidence = this.applyDeadLead(action.leadType);
-		return <PursueOutcome> {
+		const outcome: PursueOutcome = {
 			action,
 			activePlayer,
 			impossibleCount: this.board.impossibleCount,
 			nextLead: this.board.leadFor(action.leadType),
+			outcomeType: OutcomeType.Pursue,
 			returnedEvidence,
 		};
+		console.log(formatPursueOutcome(outcome));
+		return outcome;
 	}
 
 	private broadcastOutcome(outcome: Outcome): void {
@@ -255,10 +331,19 @@ export class Game {
 		this.activePlayerNum = (this.activePlayerNum + 1) % this.players.length;
 		this.turnCount++;
 		const activePlayer = this.players[this.activePlayerNum];
-		const action = activePlayer.takeTurn({
+		const turnStart: TurnStart = {
+			askOtherPlayerAboutTheirHand: (otherPlayer: OtherPlayer): OtherHand => {
+				const other = this.findPlayer(otherPlayer);
+				if (isSamePlayer(other, activePlayer)) {
+					throw new Error(`Cannot ask about your own hand: ${activePlayer}`);
+				}
+				return other.otherHand;
+			},
 			board: this.board,
-			otherPlayers: this.players.filter(p => p !== activePlayer),
-		});
+			otherPlayers: this.players.filter(p => !isSamePlayer(p, activePlayer)),
+			player: activePlayer,
+		};
+		const action = activePlayer.takeTurn(turnStart);
 		this.applyAction(action, activePlayer);
 	}
 

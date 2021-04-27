@@ -12,6 +12,10 @@ export function isCaseFileCard(maybe: unknown): maybe is CaseFileCard {
 	return isCardOfType<CardType.CaseFile>(maybe, CardType.CaseFile);
 }
 
+export function formatCaseFileCard(caseFile: CaseFileCard): string {
+	return `${caseFile.caseNumber}:${caseFile.impossibleCount}i:${caseFile.holmesStart}h`;
+}
+
 export const CASE_FILE_CARDS: CaseFileCard[] = [
 	{
 		cardType: CardType.CaseFile,

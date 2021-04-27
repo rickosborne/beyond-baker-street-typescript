@@ -1,5 +1,5 @@
 export class Pile<C> {
-	private readonly cards: C[] = [];
+	protected readonly cards: C[] = [];
 
 	public addAt(card: C, index: number): void {
 		if (index < 0 || index > this.cards.length) {

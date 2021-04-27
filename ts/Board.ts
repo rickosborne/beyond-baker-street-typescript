@@ -104,7 +104,7 @@ export class Board implements VisibleBoard {
 	}
 
 	public get allConfirmed(): boolean {
-		return LEAD_TYPES.find(leadType => !this.leads[leadType].confirmed) != null;
+		return LEAD_TYPES.find(leadType => !this.leads[leadType].confirmed) == null;
 	}
 
 	public get anyEmptyLeads(): boolean {
@@ -129,6 +129,10 @@ export class Board implements VisibleBoard {
 
 	public confirm(leadType: LeadType): void {
 		this.leads[leadType].confirm();
+	}
+
+	public dealEvidence(): EvidenceCard | undefined {
+		return this.remainingEvidence.takeFromTop();
 	}
 
 	public evidenceTypeFor(leadType: LeadType): EvidenceType {

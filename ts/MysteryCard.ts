@@ -5,7 +5,12 @@ import { CardType } from "./CardType";
 import { removeIf } from "./removeIf";
 import { Pile } from "./Pile";
 
-export class MysteryCard {
+export interface UnknownCard {
+	possibleTypes: EvidenceType[];
+	possibleValues: EvidenceValue[];
+}
+
+export class MysteryCard implements UnknownCard {
 	private readonly possible: EvidenceCard[] = [];
 
 	constructor(
@@ -28,6 +33,13 @@ export class MysteryCard {
 		return this.possible.slice();
 	}
 
+	public asEvidence(): EvidenceCard | undefined {
+		if (this.possible.length === 1) {
+			return this.possible[0];
+		}
+		return undefined;
+	}
+
 	public couldBe(evidenceCard: EvidenceCard): boolean {
 		return this.possible.find(card => isSameEvidenceCard(card, evidenceCard)) != null;
 	}
@@ -41,7 +53,9 @@ export class MysteryCard {
 	}
 
 	public eliminateCard(evidenceCard: EvidenceCard): void {
-		removeIf(this.possible, card => isSameEvidenceCard(evidenceCard, card));
+		if (!this.isKnown) {
+			removeIf(this.possible, card => isSameEvidenceCard(evidenceCard, card));
+		}
 	}
 
 	public eliminateType(evidenceType: EvidenceType): void {
@@ -56,6 +70,26 @@ export class MysteryCard {
 		return this.possible.length === 1;
 	}
 
+	public get possibleTypes(): EvidenceType[] {
+		const types: EvidenceType[] = [];
+		for (const evidenceCard of this.possible) {
+			if (!types.includes(evidenceCard.evidenceType)) {
+				types.push(evidenceCard.evidenceType);
+			}
+		}
+		return types;
+	}
+
+	public get possibleValues(): EvidenceValue[] {
+		const values: EvidenceValue[] = [];
+		for (const evidenceCard of this.possible) {
+			if (!values.includes(evidenceCard.evidenceValue)) {
+				values.push(evidenceCard.evidenceValue);
+			}
+		}
+		return values;
+	}
+
 	public setType(evidenceType: EvidenceType): void {
 		removeIf(this.possible, card => card.evidenceType !== evidenceType);
 	}
@@ -65,4 +99,20 @@ export class MysteryCard {
 	}
 }
 
-export class MysteryPile extends Pile<MysteryCard> {}
+export class MysteryPile extends Pile<EvidenceCard> {
+	constructor() {
+		super();
+		const cardType: CardType.Evidence = CardType.Evidence;
+		this.cards.push(...EVIDENCE_TYPES.flatMap(evidenceType => EVIDENCE_CARD_VALUES.map(evidenceValue => ({
+			cardType,
+			evidenceType,
+			evidenceValue,
+		}))));
+	}
+
+	public eliminate(evidenceCard: EvidenceCard | undefined): void {
+		if (evidenceCard != null) {
+			removeIf(this.cards, c => isSameEvidenceCard(evidenceCard, c));
+		}
+	}
+}
