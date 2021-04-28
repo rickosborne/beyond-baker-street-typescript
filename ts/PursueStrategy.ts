@@ -1,19 +1,20 @@
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
-import { TurnStart } from "./TurnStart";
+import { ActionType } from "./ActionType";
 import { Bot } from "./Bot";
-import { LEAD_TYPES } from "./LeadType";
-import { unconfirmedLeads } from "./unconfirmedLeads";
+import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
+import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
-import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
-import { MysteryCard } from "./MysteryCard";
-import { ALL_PATHS_TO, MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
-import { unique } from "./unique";
-import { PursueAction } from "./PursueAction";
-import { ActionType } from "./ActionType";
-import { VisibleLead } from "./VisibleBoard";
+import { HOLMES_MOVE_PURSUE } from "./Game";
 import { HolmesProgressEffect } from "./HolmesProgressEffect";
-import { HOLMES_MOVE_ASSIST, HOLMES_MOVE_PURSUE } from "./Game";
+import { LEAD_TYPES } from "./LeadType";
+import { LoseEffect } from "./LoseEffect";
+import { MysteryCard } from "./MysteryCard";
+import { PursueAction } from "./PursueAction";
+import { ALL_PATHS_TO, MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
+import { TurnStart } from "./TurnStart";
+import { unconfirmedLeads } from "./unconfirmedLeads";
+import { unique } from "./unique";
+import { VisibleLead } from "./VisibleBoard";
 
 export interface PursueOption extends BotTurnOption {
 	action: PursueAction;
@@ -55,50 +56,60 @@ export class PursueStrategy implements BotTurnStrategy {
 	private buildPursueForLead(lead: VisibleLead, turn: TurnStart, bot: Bot): PursueOption | undefined {
 		const totalValue = lead.badValue + lead.leadCard.evidenceTarget;
 		const gap = totalValue - lead.evidenceValue;
-		if (gap < 1) {
-			return undefined;
-		}
 		const effects: BotTurnEffect[] = [];
-		if (turn.board.impossibleCards.length + 1 > turn.board.caseFile.impossibleCount) {
-			const holmesEffect: HolmesProgressEffect = {
-				delta: HOLMES_MOVE_PURSUE,
-				effectType: BotTurnEffectType.HolmesProgress,
+		if (lead.leadCount === 1) {
+			const lose: LoseEffect = {
+				effectType: BotTurnEffectType.Lose,
 			};
-			effects.push(holmesEffect);
+			effects.push(lose);
 		}
-		if (totalValue > MAX_POSSIBLE_EVIDENCE_VALUE) {
-			const imp: PursueImpossibleEffect = {
-				effectType: BotTurnEffectType.PursueImpossible,
+		if (gap < 1) {
+			const possible: PursuePossibleEffect = {
+				effectType: BotTurnEffectType.PursuePossible,
 			};
-			effects.push(imp);
+			effects.push(possible);
 		} else {
-			const knownValues = this.gatherEvidence(lead.leadCard.evidenceType, turn, bot.hand);
-			const pathCount = summingPathsTo(gap, knownValues);
-			if (pathCount > 0) {
-				const possible: PursuePossibleEffect = {
-					effectType: BotTurnEffectType.PursuePossible,
+			if (turn.board.impossibleCards.length + 1 > turn.board.caseFile.impossibleCount) {
+				const holmesEffect: HolmesProgressEffect = {
+					delta: HOLMES_MOVE_PURSUE,
+					effectType: BotTurnEffectType.HolmesProgress,
 				};
-				effects.push(possible);
+				effects.push(holmesEffect);
+			}
+			if (totalValue > MAX_POSSIBLE_EVIDENCE_VALUE) {
+				const imp: PursueImpossibleEffect = {
+					effectType: BotTurnEffectType.PursueImpossible,
+				};
+				effects.push(imp);
 			} else {
-				const impossibleValues: EvidenceValue[] = [];
-				this.gatherEvidenceFromImpossible(lead.leadCard.evidenceType, turn, impossibleValues);
-				impossibleValues.sort();
-				const allPaths = ALL_PATHS_TO[totalValue];
-				if (!Array.isArray(allPaths) || allPaths.length === 0) {
-					throw new Error(`Unable to figure out card paths to ${totalValue}!`);
-				}
-				const paths = allPaths.filter(p => impossibleValues.findIndex(i => p.includes(i)) < 0);
-				if (impossibleValues.length > 0 && paths.length === 0) {
-					const imp: PursueImpossibleEffect = {
-						effectType: BotTurnEffectType.PursueImpossible,
+				const knownValues = this.gatherEvidence(lead.leadCard.evidenceType, turn, bot.hand);
+				const pathCount = summingPathsTo(gap, knownValues);
+				if (pathCount > 0) {
+					const possible: PursuePossibleEffect = {
+						effectType: BotTurnEffectType.PursuePossible,
 					};
-					effects.push(imp);
+					effects.push(possible);
 				} else {
-					const maybe: PursueMaybeEffect = {
-						effectType: BotTurnEffectType.PursueMaybe,
-						pathCount: paths.length,
-					};
-					effects.push(maybe);
+					const impossibleValues: EvidenceValue[] = [];
+					this.gatherEvidenceFromImpossible(lead.leadCard.evidenceType, turn, impossibleValues);
+					impossibleValues.sort();
+					const allPaths = ALL_PATHS_TO[totalValue];
+					if (!Array.isArray(allPaths) || allPaths.length === 0) {
+						throw new Error(`Unable to figure out card paths to ${totalValue}!`);
+					}
+					const paths = allPaths.filter(p => impossibleValues.findIndex(i => p.includes(i)) < 0);
+					if (impossibleValues.length > 0 && paths.length === 0) {
+						const imp: PursueImpossibleEffect = {
+							effectType: BotTurnEffectType.PursueImpossible,
+						};
+						effects.push(imp);
+					} else {
+						const maybe: PursueMaybeEffect = {
+							effectType: BotTurnEffectType.PursueMaybe,
+							pathCount: paths.length,
+						};
+						effects.push(maybe);
+					}
 				}
 			}
 		}

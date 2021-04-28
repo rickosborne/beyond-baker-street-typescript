@@ -1,4 +1,5 @@
 import { Board } from "./Board";
+import { Logger, SILENT_LOGGER } from "./logger";
 import { ActivePlayer, isSamePlayer, OtherPlayer, Player } from "./Player";
 import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
 import { EvidenceCard } from "./EvidenceCard";
@@ -106,6 +107,7 @@ export class Game {
 	constructor(
 		public readonly caseFile: CaseFileCard,
 		players: ActivePlayer[],
+		private readonly logger: Logger = SILENT_LOGGER,
 	) {
 		this.board = new Board(caseFile);
 		this.players = players.map(p => new GamePlayer(p));
@@ -122,7 +124,7 @@ export class Game {
 				player.addCard(i, evidence, false);
 			}
 		}
-		console.log(`Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
+		this.logger(`Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
 	}
 
 	private applyAction(
@@ -169,7 +171,7 @@ export class Game {
 				.filter(index => index >= 0),
 			outcomeType: OutcomeType.Assist,
 		};
-		console.log(formatAssistOutcome(outcome));
+		this.logger(formatAssistOutcome(outcome));
 		return outcome;
 	}
 
@@ -190,7 +192,7 @@ export class Game {
 			outcomeType: OutcomeType.Confirm,
 			unconfirmedLeadTypes: LEAD_TYPES.filter(leadType => !this.board.isConfirmed(leadType)),
 		};
-		console.log(formatConfirmOutcome(outcome));
+		this.logger(formatConfirmOutcome(outcome));
 		return outcome;
 	}
 
@@ -220,7 +222,7 @@ export class Game {
 			investigationMarker,
 			outcomeType: OutcomeType.Eliminate,
 		};
-		console.log(formatEliminateOutcome(outcome));
+		this.logger(formatEliminateOutcome(outcome));
 		return outcome;
 	}
 
@@ -246,7 +248,7 @@ export class Game {
 				targetValue,
 				totalValue: badValue + targetValue,
 			};
-			console.log(formatBadInvestigateOutcome(outcome));
+			this.logger(formatBadInvestigateOutcome(outcome));
 			return outcome;
 		}
 		this.board.addEvidence(action.leadType, evidenceCard);
@@ -263,7 +265,7 @@ export class Game {
 				outcomeType: OutcomeType.DeadLead,
 				returnedEvidence,
 			};
-			console.log(formatDeadLeadInvestigateOutcome(outcome));
+			this.logger(formatDeadLeadInvestigateOutcome(outcome));
 			return outcome;
 		}
 		const outcome: GoodInvestigateOutcome = {
@@ -277,7 +279,7 @@ export class Game {
 			targetValue: this.board.targetForLead(action.leadType),
 			totalValue: this.board.calculateTotalFor(action.leadType),
 		};
-		console.log(formatGoodInvestigateOutcome(outcome));
+		this.logger(formatGoodInvestigateOutcome(outcome));
 		return outcome;
 	}
 
@@ -291,7 +293,7 @@ export class Game {
 			outcomeType: OutcomeType.Pursue,
 			returnedEvidence,
 		};
-		console.log(formatPursueOutcome(outcome));
+		this.logger(formatPursueOutcome(outcome));
 		return outcome;
 	}
 
@@ -348,4 +350,7 @@ export class Game {
 		this.applyAction(action, activePlayer);
 	}
 
+	public get turns(): number {
+		return this.turnCount;
+	}
 }

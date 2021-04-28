@@ -30,11 +30,11 @@ export interface ValueAssistTurnOption extends AssistTurnOption {
 }
 
 export interface KnownCardEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.KnownCard;
+	effectType: BotTurnEffectType.AssistKnown;
 }
 
 export interface NarrowCardEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.NarrowCard;
+	effectType: BotTurnEffectType.AssistNarrow;
 	remainingPossibilities: number;
 }
 
@@ -74,11 +74,11 @@ export class AssistStrategy implements BotTurnStrategy {
 					return undefined;
 				} else if (otherTypes.length === 1) {
 					return <KnownCardEffect>{
-						effectType: BotTurnEffectType.KnownCard,
+						effectType: BotTurnEffectType.AssistKnown,
 					};
 				} else {
 					return <NarrowCardEffect>{
-						effectType: BotTurnEffectType.NarrowCard,
+						effectType: BotTurnEffectType.AssistNarrow,
 						remainingPossibilities: otherTypes.length,
 					};
 				}

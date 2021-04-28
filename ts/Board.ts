@@ -62,6 +62,10 @@ class BoardLead implements VisibleLead {
 		return this.leadCards[0];
 	}
 
+	public get leadCount(): number {
+		return this.leadCards.length;
+	}
+
 	public removeAllEvidence(): EvidenceCard[] {
 		const allEvidence = this.good.toArray();
 		allEvidence.push(...this.bad.toArray());

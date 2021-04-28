@@ -11,6 +11,7 @@ export interface VisibleLead {
 	readonly evidenceCards: EvidenceCard[];
 	readonly evidenceValue: number;
 	readonly leadCard: LeadCard;
+	readonly leadCount: number;
 }
 
 export interface VisibleBoard {

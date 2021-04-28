@@ -3,6 +3,8 @@ import { TurnStart } from "./TurnStart";
 import { Bot } from "./Bot";
 
 export enum BotTurnEffectType {
+	AssistKnown = "AssistKnown",
+	AssistNarrow = "AssistNarrow",
 	Confirm = "Confirm",
 	EliminateKnownUnusedValue = "EliminateKnownUnusedValue",
 	EliminateKnownUsedValue = "EliminateKnownUsedValue",
@@ -12,9 +14,13 @@ export enum BotTurnEffectType {
 	EliminateWild = "EliminateWild",
 	HolmesImpeded = "HolmesImpeded",
 	HolmesProgress = "HolmesProgress",
-	KnownCard = "KnownCard",
+	InvestigateBad = "InvestigateBad",
+	InvestigateCorrectType = "InvestigateCorrectType",
+	InvestigateCorrectValue = "InvestigateCorrectValue",
+	InvestigateMaybeBad = "InvestigateMaybeBad",
+	InvestigatePerfect = "InvestigatePerfect",
+	InvestigateWild = "InvestigateWild",
 	Lose = "Lose",
-	NarrowCard = "NarrowCard",
 	PursueImpossible = "PursueImpossible",
 	PursueMaybe = "PursueMaybe",
 	PursuePossible = "PursuePossible",
@@ -40,5 +46,6 @@ export enum BotTurnStrategyType {
 	Assist = "Assist",
 	Confirm = "Confirm",
 	Eliminate = "Eliminate",
+	Investigate = "Investigate",
 	Pursue = "Pursue",
 }

@@ -14,3 +14,6 @@ ij_typescript_method_parameters_new_line_after_left_paren = true
 ij_typescript_method_parameters_right_paren_on_new_line = true
 ij_typescript_prefer_explicit_types_function_returns = true
 ij_typescript_prefer_explicit_types_function_expression_returns = true
+ij_typescript_import_sort_module_name = true
+ij_javascript_import_sort_members = true
+ij_javascript_import_sort_module_name = true
