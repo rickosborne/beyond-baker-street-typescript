@@ -2,3 +2,6 @@
 *.iml
 node_modules/
 dist/
+*.js.map
+*.js
+*.d.ts

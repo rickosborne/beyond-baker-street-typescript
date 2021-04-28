@@ -10,6 +10,7 @@ export enum BotTurnEffectType {
 	EliminateUnusedType = "EliminateUnusedType",
 	EliminateUsedType = "EliminateUsedType",
 	EliminateWild = "EliminateWild",
+	HolmesImpeded = "HolmesImpeded",
 	HolmesProgress = "HolmesProgress",
 	KnownCard = "KnownCard",
 	Lose = "Lose",

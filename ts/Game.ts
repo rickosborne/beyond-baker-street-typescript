@@ -94,6 +94,7 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 export const HOLMES_GOAL = 0;
 export const INVESTIGATION_MARKER_GOAL = 20;
 export const HOLMES_MOVE_ASSIST = -1;
+export const HOLMES_MOVE_PURSUE = -1;
 export const HOLMES_MOVE_CONFIRM = 1;
 
 export class Game {

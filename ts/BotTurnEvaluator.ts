@@ -24,10 +24,14 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 		[BotTurnEffectType.EliminateUnusedType]: -10,
 		[BotTurnEffectType.EliminateUsedType]: -20,
 		[BotTurnEffectType.EliminateWild]: -50,
-		[BotTurnEffectType.HolmesProgress]: 0,
+		[BotTurnEffectType.HolmesImpeded]: 10,
+		[BotTurnEffectType.HolmesProgress]: -10,
 		[BotTurnEffectType.KnownCard]: 5,
 		[BotTurnEffectType.Lose]: -1000,
 		[BotTurnEffectType.NarrowCard]: 1,
+		[BotTurnEffectType.PursueImpossible]: 50,
+		[BotTurnEffectType.PursueMaybe]: -25,
+		[BotTurnEffectType.PursuePossible]: -60,
 		[BotTurnEffectType.Win]: 1000,
 	};
 	private readonly scoreFromType: Record<BotTurnEffectType, number>;
