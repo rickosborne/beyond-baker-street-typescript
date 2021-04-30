@@ -4,20 +4,30 @@
 import { EvidenceValue } from "./EvidenceValue";
 import { range } from "./range";
 
-export function summingPathsTo(target: number, values: number[]): number {
-	let pathCount = 0;
-	for (const value of values) {
-		if (target === value) {
-			pathCount++;
-		} else if (value < target) {
-			const remain = values.filter(v => v !== value);
-			if (remain.length > 0) {
-				pathCount += summingPathsTo(target - value, remain);
+export const summingPathsTo: (target: number, values: number[]) => number = (function summingPathsToFactory () {
+	const cache: Record<string, number> = {};
+	return function summingPathsTo(target: number, values: number[]): number {
+		const sortedValues = values.slice().sort();
+		const cacheKey = `${target}:${sortedValues.join(",")}`;
+		const existing = cache[cacheKey];
+		if (existing !== undefined) {
+			return existing;
+		}
+		let pathCount = 0;
+		for (const value of sortedValues) {
+			if (target === value) {
+				pathCount++;
+			} else if (value < target) {
+				const remain = sortedValues.filter(v => v !== value);
+				if (remain.length > 0) {
+					pathCount += summingPathsTo(target - value, remain);
+				}
 			}
 		}
-	}
-	return pathCount;
-}
+		cache[cacheKey] = pathCount;
+		return pathCount;
+	};
+})();
 
 export const EVIDENCE_CARD_VALUES: EvidenceValue[] = range(1, 6);
 export const MAX_POSSIBLE_EVIDENCE_VALUE: EvidenceValue = EVIDENCE_CARD_VALUES.reduce((p, c) => p + c, 0);

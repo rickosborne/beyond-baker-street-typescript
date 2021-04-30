@@ -105,9 +105,10 @@ export class AssistStrategy implements BotTurnStrategy {
 		const { evidenceCard, unknownCard } = otherCardKnowledge;
 		const { evidenceType, evidenceValue } = evidenceCard;
 		const otherPossibleBefore = otherCards.reduce((prev, cur) => prev + cur.unknownCard.possibleCount, 0);
-		const possibleBefore = unknownCard.possibleCount + otherPossibleBefore;
-		const knowsValue = unknownCard.possibleValues.length === 1;
-		const knowsType = unknownCard.possibleTypes.length === 1;
+		const { possibleCount, possibleTypes, possibleValues } = unknownCard;
+		const possibleBefore = possibleCount + otherPossibleBefore;
+		const knowsValue = possibleValues.length === 1;
+		const knowsType = possibleTypes.length === 1;
 		const { holmesLocation, investigationMarker } = turn.board;
 		const investigateGap = INVESTIGATION_MARKER_GOAL - investigationMarker;
 		if (knowsType && knowsValue) {
@@ -142,7 +143,7 @@ export class AssistStrategy implements BotTurnStrategy {
 					effectType: BotTurnEffectType.AssistNarrow,
 					possibleAfter,
 					possibleBefore,
-					remainingPossibilities: unknownCard.possibleValues.length,
+					remainingPossibilities: possibleValues.length,
 				});
 			}
 			const assistType: TypeAssistTurnOption = {
@@ -180,7 +181,7 @@ export class AssistStrategy implements BotTurnStrategy {
 					effectType: BotTurnEffectType.AssistNarrow,
 					possibleAfter,
 					possibleBefore,
-					remainingPossibilities: unknownCard.possibleTypes.length,
+					remainingPossibilities: possibleTypes.length,
 				});
 			}
 			const assistValue: ValueAssistTurnOption = {

@@ -1,12 +1,14 @@
 export interface Logger {
-	info(message: string): void;
+	info(messageBuilder: () => string): void;
 	json(data: unknown): void;
-	trace(message: string): void;
+	trace(messageBuilder: () => string): void;
 }
 
-export const CONSOLE_LOGGER: Logger = Object.assign({
-	json: (data: unknown) => console.log(data),
-}, console);
+export const CONSOLE_LOGGER: Logger = {
+	info: (messageBuilder: () => string) => console.info(messageBuilder()),
+	json: (data: unknown) => console.log(JSON.stringify(data)),
+	trace: (messageBuilder: () => string) => console.trace(messageBuilder()),
+};
 export const SILENT_LOGGER: Logger = {
 	info: () => void (0),
 	json: () => void (0),
@@ -28,9 +30,10 @@ export type CachingLogger = Logger & {
 	readonly messages: LogWithLevel[];
 };
 
+// noinspection JSUnusedGlobalSymbols
 export function cachingLoggerFactory(): CachingLogger {
 	const messages: LogWithLevel[] = [];
-	const log = (level: LogLevel) => (message: string) => messages.push({ level, message });
+	const log = (level: LogLevel) => (messageBuilder: () => string) => messages.push({ level, message: messageBuilder() });
 	return {
 		info: log(LogLevel.info),
 		json: log(LogLevel.json),

@@ -8,10 +8,15 @@ export interface PseudoRNG {
 	state(): seedrandom.State;
 }
 
+type SeedRandom = (seed?: string, options?: seedrandom.Options, callback?: seedrandom.Callback) => PseudoRNG;
+type SeedRandomModule = {
+	default: SeedRandom;
+}
+
 export function buildRNG(
 	seed?: string,
 	options?: seedrandom.Options,
 	callback?: seedrandom.Callback
 ): PseudoRNG {
-	return seedrandom(seed, options, callback);
+	return (seedrandom as unknown as SeedRandomModule).default(seed, options, callback);
 }

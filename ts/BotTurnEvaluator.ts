@@ -102,15 +102,27 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 		return effects.map(e => this.scoreEffect(e, turnStart)).reduce((p, c) => p + c, 0);
 	}
 
-	public selectOption(options: BotTurnOption[], bot: Bot, turnStart: TurnStart): BotTurnOption {
-		const scored: ScoredOption[] = options
+	public scoreOptions(options: BotTurnOption[], turnStart: TurnStart): ScoredOption[] {
+		return options
 			.map(option => ({
 				option,
 				score: this.scoreEffects(option.effects, turnStart),
-			}))
-			.sort((a, b) => b.score - a.score);
-		this.logger.trace(`${bot.formatKnowledge(turnStart)}  Options:\n${this.formatScoredOptions(scored, bot, turnStart)}`);
-		return scored[0].option;
+			}));
+	}
+
+	public selectBestOption(scored: ScoredOption[], bot: Bot, turnStart: TurnStart): BotTurnOption {
+		if (this.logger === SILENT_LOGGER) {
+			return scored.reduce((prev, cur) => prev == null || prev.score < cur.score ? cur : prev, undefined as ScoredOption | undefined)?.option as BotTurnOption;
+		} else {
+			scored.sort((a, b) => b.score - a.score);
+			this.logger.trace(() => `${bot.formatKnowledge(turnStart)}  Options:\n${this.formatScoredOptions(scored, bot, turnStart)}`);
+			return scored[0].option;
+		}
+	}
+
+	public selectOption(options: BotTurnOption[], bot: Bot, turnStart: TurnStart): BotTurnOption {
+		const scored: ScoredOption[] = this.scoreOptions(options, turnStart);
+		return this.selectBestOption(scored, bot, turnStart);
 	}
 }
 

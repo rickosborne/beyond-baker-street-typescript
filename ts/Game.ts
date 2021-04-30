@@ -155,7 +155,7 @@ export class Game {
 				player.addCard(i, evidence, false, false);
 			}
 		}
-		this.logger.info(`Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
+		this.logger.info(() => `Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
 		const gameStart: GameStart = {
 			playerNames: this.players.map(p => p.name),
 			state: GameState.Playing,
@@ -193,7 +193,7 @@ export class Game {
 				turnCount: this.turnCount,
 			};
 			this.logger.json(gameEnd);
-			this.logger.info(state);
+			this.logger.info(() => state);
 		}
 		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
 			const evidence = this.board.dealEvidence();
@@ -226,7 +226,7 @@ export class Game {
 				.filter(index => index >= 0),
 			outcomeType: OutcomeType.Assist,
 		};
-		this.logger.info(formatAssistOutcome(outcome));
+		this.logger.info(() => formatAssistOutcome(outcome));
 		return outcome;
 	}
 
@@ -247,7 +247,7 @@ export class Game {
 			outcomeType: OutcomeType.Confirm,
 			unconfirmedLeadTypes: LEAD_TYPES.filter(leadType => !this.board.isConfirmed(leadType)),
 		};
-		this.logger.info(formatConfirmOutcome(outcome));
+		this.logger.info(() => formatConfirmOutcome(outcome));
 		return outcome;
 	}
 
@@ -277,7 +277,7 @@ export class Game {
 			investigationMarker,
 			outcomeType: OutcomeType.Eliminate,
 		};
-		this.logger.info(formatEliminateOutcome(outcome, this.board));
+		this.logger.info(() => formatEliminateOutcome(outcome, this.board));
 		return outcome;
 	}
 
@@ -303,7 +303,7 @@ export class Game {
 				targetValue,
 				totalValue: badValue + targetValue,
 			};
-			this.logger.info(formatBadInvestigateOutcome(outcome));
+			this.logger.info(() => formatBadInvestigateOutcome(outcome));
 			return outcome;
 		}
 		this.board.addEvidence(action.leadType, evidenceCard);
@@ -320,7 +320,7 @@ export class Game {
 				outcomeType: OutcomeType.DeadLead,
 				returnedEvidence,
 			};
-			this.logger.info(formatDeadLeadInvestigateOutcome(outcome));
+			this.logger.info(() => formatDeadLeadInvestigateOutcome(outcome));
 			return outcome;
 		}
 		const outcome: GoodInvestigateOutcome = {
@@ -334,7 +334,7 @@ export class Game {
 			targetValue: this.board.targetForLead(action.leadType),
 			totalValue: this.board.calculateTotalFor(action.leadType),
 		};
-		this.logger.info(formatGoodInvestigateOutcome(outcome));
+		this.logger.info(() => formatGoodInvestigateOutcome(outcome));
 		return outcome;
 	}
 
@@ -348,7 +348,7 @@ export class Game {
 			outcomeType: OutcomeType.Pursue,
 			returnedEvidence,
 		};
-		this.logger.info(formatPursueOutcome(outcome, this.board));
+		this.logger.info(() => formatPursueOutcome(outcome, this.board));
 		return outcome;
 	}
 
@@ -403,7 +403,7 @@ export class Game {
 			otherPlayers: this.players.filter(p => !isSamePlayer(p, activePlayer)),
 			player: activePlayer,
 		};
-		this.logger.trace(`\n${this.turnCount}: ${formatLeadsProgress(this.board)}\n`);
+		this.logger.trace(() => `\n${this.turnCount}: ${formatLeadsProgress(this.board)}\n`);
 		const action = activePlayer.takeTurn(turnStart);
 		this.applyAction(action, activePlayer);
 	}

@@ -5,3 +5,4 @@ dist/
 *.js.map
 *.js
 *.d.ts
+*.log

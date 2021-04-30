@@ -71,7 +71,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	public addCard(index: number, evidenceCard: EvidenceCard | undefined, fromRemainingEvidence: boolean): void {
 		const mysteryCard = evidenceCard != null ? MysteryCard.fromEvidenceCard(evidenceCard) : fromRemainingEvidence ? this.remainingEvidence.toMysteryCard() : new MysteryCard();
 		this.hand.splice(index, 0, mysteryCard);
-		this.logger.trace(`${this.name} took a card.  ${this.formatKnowledge(undefined)}`);
+		this.logger.trace(() => `${this.name} took a card.  ${this.formatKnowledge(undefined)}`);
 	}
 
 	private assessGameState(turnStart: TurnStart): void {
@@ -237,7 +237,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		} else {
 			throw new Error(`Unknown Assist type: ${action}`);
 		}
-		this.logger.trace(`${this.name} saw ${sawWhat} at ${this.formatHandIndexes(handIndexes)}. ${this.formatKnowledge(undefined)}`);
+		this.logger.trace(() => `${this.name} saw ${sawWhat} at ${this.formatHandIndexes(handIndexes)}. ${this.formatKnowledge(undefined)}`);
 	}
 
 	private wasTypeAssisted(action: TypeAssistAction, handIndexes: number[]): void {

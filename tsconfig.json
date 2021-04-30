@@ -7,16 +7,24 @@
 		"checkJs": false,
 		"declaration": true,
 		"downlevelIteration": true,
+		"esModuleInterop": false,
+		"isolatedModules": true,
 		"lib": [
 			"dom",
 			"ESNext"
 		],
-		"module": "CommonJS",
-		"moduleResolution": "Node",
+		"module": "ESNext",
+		"noEmitHelpers": true,
 		"noFallthroughCasesInSwitch": true,
 		"noImplicitAny": true,
 		"noImplicitReturns": true,
 		"noImplicitThis": true,
+		"plugins": [
+			{
+				"transform": "@zoltu/typescript-transformer-append-js-extension/output/index.js",
+				"after": true,
+			}
+		],
 		"pretty": true,
 		"sourceMap": true,
 		"strict": true,
@@ -24,9 +32,10 @@
 		"strictFunctionTypes": true,
 		"strictNullChecks": true,
 		"strictPropertyInitialization": true,
-		"target": "ES6"
+		"target": "ESNext"
 	},
 	"include": [
+		"index.ts",
 		"ts/**/*.ts"
 	]
 }
