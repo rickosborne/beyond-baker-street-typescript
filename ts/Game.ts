@@ -113,8 +113,13 @@ export const HOLMES_MOVE_IMPOSSIBLE = -1;
 export const HOLMES_MOVE_CONFIRM = 1;
 
 export interface GameStart {
-	game: "start";
 	playerNames: string[];
+	state: GameState.Playing;
+}
+
+export interface GameEnd {
+	state: GameState;
+	turnCount: number;
 }
 
 export interface TurnOutcome {
@@ -152,8 +157,8 @@ export class Game {
 		}
 		this.logger.info(`Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
 		const gameStart: GameStart = {
-			game: "start",
 			playerNames: this.players.map(p => p.name),
+			state: GameState.Playing,
 		};
 		this.logger.json(gameStart);
 	}
@@ -183,6 +188,11 @@ export class Game {
 		});
 		const state = this.state;
 		if (state !== GameState.Playing) {
+			const gameEnd: GameEnd = {
+				state,
+				turnCount: this.turnCount,
+			};
+			this.logger.json(gameEnd);
 			this.logger.info(state);
 		}
 		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {

@@ -13,5 +13,5 @@ export function buildRNG(
 	options?: seedrandom.Options,
 	callback?: seedrandom.Callback
 ): PseudoRNG {
-	return seedrandom();
+	return seedrandom(seed, options, callback);
 }

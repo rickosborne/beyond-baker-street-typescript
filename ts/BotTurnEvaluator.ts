@@ -22,48 +22,49 @@ interface ScoredOption {
 
 const HOLMES_MAX = 20;
 
+const DEFAULT_SCORE_FROM_TYPE: Record<BotTurnEffectType, number> = {
+	[BotTurnEffectType.Win]: 1000,
+	[BotTurnEffectType.InvestigatePerfect]: 100,
+	[BotTurnEffectType.PursueImpossible]: 50,
+	[BotTurnEffectType.AssistExactEliminate]: 40,
+	[BotTurnEffectType.PursueDuplicate]: 35,
+	[BotTurnEffectType.EliminateKnownUnusedValue]: 30,
+	[BotTurnEffectType.EliminateUnusedType]: 25,
+	[BotTurnEffectType.AssistKnown]: 20,
+	[BotTurnEffectType.InvestigateCorrectType]: 12,
+	[BotTurnEffectType.EliminateSetsUpExact]: 10,
+	[BotTurnEffectType.Confirm]: 8,
+	[BotTurnEffectType.HolmesImpeded]: 8,
+	[BotTurnEffectType.AssistImpossibleType]: 5,
+	[BotTurnEffectType.AssistNarrow]: 3,
+	[BotTurnEffectType.AssistNextPlayer]: 1,
+
+	[BotTurnEffectType.InvestigateCorrectValue]: 0,
+
+	[BotTurnEffectType.ImpossibleAdded]: -1,
+	[BotTurnEffectType.EliminateUnknownValue]: -5,
+	[BotTurnEffectType.HolmesProgress]: -8,
+	[BotTurnEffectType.InvestigateMaybeBad]: -10,
+	[BotTurnEffectType.InvestigateWild]: -12,
+	[BotTurnEffectType.InvestigateBad]: -15,
+	[BotTurnEffectType.EliminateUsedType]: -20,
+	[BotTurnEffectType.PursueMaybe]: -25,
+	[BotTurnEffectType.EliminateKnownUsedValue]: -30,
+	[BotTurnEffectType.EliminateStompsExact]: -40,
+	[BotTurnEffectType.EliminateWild]: -50,
+	[BotTurnEffectType.MaybeLose]: -60,
+	[BotTurnEffectType.PursuePossible]: -100,
+	[BotTurnEffectType.Lose]: -1000,
+};
+
 export class BasicBotTurnEvaluator implements BotTurnEvaluator {
-	public static readonly DEFAULT_SCORE_FROM_TYPE: Record<BotTurnEffectType, number> = {
-		[BotTurnEffectType.Win]: 1000,
-		[BotTurnEffectType.InvestigatePerfect]: 100,
-		[BotTurnEffectType.PursueImpossible]: 50,
-		[BotTurnEffectType.AssistExactEliminate]: 40,
-		[BotTurnEffectType.PursueDuplicate]: 35,
-		[BotTurnEffectType.EliminateKnownUnusedValue]: 30,
-		[BotTurnEffectType.EliminateUnusedType]: 25,
-		[BotTurnEffectType.AssistKnown]: 20,
-		[BotTurnEffectType.InvestigateCorrectType]: 12,
-		[BotTurnEffectType.EliminateSetsUpExact]: 10,
-		[BotTurnEffectType.Confirm]: 8,
-		[BotTurnEffectType.HolmesImpeded]: 8,
-		[BotTurnEffectType.AssistImpossibleType]: 5,
-		[BotTurnEffectType.AssistNarrow]: 3,
-		[BotTurnEffectType.AssistNextPlayer]: 1,
-
-		[BotTurnEffectType.InvestigateCorrectValue]: 0,
-
-		[BotTurnEffectType.ImpossibleAdded]: -1,
-		[BotTurnEffectType.EliminateUnknownValue]: -5,
-		[BotTurnEffectType.HolmesProgress]: -8,
-		[BotTurnEffectType.InvestigateMaybeBad]: -10,
-		[BotTurnEffectType.InvestigateWild]: -12,
-		[BotTurnEffectType.InvestigateBad]: -15,
-		[BotTurnEffectType.EliminateUsedType]: -20,
-		[BotTurnEffectType.PursueMaybe]: -25,
-		[BotTurnEffectType.EliminateKnownUsedValue]: -30,
-		[BotTurnEffectType.EliminateStompsExact]: -40,
-		[BotTurnEffectType.EliminateWild]: -50,
-		[BotTurnEffectType.MaybeLose]: -60,
-		[BotTurnEffectType.PursuePossible]: -100,
-		[BotTurnEffectType.Lose]: -1000,
-	};
 	private readonly scoreFromType: Record<BotTurnEffectType, number>;
 
 	constructor(
 		scoreFromTypeOverrides: Partial<Record<BotTurnEffectType, number>> = {},
 		private readonly logger: Logger = SILENT_LOGGER,
 	) {
-		this.scoreFromType = Object.assign({}, BasicBotTurnEvaluator.DEFAULT_SCORE_FROM_TYPE, scoreFromTypeOverrides);
+		this.scoreFromType = Object.assign({}, DEFAULT_SCORE_FROM_TYPE, scoreFromTypeOverrides);
 	}
 
 	public formatScoredOptions(scored: ScoredOption[], bot: Bot, turnStart: TurnStart): string {
@@ -87,7 +88,7 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 		} else if (effect.effectType === BotTurnEffectType.EliminateKnownUnusedValue) {
 			const evidenceValue = (effect as EliminateKnownUnusedValueEffect).evidenceValue;
 			return score * ((EVIDENCE_CARD_VALUE_MAX + evidenceValue) / (EVIDENCE_CARD_VALUE_MAX * 2));
-		} else if(isAssisted(effect)) {
+		} else if (isAssisted(effect)) {
 			// Drag decreases with the amount of information revealed.
 			return score - (Math.abs(score) * (1 - assistRatio(effect)));
 		} else if (effect.effectType === BotTurnEffectType.PursueDuplicate) {
@@ -123,4 +124,5 @@ export class RandomBotTurnEvaluator implements BotTurnEvaluator {
 	}
 }
 
+// noinspection JSUnusedGlobalSymbols
 export const DEFAULT_BOT_TURN_EVALUATOR: BotTurnEvaluator = new BasicBotTurnEvaluator();
