@@ -19,10 +19,11 @@
 		"noImplicitAny": true,
 		"noImplicitReturns": true,
 		"noImplicitThis": true,
+		"outDir": "js",
 		"plugins": [
 			{
-				"transform": "@zoltu/typescript-transformer-append-js-extension/output/index.js",
 				"after": true,
+				"transform": "@zoltu/typescript-transformer-append-js-extension/output/index.js"
 			}
 		],
 		"pretty": true,

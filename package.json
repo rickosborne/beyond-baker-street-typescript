@@ -25,12 +25,13 @@
 	"main": "index.js",
 	"name": "beyond-baker-street-typescript",
 	"scripts": {
-		"clean": "rm -R ./node_modules || true",
+		"clean": "rm -R ./node_modules *.log */*.js */*.d.ts */*.js.map || true",
 		"compile": "ttsc -p tsconfig.json",
 		"lint": "eslint . --fix --ext .ts,.json",
+		"precompile": "rm -R ./js || true",
 		"prereinstall": "npm run clean",
 		"reinstall": "npm install",
-		"start": "ts-node index.ts",
+		"start": "node js/index.js",
 		"test": "mocha --config .mocharc.json ts/*.spec.ts"
 	},
 	"type": "module",

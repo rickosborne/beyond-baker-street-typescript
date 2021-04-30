@@ -1,7 +1,7 @@
 .idea/
 *.iml
 node_modules/
-dist/
+js/
 *.js.map
 *.js
 *.d.ts
