@@ -6,6 +6,7 @@ import { formatLeadCard, LeadCard } from "./LeadCard";
 import { Outcome, OutcomeType } from "./Outcome";
 import { TurnStart } from "./TurnStart";
 import { Player } from "./Player";
+import { VisibleBoard } from "./VisibleBoard";
 
 export interface PursueAction extends Action {
 	actionType: ActionType.Pursue;
@@ -32,9 +33,9 @@ export function isPursueOutcome(maybe: unknown): maybe is PursueOutcome {
 }
 
 export function formatPursue(action: PursueAction, turnStart: TurnStart): string {
-	return `${turnStart.player.name} pursues ${formatLeadCard(turnStart.board.leads[action.leadType].leadCard)}.  Impossible count is ${turnStart.board.impossibleCards.length}.`;
+	return `${turnStart.player.name} pursues ${formatLeadCard(turnStart.board.leads[action.leadType].leadCard)}.  Impossible count is ${turnStart.board.impossibleCards.length}/${turnStart.board.caseFile.impossibleCount}.`;
 }
 
-export function formatPursueOutcome(outcome: PursueOutcome): string {
-	return `${outcome.activePlayer.name} pursued ${outcome.action.leadType}.  ${outcome.returnedEvidence.length} evidence were returned.  ${outcome.impossibleCount} impossible have been found.  ${outcome.nextLead == null ? `No leads remain!` : `Next lead is ${formatLeadCard(outcome.nextLead)}.`}`;
+export function formatPursueOutcome(outcome: PursueOutcome, board: VisibleBoard): string {
+	return `${outcome.activePlayer.name} pursued ${outcome.action.leadType}.  ${outcome.returnedEvidence.length} evidence were returned.  ${outcome.impossibleCount}/${board.caseFile.impossibleCount} impossible have been found.  ${outcome.nextLead == null ? `No leads remain!` : `Next lead is ${formatLeadCard(outcome.nextLead)}.`}`;
 }

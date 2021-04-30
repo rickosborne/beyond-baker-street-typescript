@@ -1,4 +1,4 @@
-import { LeadType } from "./LeadType";
+import { LEAD_TYPES, LeadType } from "./LeadType";
 import { EvidenceCard } from "./EvidenceCard";
 import { LeadCard } from "./LeadCard";
 import { CaseFileCard } from "./CaseFileCard";
@@ -21,4 +21,20 @@ export interface VisibleBoard {
 	readonly investigationMarker: number;
 	readonly leads: Record<LeadType, VisibleLead>;
 	readonly remainingEvidenceCount: number;
+}
+
+export function formatLeadProgress(lead: VisibleLead): string {
+	return `${lead.leadCard.leadType}-${lead.confirmed ? "confirmed" : `${lead.leadCard.evidenceType}-${lead.evidenceValue}/${lead.leadCard.evidenceTarget}${lead.badValue > 0 ? `+${lead.badValue}` : ""}`}`;
+}
+
+export function formatLeadsProgress(board: VisibleBoard): string {
+	return `Leads progress: ${LEAD_TYPES.map(leadType => formatLeadProgress(board.leads[leadType])).join(", ")}`;
+}
+
+export function leadIsFinished(lead: VisibleLead): boolean {
+	return lead.evidenceValue === (lead.leadCard.evidenceTarget + lead.badValue);
+}
+
+export function leadIsUnfinished(lead: VisibleLead): boolean {
+	return !(lead.confirmed || leadIsFinished(lead));
 }

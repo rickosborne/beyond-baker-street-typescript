@@ -13,7 +13,7 @@ export interface OtherPlayer extends Player {
 }
 
 export interface ActivePlayer extends Player {
-	addCard(index: number, evidenceCard: EvidenceCard | undefined): void;
+	addCard(index: number, evidenceCard: EvidenceCard | undefined, fromRemainingEvidence: boolean): void;
 	readonly otherHand: OtherHand;
 	removeCardAt(index: number): void;
 	sawOutcome(outcome: Outcome): void;

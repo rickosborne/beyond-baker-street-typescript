@@ -1,13 +1,15 @@
-import { Pile } from "./Pile";
-import { LeadCard, randomLeadCards } from "./LeadCard";
 import { CaseFileCard } from "./CaseFileCard";
 import { EVIDENCE_CARDS, EvidenceCard } from "./EvidenceCard";
-import { LEAD_TYPES, LeadType } from "./LeadType";
-import { EvidenceValue } from "./EvidenceValue";
 import { EvidenceType } from "./EvidenceType";
-import { VisibleBoard, VisibleLead } from "./VisibleBoard";
-import { toRecord } from "./toRecord";
+import { EvidenceValue } from "./EvidenceValue";
+import { HOLMES_MOVE_IMPOSSIBLE } from "./Game";
 import { ImpossibleCard } from "./Impossible";
+import { LeadCard, randomLeadCards } from "./LeadCard";
+import { LEAD_TYPES, LeadType } from "./LeadType";
+import { Pile } from "./Pile";
+import { PseudoRNG } from "./rng";
+import { toRecord } from "./toRecord";
+import { VisibleBoard, VisibleLead } from "./VisibleBoard";
 
 export const LEAD_PILE_START_COUNT = 3;
 
@@ -18,7 +20,8 @@ class BoardLead implements VisibleLead {
 
 	constructor(
 		public readonly leadType: LeadType,
-		private readonly leadCards: LeadCard[] = randomLeadCards(leadType),
+		private readonly prng: PseudoRNG,
+		private readonly leadCards: LeadCard[] = randomLeadCards(leadType, prng),
 	) {
 	}
 
@@ -88,10 +91,11 @@ export class Board implements VisibleBoard {
 
 	constructor(
 		public readonly caseFile: CaseFileCard,
+		private readonly prng: PseudoRNG,
 	) {
 		this.holmesValue = caseFile.holmesStart;
 		this.investigationValue = 0;
-		this.leads = toRecord(LEAD_TYPES, lt => lt, leadType => new BoardLead(leadType));
+		this.leads = toRecord(LEAD_TYPES, lt => lt, leadType => new BoardLead(leadType, prng));
 		this.init();
 	}
 
@@ -105,6 +109,9 @@ export class Board implements VisibleBoard {
 
 	public addImpossible(card: ImpossibleCard): void {
 		this.impossible.addToTop(card);
+		if (this.impossible.count > this.caseFile.impossibleCount) {
+			this.moveHolmes(HOLMES_MOVE_IMPOSSIBLE);
+		}
 	}
 
 	public get allConfirmed(): boolean {
@@ -161,7 +168,7 @@ export class Board implements VisibleBoard {
 		for (const evidenceCard of EVIDENCE_CARDS) {
 			this.remainingEvidence.addToTop(evidenceCard);
 		}
-		this.remainingEvidence.shuffle();
+		this.remainingEvidence.shuffle(this.prng);
 	}
 
 	public get investigationMarker(): number {
@@ -201,10 +208,21 @@ export class Board implements VisibleBoard {
 		for (const evidenceCard of evidence) {
 			this.remainingEvidence.addToBottom(evidenceCard);
 		}
-		this.remainingEvidence.shuffle();
+		this.remainingEvidence.shuffle(this.prng);
 	}
 
 	public targetForLead(leadType: LeadType): EvidenceValue {
 		return this.leadFor(leadType).evidenceTarget;
+	}
+
+	// noinspection JSUnusedGlobalSymbols
+	public toJSON(): Record<string, unknown> {
+		return {
+			holmesValue: this.holmesValue,
+			impossible: this.impossible,
+			investigationValue: this.investigationValue,
+			leads: this.leads,
+			remainingEvidence: this.remainingEvidence,
+		};
 	}
 }

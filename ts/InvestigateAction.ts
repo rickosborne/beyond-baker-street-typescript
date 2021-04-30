@@ -3,6 +3,7 @@ import { ActionType } from "./ActionType";
 import { isLeadType, LeadType } from "./LeadType";
 import { EvidenceCard, formatEvidence } from "./EvidenceCard";
 import { formatLeadCard, LeadCard } from "./LeadCard";
+import { formatMysteryCard, MysteryCard } from "./MysteryCard";
 import { Outcome, OutcomeType } from "./Outcome";
 import { Player } from "./Player";
 import { TurnStart } from "./TurnStart";
@@ -85,8 +86,8 @@ export function isBadInvestigateOutcome(maybe: unknown): maybe is BadInvestigate
 	return (o != null) && (o.outcomeType === OutcomeType.BadInvestigate);
 }
 
-export function formatInvestigate(investigate: InvestigateAction, turnStart: TurnStart): string {
-	return `${turnStart.player.name} investigates ${formatLeadCard(turnStart.board.leads[investigate.leadType].leadCard)}.`;
+export function formatInvestigate(investigate: InvestigateAction, card: MysteryCard | undefined, turnStart: TurnStart): string {
+	return `${turnStart.player.name} investigates ${formatLeadCard(turnStart.board.leads[investigate.leadType].leadCard)} with ${card == null ? "unknown card" : formatMysteryCard(card)}.`;
 }
 
 export function formatBadInvestigateOutcome(outcome: BadInvestigateOutcome): string {

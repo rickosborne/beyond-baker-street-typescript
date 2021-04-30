@@ -7,3 +7,10 @@ export function unique<T>(items: T[]): T[] {
 	}
 	return u;
 }
+
+export function uniqueReducer<T>(prev: T[], cur: T): T[] {
+	if (!prev.includes(cur)) {
+		prev.push(cur);
+	}
+	return prev;
+}

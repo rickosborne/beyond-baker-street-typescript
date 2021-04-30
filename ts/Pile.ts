@@ -1,3 +1,5 @@
+import { PseudoRNG } from "./rng";
+
 export class Pile<C> {
 	protected readonly cards: C[] = [];
 
@@ -32,9 +34,9 @@ export class Pile<C> {
 		return this.cards.length === 0;
 	}
 
-	public shuffle(): void {
+	public shuffle(prng: PseudoRNG): void {
 		for (let i = 0; i < this.cards.length; i++) {
-			const j = Math.floor(Math.random() * this.cards.length);
+			const j = Math.floor(prng() * this.cards.length);
 			const c = this.cards[i];
 			this.cards[i] = this.cards[j];
 			this.cards[j] = c;
@@ -59,6 +61,13 @@ export class Pile<C> {
 
 	public toArray(): C[] {
 		return this.cards.slice();
+	}
+
+	// noinspection JSUnusedGlobalSymbols
+	public toJSON(): Record<string, unknown> {
+		return {
+			cardCount: this.cards.length,
+		};
 	}
 
 	public get topCard(): C | undefined {

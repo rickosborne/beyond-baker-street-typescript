@@ -6,6 +6,7 @@ import { removeIf } from "./removeIf";
 import { Pile } from "./Pile";
 
 export interface UnknownCard {
+	possibleCount: number;
 	possibleTypes: EvidenceType[];
 	possibleValues: EvidenceValue[];
 }
@@ -27,6 +28,11 @@ export class MysteryCard implements UnknownCard {
 				});
 			}
 		}
+	}
+
+	private addPossible(...evidenceCards: EvidenceCard[]): void {
+		evidenceCards.filter(card => this.possible.findIndex(p => isSameEvidenceCard(card, p)) < 0)
+			.forEach(card => this.possible.push(card));
 	}
 
 	public asArray(): EvidenceCard[] {
@@ -70,6 +76,10 @@ export class MysteryCard implements UnknownCard {
 		return this.possible.length === 1;
 	}
 
+	public get possibleCount(): number {
+		return this.possible.length;
+	}
+
 	public get possibleTypes(): EvidenceType[] {
 		const types: EvidenceType[] = [];
 		for (const evidenceCard of this.possible) {
@@ -90,12 +100,33 @@ export class MysteryCard implements UnknownCard {
 		return values;
 	}
 
+	public probabilityOf(predicate: (evidenceCard: EvidenceCard) => boolean): number {
+		return this.possible.filter(predicate).length / this.possible.length;
+	}
+
 	public setType(evidenceType: EvidenceType): void {
 		removeIf(this.possible, card => card.evidenceType !== evidenceType);
 	}
 
 	public setValue(value: EvidenceValue): void {
 		removeIf(this.possible, card => card.evidenceValue !== value);
+	}
+
+	// noinspection JSUnusedGlobalSymbols
+	public toJSON(): Record<string, unknown> {
+		return {
+			possibleCount: this.possibleCount,
+		};
+	}
+
+	public static fromEvidenceCard(evidenceCard: EvidenceCard): MysteryCard {
+		return new MysteryCard([evidenceCard.evidenceType], [evidenceCard.evidenceValue]);
+	}
+
+	public static fromEvidenceCards(cards: EvidenceCard[]): MysteryCard {
+		const mysteryCard = new MysteryCard([], []);
+		mysteryCard.addPossible(...cards);
+		return mysteryCard;
 	}
 }
 
@@ -115,4 +146,32 @@ export class MysteryPile extends Pile<EvidenceCard> {
 			removeIf(this.cards, c => isSameEvidenceCard(evidenceCard, c));
 		}
 	}
+
+	public toMysteryCard(): MysteryCard {
+		return MysteryCard.fromEvidenceCards(this.cards);
+	}
+}
+
+export function formatMysteryCard(mysteryCard: MysteryCard): string {
+	function formatPart<T>(possible: T[], all: T[]): string {
+		if (possible.length === all.length) {
+			return "*";
+		} else if (possible.length === all.length - 1) {
+			return  "!" + all.filter(t => !possible.includes(t)).join();
+		} else {
+			return possible.join("|");
+		}
+	}
+	return `${formatPart(mysteryCard.possibleTypes, EVIDENCE_TYPES)}-${formatPart(mysteryCard.possibleValues, EVIDENCE_CARD_VALUES)}`;
+}
+
+export interface HasMysteryHand {
+	hand: MysteryCard[];
+}
+
+export function hasMysteryHand(maybe: unknown): maybe is HasMysteryHand {
+	// noinspection SuspiciousTypeOfGuard
+	return (maybe != null)
+		&& (Array.isArray((maybe as HasMysteryHand).hand))
+		&& ((maybe as HasMysteryHand).hand.findIndex(card => !(card instanceof MysteryCard)) < 0);
 }

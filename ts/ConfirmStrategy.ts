@@ -1,12 +1,13 @@
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
-import { TurnStart } from "./TurnStart";
-import { LEAD_TYPES } from "./LeadType";
-import { ConfirmAction } from "./ConfirmAction";
 import { ActionType } from "./ActionType";
+import { addEffect } from "./addEffect";
+import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
+import { ConfirmAction } from "./ConfirmAction";
 import { HOLMES_MOVE_CONFIRM, INVESTIGATION_MARKER_GOAL } from "./Game";
-import { WinEffect } from "./WinEffect";
-import { LoseEffect } from "./LoseEffect";
 import { HolmesImpededEffect } from "./HolmesProgressEffect";
+import { LEAD_TYPES } from "./LeadType";
+import { addLoseEffect } from "./LoseEffect";
+import { TurnStart } from "./TurnStart";
+import { addWinEffect } from "./WinEffect";
 
 export interface ConfirmOption extends BotTurnOption {
 	strategyType: BotTurnStrategyType.Confirm;
@@ -24,29 +25,25 @@ export class ConfirmStrategy implements BotTurnStrategy {
 		for (const leadType of LEAD_TYPES) {
 			const lead = turn.board.leads[leadType];
 			if (!lead.confirmed && (lead.evidenceValue === lead.badValue + lead.leadCard.evidenceTarget)) {
-				const confirmEffect: ConfirmEffect = {
+				const effects: BotTurnEffect[] = [];
+				addEffect<ConfirmEffect>(effects, {
 					effectType: BotTurnEffectType.Confirm,
-				};
-				const holmesImpededEffect: HolmesImpededEffect = {
+				});
+				addEffect<HolmesImpededEffect>(effects, {
 					delta: HOLMES_MOVE_CONFIRM,
 					effectType: BotTurnEffectType.HolmesImpeded,
-				};
-				let winLoseEffect: WinEffect | LoseEffect;
+				});
 				if (turn.board.investigationMarker === INVESTIGATION_MARKER_GOAL) {
-					winLoseEffect = <WinEffect> {
-						effectType: BotTurnEffectType.Win,
-					};
+					addWinEffect(effects);
 				} else {
-					winLoseEffect = <LoseEffect> {
-						effectType: BotTurnEffectType.Lose,
-					};
+					addLoseEffect(effects);
 				}
 				options.push(<ConfirmOption> {
 					action: <ConfirmAction> {
 						actionType: ActionType.Confirm,
 						leadType,
 					},
-					effects: [ confirmEffect, holmesImpededEffect, winLoseEffect ],
+					effects,
 					strategyType: BotTurnStrategyType.Confirm,
 				});
 			}

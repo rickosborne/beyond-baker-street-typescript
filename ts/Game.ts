@@ -1,10 +1,4 @@
-import { Board } from "./Board";
-import { Logger, SILENT_LOGGER } from "./logger";
-import { ActivePlayer, isSamePlayer, OtherPlayer, Player } from "./Player";
-import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
-import { EvidenceCard } from "./EvidenceCard";
 import { Action } from "./Action";
-import { TurnStart } from "./TurnStart";
 import {
 	AssistAction,
 	AssistOutcome,
@@ -12,7 +6,12 @@ import {
 	isTypeAssistAction,
 	isValueAssistAction,
 } from "./AssistAction";
+import { Board } from "./Board";
+import { CardType } from "./CardType";
+import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
+import { ConfirmAction, ConfirmOutcome, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
 import { EliminateAction, EliminateOutcome, formatEliminateOutcome, isEliminateAction } from "./EliminateAction";
+import { EvidenceCard } from "./EvidenceCard";
 import {
 	BadInvestigateOutcome,
 	DeadLeadInvestigateOutcome,
@@ -25,13 +24,16 @@ import {
 	InvestigateOutcomeType,
 	isInvestigateAction,
 } from "./InvestigateAction";
-import { formatPursueOutcome, isPursueAction, PursueAction, PursueOutcome } from "./PursueAction";
-import { ConfirmAction, ConfirmOutcome, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
-import { Outcome, OutcomeType } from "./Outcome";
-import { LEAD_TYPES, LeadType } from "./LeadType";
 import { formatLeadCard, isLeadReverseCard } from "./LeadCard";
-import { CardType } from "./CardType";
+import { LEAD_TYPES, LeadType } from "./LeadType";
+import { Logger, SILENT_LOGGER } from "./logger";
 import { OtherHand } from "./OtherHand";
+import { Outcome, OutcomeType } from "./Outcome";
+import { ActivePlayer, isSamePlayer, OtherPlayer, Player } from "./Player";
+import { formatPursueOutcome, isPursueAction, PursueAction, PursueOutcome } from "./PursueAction";
+import { PseudoRNG } from "./rng";
+import { TurnStart } from "./TurnStart";
+import { formatLeadsProgress } from "./VisibleBoard";
 
 export const CARDS_PER_PLAYER: Record<number, number> = {
 	2: 6,
@@ -52,12 +54,16 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 	) {
 	}
 
-	public addCard(index: number, evidenceCard: EvidenceCard | undefined, playerSawCard = false): void {
+	public addCard(
+		index: number, evidenceCard: EvidenceCard | undefined,
+		fromRemainingEvidence: boolean,
+		playerSawCard = false,
+	): void {
 		if (evidenceCard == null) {
 			throw new Error(`Expected evidence card at ${index}`);
 		}
 		this._hand.splice(index, 0, evidenceCard);
-		this.player.addCard(index, playerSawCard ? evidenceCard : undefined);
+		this.player.addCard(index, playerSawCard ? evidenceCard : undefined, fromRemainingEvidence);
 	}
 
 	public get hand(): EvidenceCard[] {
@@ -90,41 +96,66 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 	public takeTurn(turnStart: TurnStart): Action {
 		return this.player.takeTurn(turnStart);
 	}
+
+	// noinspection JSUnusedGlobalSymbols  // used by JSON.stringify
+	public toJSON(): Record<string, unknown> {
+		return {
+			hand: this._hand,
+			name: this.name,
+		};
+	}
 }
 
 export const HOLMES_GOAL = 0;
 export const INVESTIGATION_MARKER_GOAL = 20;
 export const HOLMES_MOVE_ASSIST = -1;
-export const HOLMES_MOVE_PURSUE = -1;
+export const HOLMES_MOVE_IMPOSSIBLE = -1;
 export const HOLMES_MOVE_CONFIRM = 1;
+
+export interface GameStart {
+	game: "start";
+	playerNames: string[];
+}
+
+export interface TurnOutcome {
+	outcome: Outcome;
+	turnNumber: number;
+}
 
 export class Game {
 	private activePlayerNum = -1;
 	private readonly board: Board;
+	private readonly cardsPerPlayer: number;
 	private readonly players: GamePlayer[];
 	private turnCount = 0;
 
 	constructor(
 		public readonly caseFile: CaseFileCard,
 		players: ActivePlayer[],
+		private readonly prng: PseudoRNG,
 		private readonly logger: Logger = SILENT_LOGGER,
 	) {
-		this.board = new Board(caseFile);
+		this.board = new Board(caseFile, prng);
 		this.players = players.map(p => new GamePlayer(p));
-		const cardsPerPlayer = CARDS_PER_PLAYER[players.length];
-		if (isNaN(cardsPerPlayer)) {
+		this.cardsPerPlayer = CARDS_PER_PLAYER[players.length];
+		if (isNaN(this.cardsPerPlayer)) {
 			throw new Error(`Invalid number of players: ${players.length}`);
 		}
-		for (let i = 0; i < cardsPerPlayer; i++) {
+		for (let i = 0; i < this.cardsPerPlayer; i++) {
 			for (const player of this.players) {
 				const evidence = this.board.dealEvidence();
 				if (evidence == null) {
 					throw new Error(`Could not deal out all cards`);
 				}
-				player.addCard(i, evidence, false);
+				player.addCard(i, evidence, false, false);
 			}
 		}
-		this.logger(`Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
+		this.logger.info(`Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
+		const gameStart: GameStart = {
+			game: "start",
+			playerNames: this.players.map(p => p.name),
+		};
+		this.logger.json(gameStart);
 	}
 
 	private applyAction(
@@ -146,6 +177,20 @@ export class Game {
 			throw new Error(`Unknown action: ${action}`);
 		}
 		this.broadcastOutcome(outcome);
+		this.logger.json(<TurnOutcome> {
+			outcome,
+			turnNumber: this.turnCount,
+		});
+		const state = this.state;
+		if (state !== GameState.Playing) {
+			this.logger.info(state);
+		}
+		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
+			const evidence = this.board.dealEvidence();
+			if (evidence != null) {
+				activePlayer.addCard(activePlayer.hand.length, evidence, true);
+			}
+		}
 	}
 
 	private applyAssist(action: AssistAction, activePlayer: GamePlayer): AssistOutcome {
@@ -171,7 +216,7 @@ export class Game {
 				.filter(index => index >= 0),
 			outcomeType: OutcomeType.Assist,
 		};
-		this.logger(formatAssistOutcome(outcome));
+		this.logger.info(formatAssistOutcome(outcome));
 		return outcome;
 	}
 
@@ -192,7 +237,7 @@ export class Game {
 			outcomeType: OutcomeType.Confirm,
 			unconfirmedLeadTypes: LEAD_TYPES.filter(leadType => !this.board.isConfirmed(leadType)),
 		};
-		this.logger(formatConfirmOutcome(outcome));
+		this.logger.info(formatConfirmOutcome(outcome));
 		return outcome;
 	}
 
@@ -222,7 +267,7 @@ export class Game {
 			investigationMarker,
 			outcomeType: OutcomeType.Eliminate,
 		};
-		this.logger(formatEliminateOutcome(outcome));
+		this.logger.info(formatEliminateOutcome(outcome, this.board));
 		return outcome;
 	}
 
@@ -248,7 +293,7 @@ export class Game {
 				targetValue,
 				totalValue: badValue + targetValue,
 			};
-			this.logger(formatBadInvestigateOutcome(outcome));
+			this.logger.info(formatBadInvestigateOutcome(outcome));
 			return outcome;
 		}
 		this.board.addEvidence(action.leadType, evidenceCard);
@@ -265,7 +310,7 @@ export class Game {
 				outcomeType: OutcomeType.DeadLead,
 				returnedEvidence,
 			};
-			this.logger(formatDeadLeadInvestigateOutcome(outcome));
+			this.logger.info(formatDeadLeadInvestigateOutcome(outcome));
 			return outcome;
 		}
 		const outcome: GoodInvestigateOutcome = {
@@ -279,7 +324,7 @@ export class Game {
 			targetValue: this.board.targetForLead(action.leadType),
 			totalValue: this.board.calculateTotalFor(action.leadType),
 		};
-		this.logger(formatGoodInvestigateOutcome(outcome));
+		this.logger.info(formatGoodInvestigateOutcome(outcome));
 		return outcome;
 	}
 
@@ -293,7 +338,7 @@ export class Game {
 			outcomeType: OutcomeType.Pursue,
 			returnedEvidence,
 		};
-		this.logger(formatPursueOutcome(outcome));
+		this.logger.info(formatPursueOutcome(outcome, this.board));
 		return outcome;
 	}
 
@@ -334,6 +379,7 @@ export class Game {
 		this.activePlayerNum = (this.activePlayerNum + 1) % this.players.length;
 		this.turnCount++;
 		const activePlayer = this.players[this.activePlayerNum];
+		const nextPlayer = this.players[(this.activePlayerNum + 1) % this.players.length];
 		const turnStart: TurnStart = {
 			askOtherPlayerAboutTheirHand: (otherPlayer: OtherPlayer): OtherHand => {
 				const other = this.findPlayer(otherPlayer);
@@ -343,11 +389,24 @@ export class Game {
 				return other.otherHand;
 			},
 			board: this.board,
+			nextPlayer,
 			otherPlayers: this.players.filter(p => !isSamePlayer(p, activePlayer)),
 			player: activePlayer,
 		};
+		this.logger.trace(`\n${this.turnCount}: ${formatLeadsProgress(this.board)}\n`);
 		const action = activePlayer.takeTurn(turnStart);
 		this.applyAction(action, activePlayer);
+	}
+
+	// noinspection JSUnusedGlobalSymbols  // used by JSON.stringify
+	public toJSON(): Record<string, unknown> {
+		return {
+			activePlayerNum: this.activePlayerNum,
+			board: this.board,
+			cardsPerPlayer: this.cardsPerPlayer,
+			players: this.players,
+			turnCount: this.turnCount,
+		};
 	}
 
 	public get turns(): number {

@@ -23,7 +23,8 @@
 					"memberTypes": [
 						"field",
 						"constructor",
-						"method"
+						"method",
+						"static-method"
 					],
 					"order": "alphabetically"
 				}

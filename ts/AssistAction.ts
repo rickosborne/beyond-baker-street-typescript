@@ -1,27 +1,41 @@
 import { Action, isActionOfType } from "./Action";
 import { ActionType } from "./ActionType";
-import { isPlayer, Player } from "./Player";
-import { EvidenceValue, isEvidenceValue } from "./EvidenceValue";
 import { EvidenceType, isEvidenceType } from "./EvidenceType";
+import { EvidenceValue, isEvidenceValue } from "./EvidenceValue";
+import { formatPercent } from "./formatPercent";
 import { Outcome, OutcomeType } from "./Outcome";
-import { TurnStart } from "./TurnStart";
+import { isPlayer, Player } from "./Player";
 
 export enum AssistType {
 	Type = "Type",
 	Value = "Value",
 }
 
-export interface AssistAction extends Action {
+export interface Assisted {
+	possibleAfter: number;
+	possibleBefore: number;
+}
+
+export interface AssistAction extends Action, Assisted {
 	actionType: ActionType.Assist;
 	assistType: AssistType;
 	player: Player;
+}
+
+export function isAssisted(maybe: unknown): maybe is Assisted {
+	const ae = maybe as Assisted;
+	// noinspection SuspiciousTypeOfGuard
+	return (maybe != null)
+		&& (typeof ae.possibleAfter === "number")
+		&& (typeof ae.possibleBefore === "number");
 }
 
 export function isAssistActionOfType(maybe: unknown, assistType: AssistType): maybe is AssistAction {
 	const aa = maybe as AssistAction;
 	return isActionOfType(maybe, ActionType.Assist)
 		&& (aa.assistType === assistType)
-		&& isPlayer(aa.player);
+		&& isPlayer(aa.player)
+		&& isAssisted(aa);
 }
 
 export interface TypeAssistAction extends AssistAction {
@@ -59,11 +73,11 @@ export function isAssistOutcome(maybe: unknown): maybe is AssistOutcome {
 }
 
 function formatTypeAssist(assist: TypeAssistAction, player: Player, holmesLocation: number): string {
-	return `${player.name} assisted ${assist.player.name} with type ${assist.evidenceType}.  Holmes is at ${holmesLocation}.`;
+	return `${player.name} assisted ${assist.player.name} with type ${assist.evidenceType}, for a ${assist.possibleBefore}>${assist.possibleAfter} (${formatPercent(assistRatio(assist))}) reduction.  Holmes is at ${holmesLocation}.`;
 }
 
 function formatValueAssist(assist: ValueAssistAction, player: Player, holmesLocation: number): string {
-	return `${player.name} assisted ${assist.player.name} with value ${assist.evidenceValue}.  Holmes is at ${holmesLocation}.`;
+	return `${player.name} assisted ${assist.player.name} with value ${assist.evidenceValue}, for a ${assist.possibleBefore}>${assist.possibleAfter} (${formatPercent(assistRatio(assist))}) reduction.  Holmes is at ${holmesLocation}.`;
 }
 
 export function formatAssist(assist: AssistAction, player: Player, holmesLocation: number): string {
@@ -77,4 +91,8 @@ export function formatAssist(assist: AssistAction, player: Player, holmesLocatio
 
 export function formatAssistOutcome(outcome: AssistOutcome): string {
 	return formatAssist(outcome.action, outcome.activePlayer, outcome.holmesLocation);
+}
+
+export function assistRatio(assisted: Assisted): number {
+	return (assisted.possibleBefore - assisted.possibleAfter) / assisted.possibleBefore;
 }

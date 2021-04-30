@@ -7,6 +7,7 @@ import { isEvidenceValue } from "./EvidenceValue";
 import { groupBy } from "./groupBy";
 import { randomItems } from "./randomItems";
 import { LEAD_PILE_START_COUNT } from "./Board";
+import { PseudoRNG } from "./rng";
 
 export interface LeadCard extends Card<CardType.Lead> {
 	cardType: CardType.Lead;
@@ -45,8 +46,8 @@ export const LEAD_CARDS: LeadCard[] = range(LEAD_CARD_TARGET_MIN, LEAD_CARD_TARG
 
 export const LEAD_CARDS_BY_LEADTYPE: Record<LeadType, LeadCard[]> = groupBy(LEAD_CARDS, c => c.leadType);
 
-export function randomLeadCards(leadType: LeadType): LeadCard[] {
-	return randomItems(LEAD_CARDS_BY_LEADTYPE[leadType], LEAD_PILE_START_COUNT);
+export function randomLeadCards(leadType: LeadType, prng: PseudoRNG): LeadCard[] {
+	return randomItems(LEAD_CARDS_BY_LEADTYPE[leadType], LEAD_PILE_START_COUNT, prng);
 }
 
 export interface LeadReverseCard extends Card<CardType.LeadReverse> {

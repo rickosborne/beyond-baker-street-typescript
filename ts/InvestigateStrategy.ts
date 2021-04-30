@@ -1,13 +1,14 @@
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
-import { TurnStart } from "./TurnStart";
-import { Bot } from "./Bot";
-import { unconfirmedLeads } from "./unconfirmedLeads";
-import { VisibleLead } from "./VisibleBoard";
-import { MysteryCard } from "./MysteryCard";
-import { InvestigateAction } from "./InvestigateAction";
 import { ActionType } from "./ActionType";
+import { addEffect } from "./addEffect";
+import { Bot } from "./Bot";
+import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
+import { InvestigateAction } from "./InvestigateAction";
+import { MysteryCard } from "./MysteryCard";
+import { TurnStart } from "./TurnStart";
+import { unfinishedLeads } from "./unconfirmedLeads";
+import { VisibleLead } from "./VisibleBoard";
 
 export interface InvestigateOption extends BotTurnOption {
 	action: InvestigateAction,
@@ -51,7 +52,7 @@ export class InvestigateStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Investigate;
 
 	public buildOptions(turn: TurnStart, bot: Bot): InvestigateOption[] {
-		return unconfirmedLeads(turn)
+		return unfinishedLeads(turn)
 			.flatMap(lead => bot.hand.map((mysteryCard, handIndex) => this.buildOptionsForLeadWithCard(lead, mysteryCard, handIndex)))
 			;
 	}
@@ -72,44 +73,38 @@ export class InvestigateStrategy implements BotTurnStrategy {
 		const possibleType = exactType || mysteryCard.possibleTypes.includes(evidenceType);
 		const maybeOver = mysteryCard.possibleValues.filter(v => v > gap).length;
 		if (!possibleType) {
-			const knownBad: InvestigateBadEffect = {
+			addEffect<InvestigateBadEffect>(effects, {
 				effectType: BotTurnEffectType.InvestigateBad,
 				wouldAdd: mysteryCard.possibleValues.slice(),
-			};
-			effects.push(knownBad);
+			});
 		} else if (exactType && exactValue) {
-			const perfect: InvestigatePerfectEffect = {
+			addEffect<InvestigatePerfectEffect>(effects, {
 				effectType: BotTurnEffectType.InvestigatePerfect,
-			};
-			effects.push(perfect);
+			});
 		} else if (exactValue) {
-			const correctValue: InvestigateCorrectValueEffect = {
+			addEffect<InvestigateCorrectValueEffect>(effects, {
 				effectType: BotTurnEffectType.InvestigateCorrectValue,
 				possibleTypes: mysteryCard.possibleTypes.slice(),
-			};
-			effects.push(correctValue);
+			});
 		} else if (maybeOver > 0) {
-			const maybeBad: InvestigateMaybeOverEffect = {
+			addEffect<InvestigateMaybeOverEffect>(effects, {
 				effectType: BotTurnEffectType.InvestigateMaybeBad,
 				maybeOver,
 				possibleTypes: mysteryCard.possibleTypes.slice(),
 				possibleValues: mysteryCard.possibleValues.slice(),
-			};
-			effects.push(maybeBad);
+			});
 		} else if (exactType) {
-			const correctType: InvestigateCorrectTypeEffect = {
+			addEffect<InvestigateCorrectTypeEffect>(effects, {
 				effectType: BotTurnEffectType.InvestigateCorrectType,
 				possibleValues: mysteryCard.possibleValues.slice(),
-			};
-			effects.push(correctType);
+			});
 		} else {
-			const wild: InvestigateWildEffect = {
+			addEffect<InvestigateWildEffect>(effects, {
 				effectType: BotTurnEffectType.InvestigateWild,
 				maybeOver,
 				possibleTypes: mysteryCard.possibleTypes.slice(),
 				possibleValues: mysteryCard.possibleValues.slice(),
-			};
-			effects.push(wild);
+			});
 		}
 		return {
 			action: {

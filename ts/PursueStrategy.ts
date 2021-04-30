@@ -1,18 +1,18 @@
 import { ActionType } from "./ActionType";
+import { addEffect } from "./addEffect";
 import { Bot } from "./Bot";
 import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
-import { HOLMES_MOVE_PURSUE } from "./Game";
-import { HolmesProgressEffect } from "./HolmesProgressEffect";
+import { addImpossibleAddedEffectsFromTurn } from "./ImpossibleAdded";
 import { LEAD_TYPES } from "./LeadType";
-import { LoseEffect } from "./LoseEffect";
+import { addLoseEffect } from "./LoseEffect";
 import { MysteryCard } from "./MysteryCard";
 import { PursueAction } from "./PursueAction";
 import { ALL_PATHS_TO, MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
-import { unconfirmedLeads } from "./unconfirmedLeads";
+import { unfinishedLeads } from "./unconfirmedLeads";
 import { unique } from "./unique";
 import { VisibleLead } from "./VisibleBoard";
 
@@ -43,73 +43,74 @@ export interface PursuePossibleEffect extends BotTurnEffect {
 	effectType: BotTurnEffectType.PursuePossible;
 }
 
+/**
+ * Pursue a lead where another lead shares the same evidence type.
+ */
+export interface PursueDuplicateEffect extends BotTurnEffect {
+	effectType: BotTurnEffectType.PursueDuplicate;
+	evidenceTarget: EvidenceValue;
+}
+
 export class PursueStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Pursue;
 
 	public buildOptions(turn: TurnStart, bot: Bot): BotTurnOption[] {
-		return unconfirmedLeads(turn)
-			.map(lead => this.buildPursueForLead(lead, turn, bot))
+		const visibleLeads = unfinishedLeads(turn);
+		return visibleLeads
+			.map(lead => this.buildPursueForLead(lead, visibleLeads, turn, bot))
 			.filter(option => option != null) as PursueOption[]
-		;
+			;
 	}
 
-	private buildPursueForLead(lead: VisibleLead, turn: TurnStart, bot: Bot): PursueOption | undefined {
-		const totalValue = lead.badValue + lead.leadCard.evidenceTarget;
+	private buildPursueForLead(lead: VisibleLead, allLeads: VisibleLead[], turn: TurnStart, bot: Bot): PursueOption | undefined {
+		const { evidenceTarget, evidenceType } = lead.leadCard;
+		const totalValue = lead.badValue + evidenceTarget;
 		const gap = totalValue - lead.evidenceValue;
 		const effects: BotTurnEffect[] = [];
+		addImpossibleAddedEffectsFromTurn(effects, turn);
 		if (lead.leadCount === 1) {
-			const lose: LoseEffect = {
-				effectType: BotTurnEffectType.Lose,
-			};
-			effects.push(lose);
+			addLoseEffect(effects);
+		}
+		const otherLeads = allLeads.filter(l => l !== lead);
+		if (lead.evidenceCards.length === 0 && otherLeads.find(l => l.leadCard.evidenceType === evidenceType) != null) {
+			addEffect<PursueDuplicateEffect>(effects, {
+				effectType: BotTurnEffectType.PursueDuplicate,
+				evidenceTarget: evidenceTarget,
+			});
 		}
 		if (gap < 1) {
-			const possible: PursuePossibleEffect = {
+			addEffect<PursuePossibleEffect>(effects, {
 				effectType: BotTurnEffectType.PursuePossible,
-			};
-			effects.push(possible);
+			});
+		} else if (totalValue > MAX_POSSIBLE_EVIDENCE_VALUE) {
+			addEffect<PursueImpossibleEffect>(effects, {
+				effectType: BotTurnEffectType.PursueImpossible,
+			});
 		} else {
-			if (turn.board.impossibleCards.length + 1 > turn.board.caseFile.impossibleCount) {
-				const holmesEffect: HolmesProgressEffect = {
-					delta: HOLMES_MOVE_PURSUE,
-					effectType: BotTurnEffectType.HolmesProgress,
-				};
-				effects.push(holmesEffect);
-			}
-			if (totalValue > MAX_POSSIBLE_EVIDENCE_VALUE) {
-				const imp: PursueImpossibleEffect = {
-					effectType: BotTurnEffectType.PursueImpossible,
-				};
-				effects.push(imp);
+			const knownValues = this.gatherEvidence(evidenceType, turn, bot.hand);
+			const pathCount = summingPathsTo(gap, knownValues);
+			if (pathCount > 0) {
+				addEffect<PursuePossibleEffect>(effects, {
+					effectType: BotTurnEffectType.PursuePossible,
+				});
 			} else {
-				const knownValues = this.gatherEvidence(lead.leadCard.evidenceType, turn, bot.hand);
-				const pathCount = summingPathsTo(gap, knownValues);
-				if (pathCount > 0) {
-					const possible: PursuePossibleEffect = {
-						effectType: BotTurnEffectType.PursuePossible,
-					};
-					effects.push(possible);
+				const impossibleValues: EvidenceValue[] = [];
+				this.gatherEvidenceFromImpossible(evidenceType, turn, impossibleValues);
+				impossibleValues.sort();
+				const allPaths = ALL_PATHS_TO[totalValue];
+				if (!Array.isArray(allPaths) || allPaths.length === 0) {
+					throw new Error(`Unable to figure out card paths to ${totalValue}!`);
+				}
+				const paths = allPaths.filter(p => impossibleValues.findIndex(i => p.includes(i)) < 0);
+				if (impossibleValues.length > 0 && paths.length === 0) {
+					addEffect<PursueImpossibleEffect>(effects, {
+						effectType: BotTurnEffectType.PursueImpossible,
+					});
 				} else {
-					const impossibleValues: EvidenceValue[] = [];
-					this.gatherEvidenceFromImpossible(lead.leadCard.evidenceType, turn, impossibleValues);
-					impossibleValues.sort();
-					const allPaths = ALL_PATHS_TO[totalValue];
-					if (!Array.isArray(allPaths) || allPaths.length === 0) {
-						throw new Error(`Unable to figure out card paths to ${totalValue}!`);
-					}
-					const paths = allPaths.filter(p => impossibleValues.findIndex(i => p.includes(i)) < 0);
-					if (impossibleValues.length > 0 && paths.length === 0) {
-						const imp: PursueImpossibleEffect = {
-							effectType: BotTurnEffectType.PursueImpossible,
-						};
-						effects.push(imp);
-					} else {
-						const maybe: PursueMaybeEffect = {
-							effectType: BotTurnEffectType.PursueMaybe,
-							pathCount: paths.length,
-						};
-						effects.push(maybe);
-					}
+					addEffect<PursueMaybeEffect>(effects, {
+						effectType: BotTurnEffectType.PursueMaybe,
+						pathCount: paths.length,
+					});
 				}
 			}
 		}

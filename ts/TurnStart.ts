@@ -5,6 +5,7 @@ import { OtherHand } from "./OtherHand";
 export interface TurnStart {
 	askOtherPlayerAboutTheirHand(otherPlayer: OtherPlayer): OtherHand;
 	board: VisibleBoard;
+	nextPlayer: Player;
 	otherPlayers: OtherPlayer[];
 	player: Player;
 }

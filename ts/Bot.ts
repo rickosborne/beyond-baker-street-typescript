@@ -1,11 +1,20 @@
-import { ActivePlayer, isSamePlayer } from "./Player";
-import { Outcome } from "./Outcome";
-import { TurnStart } from "./TurnStart";
 import { Action } from "./Action";
-import { MysteryCard, MysteryPile } from "./MysteryCard";
-import { range } from "./range";
+import {
+	AssistOutcome,
+	isAssistOutcome,
+	isTypeAssistAction,
+	isValueAssistAction,
+	TypeAssistAction,
+	ValueAssistAction,
+} from "./AssistAction";
+import { BOT_STRATEGIES } from "./BotStrategies";
+import { BotTurnStrategy } from "./BotTurn";
+import { BasicBotTurnEvaluator, BotTurnEvaluator } from "./BotTurnEvaluator";
+import { ConfirmOutcome, isConfirmOutcome } from "./ConfirmAction";
+import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
-import { AssistOutcome, isAssistOutcome, isTypeAssistAction, isValueAssistAction } from "./AssistAction";
+import { EvidenceType } from "./EvidenceType";
+import { EvidenceValue } from "./EvidenceValue";
 import {
 	BadInvestigateOutcome,
 	DeadLeadInvestigateOutcome,
@@ -14,14 +23,18 @@ import {
 	isDeadLeadInvestigateOutcome,
 	isGoodInvestigateOutcome,
 } from "./InvestigateAction";
-import { ConfirmOutcome, isConfirmOutcome } from "./ConfirmAction";
-import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
-import { isPursueOutcome, PursueOutcome } from "./PursueAction";
+import { formatLeadCard } from "./LeadCard";
 import { LEAD_TYPES } from "./LeadType";
+import { Logger } from "./logger";
+import { formatMysteryCard, HasMysteryHand, MysteryCard, MysteryPile } from "./MysteryCard";
 import { OtherHand } from "./OtherHand";
-import { BotTurnStrategy } from "./BotTurn";
-import { BOT_STRATEGIES } from "./BotStrategies";
-import { BotTurnEvaluator, DEFAULT_BOT_TURN_EVALUATOR } from "./BotTurnEvaluator";
+import { Outcome } from "./Outcome";
+import { ActivePlayer, isSamePlayer } from "./Player";
+import { isPursueOutcome, PursueOutcome } from "./PursueAction";
+import { range } from "./range";
+import { PseudoRNG } from "./rng";
+import { TurnStart } from "./TurnStart";
+import { unconfirmedLeads } from "./unconfirmedLeads";
 
 export const BOT_NAMES: string[] = [
 	"Alice",
@@ -33,26 +46,32 @@ export const BOT_NAMES: string[] = [
 ];
 
 const nextName = (function nextName() {
-	let index = Math.floor(Math.random() * BOT_NAMES.length);
-	return function nextName(): string {
+	let index: number | undefined;
+	return function nextName(prng: PseudoRNG): string {
+		if (index === undefined) {
+			index = Math.floor(prng() * BOT_NAMES.length);
+		}
 		index = (index + 1) % BOT_NAMES.length;
 		return BOT_NAMES[index];
 	};
 })();
 
-export class Bot implements ActivePlayer {
+export class Bot implements ActivePlayer, HasMysteryHand {
 	public readonly hand: MysteryCard[] = [];
 	public readonly remainingEvidence = new MysteryPile();
 
 	constructor(
-		public readonly name: string = nextName(),
+		private readonly logger: Logger,
+		private readonly prng: PseudoRNG,
+		public readonly name: string = nextName(prng),
 		private readonly strategies: BotTurnStrategy[] = BOT_STRATEGIES.slice(),
-		private readonly evaluator: BotTurnEvaluator = DEFAULT_BOT_TURN_EVALUATOR,
+		private readonly evaluator: BotTurnEvaluator = new BasicBotTurnEvaluator({}, logger),
 	) {}
 
-	public addCard(index: number, evidenceCard: EvidenceCard | undefined): void {
-		const mysteryCard = evidenceCard == null ? new MysteryCard() : new MysteryCard([evidenceCard.evidenceType], [evidenceCard.evidenceValue]);
+	public addCard(index: number, evidenceCard: EvidenceCard | undefined, fromRemainingEvidence: boolean): void {
+		const mysteryCard = evidenceCard != null ? MysteryCard.fromEvidenceCard(evidenceCard) : fromRemainingEvidence ? this.remainingEvidence.toMysteryCard() : new MysteryCard();
 		this.hand.splice(index, 0, mysteryCard);
+		this.logger.trace(`${this.name} took a card.  ${this.formatKnowledge(undefined)}`);
 	}
 
 	private assessGameState(turnStart: TurnStart): void {
@@ -68,6 +87,31 @@ export class Bot implements ActivePlayer {
 		}
 		const impossible = board.impossibleCards;
 		this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[]);
+	}
+
+	private formatHandIndexes(handIndexes: number[]): string {
+		return "«" + this.hand.map((c, i) => handIndexes.includes(i) ? "✓" : "␣").join("") + "»";
+	}
+
+	public formatKnowledge(turn: TurnStart | undefined): string {
+		const unconfirmedCount = turn == null ? 3 : unconfirmedLeads(turn).length;
+		return `${this.name} knows ${this.hand.map(card => this.formatKnowledgeForCard(card, unconfirmedCount, turn)).join(", ")}.`;
+	}
+
+	private formatKnowledgeForCard(card: MysteryCard, unconfirmedCount: number, turn: TurnStart | undefined): string {
+		let tail = "";
+		if (turn != null) {
+			const couldMatchLeads = LEAD_TYPES.map(leadType => turn.board.leads[leadType])
+				.filter(lead => card.couldBeType(lead.leadCard.evidenceType));
+			if (couldMatchLeads.length === 0) {
+				tail += " (impossible)";
+			} else if (couldMatchLeads.length === unconfirmedCount) {
+				tail += " (anywhere)";
+			} else {
+				tail += ` (maybe for: ${couldMatchLeads.map(lead => formatLeadCard(lead.leadCard)).join(" or ")})`;
+			}
+		}
+		return `${formatMysteryCard(card)}${tail}`;
 	}
 
 	public get otherHand(): OtherHand {
@@ -86,24 +130,8 @@ export class Bot implements ActivePlayer {
 	}
 
 	private sawAssist(outcome: AssistOutcome): void {
-		const action = outcome.action;
-		if (isSamePlayer(this, action.player)) {
-			let updater: (identified: boolean, card: MysteryCard) => void;
-			if (isTypeAssistAction(action)) {
-				updater = (identified: boolean, card: MysteryCard) => identified ? card.setType(action.evidenceType) : card.eliminateType(action.evidenceType);
-			} else if (isValueAssistAction(action)) {
-				updater = (identified: boolean, card: MysteryCard) => identified ? card.setValue(action.evidenceValue) : card.eliminateValue(action.evidenceValue);
-			} else {
-				throw new Error(`Unknown Assist type: ${action}`);
-			}
-			for (let i = 0; i < this.hand.length; i++) {
-				const mysteryCard = this.hand[i];
-				updater(outcome.identifiedHandIndexes.includes(i), mysteryCard);
-				const evidenceCard = mysteryCard.asEvidence();
-				if (evidenceCard != null) {
-					this.sawEvidence(evidenceCard);
-				}
-			}
+		if (isSamePlayer(this, outcome.action.player)) {
+			this.wasAssisted(outcome);
 		}
 	}
 
@@ -111,9 +139,12 @@ export class Bot implements ActivePlayer {
 		this.sawEvidence(outcome.evidenceCard);
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	private sawConfirm(outcome: ConfirmOutcome): void {
-		// nothing to do here?
+		// nothing to do here?  The next lines just make the linter happy.
+		// noinspection BadExpressionStatementJS
+		outcome;
+		// noinspection BadExpressionStatementJS
+		this;
 	}
 
 	private sawDeadLead(outcome: DeadLeadInvestigateOutcome): void {
@@ -177,10 +208,63 @@ export class Bot implements ActivePlayer {
 	public takeTurn(turnStart: TurnStart): Action {
 		this.assessGameState(turnStart);
 		const options = this.strategies.flatMap(s => s.buildOptions(turnStart, this));
-		const option = this.evaluator.selectOption(options, turnStart);
+		const option = this.evaluator.selectOption(options, this, turnStart);
 		if (option == null) {
 			throw new Error(`No option found from ${options.length} options`);
 		}
 		return option.action;
+	}
+
+	// noinspection JSUnusedGlobalSymbols
+	public toJSON(): Record<string, unknown> {
+		return {
+			hand: this.hand,
+			name: this.name,
+			remainingEvidence: this.remainingEvidence,
+		};
+	}
+
+	private wasAssisted(outcome: AssistOutcome): void {
+		const action = outcome.action;
+		const handIndexes = outcome.identifiedHandIndexes;
+		let sawWhat: EvidenceType | EvidenceValue;
+		if (isTypeAssistAction(action)) {
+			this.wasTypeAssisted(action, handIndexes);
+			sawWhat = action.evidenceType;
+		} else if (isValueAssistAction(action)) {
+			this.wasValueAssisted(action, handIndexes);
+			sawWhat = action.evidenceValue;
+		} else {
+			throw new Error(`Unknown Assist type: ${action}`);
+		}
+		this.logger.trace(`${this.name} saw ${sawWhat} at ${this.formatHandIndexes(handIndexes)}. ${this.formatKnowledge(undefined)}`);
+	}
+
+	private wasTypeAssisted(action: TypeAssistAction, handIndexes: number[]): void {
+		this.wasTypeOrValueAssisted(action.evidenceType, handIndexes, (c, t) => c.setType(t), (c, t) => c.eliminateType(t));
+	}
+
+	private wasTypeOrValueAssisted<TV extends EvidenceType | EvidenceValue>(
+		tv: TV,
+		handIndexes: number[],
+		setter: (card: MysteryCard, tv: TV) => void,
+		eliminator: (card: MysteryCard, tv: TV) => void,
+	) {
+		for (let i = 0; i < this.hand.length; i++) {
+			const mysteryCard = this.hand[i];
+			if (handIndexes.includes(i)) {
+				setter(mysteryCard, tv);
+			} else {
+				eliminator(mysteryCard, tv);
+			}
+			const evidenceCard = mysteryCard.asEvidence();
+			if (evidenceCard != null) {
+				this.sawEvidence(evidenceCard);
+			}
+		}
+	}
+
+	private wasValueAssisted(action: ValueAssistAction, handIndexes: number[]): void {
+		this.wasTypeOrValueAssisted(action.evidenceValue, handIndexes, (c, v) => c.setValue(v), (c, v) => c.eliminateValue(v));
 	}
 }
