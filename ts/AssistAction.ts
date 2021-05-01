@@ -12,6 +12,7 @@ export enum AssistType {
 }
 
 export interface Assisted {
+	assistRatio: number;
 	possibleAfter: number;
 	possibleBefore: number;
 }
@@ -94,5 +95,10 @@ export function formatAssistOutcome(outcome: AssistOutcome): string {
 }
 
 export function assistRatio(assisted: Assisted): number {
-	return (assisted.possibleBefore - assisted.possibleAfter) / assisted.possibleBefore;
+	const { possibleBefore, possibleAfter } = assisted;
+	return assistRatioFromPossible(possibleBefore, possibleAfter);
+}
+
+export function assistRatioFromPossible(possibleBefore: number, possibleAfter: number): number {
+	return (possibleBefore - possibleAfter) / possibleBefore;
 }

@@ -11,7 +11,7 @@ let wins = 0;
 let plays = 0;
 let turns = 0;
 const config = {
-	gamesToPlay: 5000,
+	gamesToPlay: 1,
 };
 const logger: Logger = config.gamesToPlay === 1 ? CONSOLE_LOGGER : SILENT_LOGGER;
 // const logger = cachingLoggerFactory();

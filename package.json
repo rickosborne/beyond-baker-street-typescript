@@ -30,6 +30,7 @@
 		"lint": "eslint . --fix --ext .ts,.json",
 		"precompile": "rm -R ./js || true",
 		"prereinstall": "npm run clean",
+		"recompileAndRun": "npm run compile ; npm run start",
 		"reinstall": "npm install",
 		"start": "node js/index.js",
 		"test": "mocha --config .mocharc.json ts/*.spec.ts"

@@ -7,7 +7,7 @@ export interface Logger {
 export const CONSOLE_LOGGER: Logger = {
 	info: (messageBuilder: () => string) => console.info(messageBuilder()),
 	json: (data: unknown) => console.log(JSON.stringify(data)),
-	trace: (messageBuilder: () => string) => console.trace(messageBuilder()),
+	trace: (messageBuilder: () => string) => console.log(messageBuilder()),
 };
 export const SILENT_LOGGER: Logger = {
 	info: () => void (0),

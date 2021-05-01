@@ -8,6 +8,7 @@ import {
 import {
 	AssistAction,
 	Assisted,
+	assistRatioFromPossible,
 	AssistType,
 	isTypeAssistAction,
 	isValueAssistAction,
@@ -124,9 +125,11 @@ export class AssistStrategy implements BotTurnStrategy {
 				const after = types.includes(evidenceType) ? Math.round(card.possibleCount / types.length) : card.possibleCount;
 				return prev + after;
 			}, 0);
+			const assistRatio = assistRatioFromPossible(possibleBefore, possibleAfter);
 			const effects: BotTurnEffect[] = [];
 			if (matchingLeads.length === 0) {
 				addEffect<AssistImpossibleTypeEffect>(effects, {
+					assistRatio,
 					effectType: BotTurnEffectType.AssistImpossibleType,
 					possibleAfter,
 					possibleBefore,
@@ -134,12 +137,14 @@ export class AssistStrategy implements BotTurnStrategy {
 			}
 			if (knowsValue) {
 				addEffect<KnownCardEffect>(effects, {
+					assistRatio,
 					effectType: BotTurnEffectType.AssistKnown,
 					possibleAfter: 1,
 					possibleBefore,
 				});
 			} else {
 				addEffect<NarrowCardEffect>(effects, {
+					assistRatio,
 					effectType: BotTurnEffectType.AssistNarrow,
 					possibleAfter,
 					possibleBefore,
@@ -149,6 +154,7 @@ export class AssistStrategy implements BotTurnStrategy {
 			const assistType: TypeAssistTurnOption = {
 				action: {
 					actionType: ActionType.Assist,
+					assistRatio,
 					assistType: AssistType.Type,
 					evidenceType,
 					player: otherPlayer,
@@ -170,14 +176,17 @@ export class AssistStrategy implements BotTurnStrategy {
 				const after = values.includes(evidenceValue) ? Math.round(card.possibleCount / values.length) : card.possibleCount;
 				return prev + after;
 			}, 0);
+			const assistRatio = assistRatioFromPossible(possibleBefore, possibleAfter);
 			if (knowsType) {
 				addEffect<KnownCardEffect>(effects, {
+					assistRatio,
 					effectType: BotTurnEffectType.AssistKnown,
 					possibleAfter: 1,
 					possibleBefore,
 				});
 			} else {
 				addEffect<NarrowCardEffect>(effects, {
+					assistRatio,
 					effectType: BotTurnEffectType.AssistNarrow,
 					possibleAfter,
 					possibleBefore,
@@ -187,6 +196,7 @@ export class AssistStrategy implements BotTurnStrategy {
 			const assistValue: ValueAssistTurnOption = {
 				action: {
 					actionType: ActionType.Assist,
+					assistRatio,
 					assistType: AssistType.Value,
 					evidenceValue,
 					player: otherPlayer,

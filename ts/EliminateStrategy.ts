@@ -50,7 +50,7 @@ export interface EliminateKnownUsedValueEffect extends BotTurnEffect {
 
 export interface EliminateUnusedTypeEffect extends BotTurnEffect {
 	effectType: BotTurnEffectType.EliminateUnusedType;
-	mysteryCard: MysteryCard;
+	probability4plus: number;
 	unusedEvidenceTypes: EvidenceType[];
 }
 
@@ -133,7 +133,7 @@ export class EliminateStrategy implements BotTurnStrategy {
 			if (maybeUsedEvidenceTypes.length === 0) {
 				addEffect<EliminateUnusedTypeEffect>(effects, {
 					effectType: BotTurnEffectType.EliminateUnusedType,
-					mysteryCard,
+					probability4plus: mysteryCard.probabilityOf(e => e.evidenceValue >= 4),
 					unusedEvidenceTypes: possibleTypes.slice(),
 				});
 			} else {
