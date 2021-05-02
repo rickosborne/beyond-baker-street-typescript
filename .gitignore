@@ -7,3 +7,4 @@ js/
 *.d.ts
 *.log
 coverage/
+.nyc_output/

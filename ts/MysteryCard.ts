@@ -1,5 +1,5 @@
 import { CardType } from "./CardType";
-import { EVIDENCE_CARD_VALUES, EvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
+import { EVIDENCE_CARD_VALUES, EVIDENCE_CARDS, EvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
 import { EVIDENCE_TYPES, EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
 import { Pile } from "./Pile";
@@ -12,21 +12,43 @@ export interface UnknownCard {
 	possibleValues: EvidenceValue[];
 }
 
+type ValueFlags = [ boolean, boolean, boolean, boolean, boolean, boolean, boolean ];
+const ALL_FALSE_VALUE_FLAGS: ValueFlags = [ false, false, false, false, false, false, false ];
+
 export class MysteryCard implements UnknownCard {
-	private readonly _possibleTypes = new UniqueArray<EvidenceType>();
-	private readonly _possibleValues = new UniqueArray<EvidenceValue>();
-	private readonly possible = new UniqueArray<EvidenceCard>(isSameEvidenceCard);
+	private _evidence: EvidenceCard | undefined;
+	private readonly possible: Record<EvidenceType, ValueFlags> = {
+		[EvidenceType.Contact]: ALL_FALSE_VALUE_FLAGS.slice() as ValueFlags,
+		[EvidenceType.Detail]: ALL_FALSE_VALUE_FLAGS.slice() as ValueFlags,
+		[EvidenceType.Document]: ALL_FALSE_VALUE_FLAGS.slice() as ValueFlags,
+		[EvidenceType.Track]: ALL_FALSE_VALUE_FLAGS.slice() as ValueFlags,
+	};
+	public possibleCount = 0;
+	private readonly typeCounts: Record<EvidenceType, number> = {
+		[EvidenceType.Contact]: 0,
+		[EvidenceType.Detail]: 0,
+		[EvidenceType.Document]: 0,
+		[EvidenceType.Track]: 0,
+	};
+	private readonly uniqueTypes = new UniqueArray<EvidenceType>();
+	private readonly uniqueValues = new UniqueArray<number>();
+	private readonly valueCounts: Record<EvidenceValue, number> = {
+		1: 0,
+		2: 0,
+		3: 0,
+		4: 0,
+		5: 0,
+		6: 0,
+	};
 
 	constructor(
 		possibleTypes: EvidenceType[] = EVIDENCE_TYPES,
 		possibleValues: EvidenceValue[] = EVIDENCE_CARD_VALUES,
 	) {
 		const cardType = CardType.Evidence;
-		this._possibleTypes.add(...possibleTypes);
-		this._possibleValues.add(...possibleValues);
-		for (const evidenceType of possibleTypes) {
-			for (const evidenceValue of possibleValues) {
-				this.possible.add({
+		for (const evidenceValue of possibleValues) {
+			for (const evidenceType of possibleTypes) {
+				this.addPossible(<EvidenceCard> {
 					cardType,
 					evidenceType,
 					evidenceValue,
@@ -36,87 +58,130 @@ export class MysteryCard implements UnknownCard {
 	}
 
 	private addPossible(...evidenceCards: EvidenceCard[]): void {
-		if (this.possible.add(...evidenceCards) > 0) {
-			this._possibleValues.clear();
-			this._possibleTypes.clear();
-		}
-	}
-
-	public asArray(): EvidenceCard[] {
-		return this.possible.asArray();
-	}
-
-	public asEvidence(): EvidenceCard | undefined {
-		return this.possible.head;
-	}
-
-	public couldBe(evidenceCard: EvidenceCard): boolean {
-		return this.possible.includes(evidenceCard);
-	}
-
-	public couldBeType(evidenceType: EvidenceType): boolean {
-		return this.possibleTypes.includes(evidenceType);
-	}
-
-	public couldBeValue(value: EvidenceValue): boolean {
-		return this.possibleValues.includes(value);
-	}
-
-	public eliminateCard(evidenceCard: EvidenceCard): void {
-		if (!this.isKnown) {
-			if (this.possible.remove(evidenceCard) > 0) {
-				this._possibleTypes.clear();
-				this._possibleValues.clear();
+		for (const evidenceCard of evidenceCards) {
+			const evidenceType = evidenceCard.evidenceType;
+			const evidenceValue = evidenceCard.evidenceValue;
+			const existing = this.possible[evidenceType][evidenceValue];
+			if (!existing) {
+				this.possible[evidenceType][evidenceValue] = true;
+				this.possibleCount++;
+				this.uniqueTypes.add(evidenceType);
+				this.typeCounts[evidenceType]++;
+				this.uniqueValues.add(evidenceValue);
+				this.valueCounts[evidenceValue]++;
+				this._evidence = this.possibleCount === 1 ? {
+					cardType: CardType.Evidence,
+					evidenceType,
+					evidenceValue,
+				} : undefined;
 			}
 		}
 	}
 
-	public eliminateType(evidenceType: EvidenceType): void {
-		this.possible.removeIf(card => card.evidenceType === evidenceType);
-		this._possibleTypes.remove(evidenceType);
+	private asArray(): EvidenceCard[] {
+		if (this._evidence != null) {
+			return [this._evidence];
+		}
+		return EVIDENCE_CARDS.filter(c => this.couldBe(c));
 	}
 
-	public eliminateValue(value: EvidenceValue): void {
-		this.possible.removeIf(card => card.evidenceValue === value);
-		this._possibleValues.remove(value);
+	public asEvidence(): EvidenceCard | undefined {
+		return this._evidence;
+	}
+
+	public couldBe(evidenceCard: EvidenceCard): boolean {
+		return this.possible[evidenceCard.evidenceType][evidenceCard.evidenceValue];
+	}
+
+	public couldBeType(evidenceType: EvidenceType): boolean {
+		return this.typeCounts[evidenceType] > 0;
+	}
+
+	public couldBeValue(value: EvidenceValue): boolean {
+		return this.valueCounts[value] > 0;
+	}
+
+	public eliminateCard(evidenceCard: EvidenceCard): void {
+		if (this.possibleCount > 1) {
+			const evidenceType = evidenceCard.evidenceType;
+			const evidenceValue = evidenceCard.evidenceValue;
+			this.eliminateTypeAndValue(evidenceType, evidenceValue);
+		}
+	}
+
+	public eliminateType(evidenceType: EvidenceType): void {
+		for (const evidenceValue of EVIDENCE_CARD_VALUES) {
+			this.eliminateTypeAndValue(evidenceType, evidenceValue);
+		}
+	}
+
+	private eliminateTypeAndValue(evidenceType: EvidenceType, evidenceValue: EvidenceValue): void {
+		const existing = this.possible[evidenceType][evidenceValue];
+		if (existing) {
+			this.possible[evidenceType][evidenceValue] = false;
+			this.typeCounts[evidenceType]--;
+			if (this.typeCounts[evidenceType] === 0) {
+				this.uniqueTypes.remove(evidenceType);
+			}
+			this.valueCounts[evidenceValue]--;
+			if (this.valueCounts[evidenceValue] === 0) {
+				this.uniqueValues.remove(evidenceValue);
+			}
+			this.possibleCount--;
+			if (this.possibleCount === 1) {
+				this._evidence = {
+					cardType: CardType.Evidence,
+					evidenceType: this.uniqueTypes.head as EvidenceType,
+					evidenceValue: this.uniqueValues.head as EvidenceValue,
+				};
+			} else if (this.possibleCount === 0) {
+				throw new Error("Eliminated all possibilities");
+			}
+		}
+	}
+
+	public eliminateValue(evidenceValue: EvidenceValue): void {
+		for (const evidenceType of EVIDENCE_TYPES) {
+			this.eliminateTypeAndValue(evidenceType, evidenceValue);
+		}
 	}
 
 	public get isKnown(): boolean {
-		return this.possible.length === 1;
-	}
-
-	public get possibleCount(): number {
-		return this.possible.length;
+		return this.possibleCount === 1;
 	}
 
 	public get possibleTypes(): EvidenceType[] {
-		if (this._possibleTypes.length === 0) {
-			this._possibleTypes.add(...this.possible.map(p => p.evidenceType));
-		}
-		return this._possibleTypes.asArray();
+		return this.uniqueTypes.asArray();
 	}
 
 	public get possibleValues(): EvidenceValue[] {
-		if (this._possibleValues.length === 0) {
-			this._possibleValues.add(...this.possible.map(p => p.evidenceValue));
-		}
-		return this._possibleValues.asArray();
+		return this.uniqueValues.asArray();
 	}
 
 	public probabilityOf(predicate: (evidenceCard: EvidenceCard) => boolean): number {
-		return this.possible.filter(predicate).length / this.possible.length;
+		return this.asArray().filter(predicate).length / this.possibleCount;
 	}
 
 	public setType(evidenceType: EvidenceType): void {
-		this.possible.removeIf(card => card.evidenceType !== evidenceType);
-		this._possibleTypes.clear();
-		this._possibleTypes.add(evidenceType);
+		for (const et of EVIDENCE_TYPES) {
+			if (et === evidenceType) {
+				continue;
+			}
+			for (const evidenceValue of EVIDENCE_CARD_VALUES) {
+				this.eliminateTypeAndValue(et, evidenceValue);
+			}
+		}
 	}
 
 	public setValue(value: EvidenceValue): void {
-		this.possible.removeIf(card => card.evidenceValue !== value);
-		this._possibleValues.clear();
-		this._possibleValues.add(value);
+		for (const evidenceValue of EVIDENCE_CARD_VALUES) {
+			if (evidenceValue === value) {
+				continue;
+			}
+			for (const evidenceType of EVIDENCE_TYPES) {
+				this.eliminateTypeAndValue(evidenceType, evidenceValue);
+			}
+		}
 	}
 
 	// noinspection JSUnusedGlobalSymbols
@@ -165,8 +230,7 @@ export function formatMysteryCard(mysteryCard: MysteryCard): string {
 			return "*";
 		} else if (possible.length === all.length - 1) {
 			return "!" + all.filter(t => !possible.includes(t)).join();
-		} else {
-			return possible.join("|");
+		} else {			return possible.join("|");
 		}
 	}
 

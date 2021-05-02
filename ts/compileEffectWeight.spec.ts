@@ -10,6 +10,7 @@ import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
 import { HOLMES_MAX } from "./Game";
 import { LeadType } from "./LeadType";
 import { PursueDuplicateEffect } from "./PursueStrategy";
+import { randomInt, randomPercent } from "./rng";
 import { TurnStart } from "./TurnStart";
 import { VisibleBoard, VisibleLead } from "./VisibleBoard";
 
@@ -24,14 +25,6 @@ function assistKnownCardEffect(): AssistKnownCardEffect {
 		possibleAfter: 1,
 		possibleBefore,
 	};
-}
-
-function randomInt(max = 100, min = 1): number {
-	return min + Math.round(Math.random() * (max - min + 1));
-}
-
-function randomPercent(): number {
-	return randomInt(100) / 100;
 }
 
 function testBoth(

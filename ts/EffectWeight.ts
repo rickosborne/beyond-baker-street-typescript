@@ -270,6 +270,6 @@ export function compileEffectWeight(
 	}
 	return {
 		calculate: (e: BotTurnEffect, t: TurnStart): number => doIt(e, t, math),
-		format: (e: BotTurnEffect, t: TurnStart): string => wantFormatter ? "" : doIt(e, t, formats),
+		format: (e: BotTurnEffect, t: TurnStart): string => wantFormatter ? doIt(e, t, formats) : "",
 	};
 }

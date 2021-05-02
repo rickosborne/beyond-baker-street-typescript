@@ -18,3 +18,11 @@ export function buildRNG(
 ): PseudoRNG {
 	return sr(seed, options, callback);
 }
+
+export function randomInt(max = 100, min = 1): number {
+	return min + Math.round(Math.random() * (max - min + 1));
+}
+
+export function randomPercent(): number {
+	return randomInt(100) / 100;
+}
