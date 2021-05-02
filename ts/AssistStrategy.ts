@@ -119,12 +119,7 @@ export class AssistStrategy implements BotTurnStrategy {
 		const matchingLeads = leads.filter(lead => lead.leadCard.evidenceType === evidenceType);
 		if (!knowsType) {
 			// Assist with Type
-			const possibleAfter = otherPlayerKnowledge.knowledge.reduce((prev, cur) => {
-				const card = cur.unknownCard;
-				const types = card.possibleTypes;
-				const after = types.includes(evidenceType) ? Math.round(card.possibleCount / types.length) : card.possibleCount;
-				return prev + after;
-			}, 0);
+			const possibleAfter = this.getPossibleAfterTypes(otherPlayerKnowledge, evidenceType);
 			const assistRatio = assistRatioFromPossible(possibleBefore, possibleAfter);
 			const effects: BotTurnEffect[] = [];
 			if (matchingLeads.length === 0) {
@@ -170,12 +165,7 @@ export class AssistStrategy implements BotTurnStrategy {
 		}
 		if (!knowsValue) {
 			const effects: BotTurnEffect[] = [];
-			const possibleAfter = otherPlayerKnowledge.knowledge.reduce((prev, cur) => {
-				const card = cur.unknownCard;
-				const values = card.possibleValues;
-				const after = values.includes(evidenceValue) ? Math.round(card.possibleCount / values.length) : card.possibleCount;
-				return prev + after;
-			}, 0);
+			const possibleAfter = this.getPossibleAfterValues(otherPlayerKnowledge, evidenceValue);
 			const assistRatio = assistRatioFromPossible(possibleBefore, possibleAfter);
 			if (knowsType) {
 				addEffect<AssistKnownCardEffect>(effects, {
@@ -249,6 +239,24 @@ export class AssistStrategy implements BotTurnStrategy {
 		return askOtherPlayersAboutTheirHands(turn)
 			.flatMap(otherPlayerKnowledge => this.buildAssistsForPlayer(otherPlayerKnowledge, leads, turn))
 			;
+	}
+
+	private getPossibleAfterTypes(otherPlayerKnowledge: OtherPlayerKnowledge, evidenceType: EvidenceType): number {
+		return otherPlayerKnowledge.knowledge.reduce((prev, cur) => {
+			const card = cur.unknownCard;
+			const types = card.possibleTypes;
+			const after = types.includes(evidenceType) ? Math.round(card.possibleCount / types.length) : card.possibleCount;
+			return prev + after;
+		}, 0);
+	}
+
+	private getPossibleAfterValues(otherPlayerKnowledge: OtherPlayerKnowledge, evidenceValue: number): number {
+		return otherPlayerKnowledge.knowledge.reduce((prev, cur) => {
+			const card = cur.unknownCard;
+			const values = card.possibleValues;
+			const after = values.includes(evidenceValue) ? Math.round(card.possibleCount / values.length) : card.possibleCount;
+			return prev + after;
+		}, 0);
 	}
 
 	private mergeEffects(destination: BotTurnEffect[], source: BotTurnEffect[]): void {
