@@ -13,7 +13,7 @@
 			"dom",
 			"ESNext"
 		],
-		"module": "ESNext",
+		"module": "CommonJS",
 		"noEmitHelpers": true,
 		"noFallthroughCasesInSwitch": true,
 		"noImplicitAny": true,

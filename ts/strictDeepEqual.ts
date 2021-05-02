@@ -13,6 +13,7 @@ export function strictDeepEqual(a: unknown, b: unknown): boolean {
 		// Because the linter complains about Function
 		return (a as string).toString() === (b as string).toString();
 	} else if (type !== "object") {
+		/* istanbul ignore next */
 		throw new Error(`Unhandled type ${type} in strictDeepEqual`);
 	}
 	const isArray = Array.isArray(a);

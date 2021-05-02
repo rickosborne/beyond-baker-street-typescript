@@ -10,7 +10,7 @@ import { LEAD_TYPES } from "./LeadType";
 import { addLoseEffect } from "./LoseEffect";
 import { MysteryCard } from "./MysteryCard";
 import { PursueAction } from "./PursueAction";
-import { ALL_PATHS_TO, MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
+import { allPathsTo, MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
 import { unique } from "./unique";
@@ -97,7 +97,7 @@ export class PursueStrategy implements BotTurnStrategy {
 				const impossibleValues: EvidenceValue[] = [];
 				this.gatherEvidenceFromImpossible(evidenceType, turn, impossibleValues);
 				impossibleValues.sort();
-				const allPaths = ALL_PATHS_TO[totalValue];
+				const allPaths = allPathsTo(totalValue);
 				if (!Array.isArray(allPaths) || allPaths.length === 0) {
 					throw new Error(`Unable to figure out card paths to ${totalValue}!`);
 				}

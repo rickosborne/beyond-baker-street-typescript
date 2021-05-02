@@ -58,16 +58,18 @@ export const EFFECT_WEIGHT_OPERANDS: EffectWeightOperand[] = [
 ];
 
 export type EffectWeightOp = EffectWeightOperator | EffectWeightOperand | number;
-export type EffectOperandResolver = (effect: BotTurnEffect, turnStart: TurnStart) => number;
-export type EffectWeightFormatter = (effect: BotTurnEffect, turnStart: TurnStart, stack: string[]) => string;
-export type EffectWeightOperation = (effect: BotTurnEffect, turnStart: TurnStart, stack: number[]) => void;
+export type EffectTurnStackConverter<S, R extends S | void> = S extends (string | number) ? (effect: BotTurnEffect, turnStart: TurnStart, stack: S[]) => R : (effect: BotTurnEffect, turnStart: TurnStart) => R;
+export type EffectOperandResolver = EffectTurnStackConverter<unknown, number>;
+export type EffectWeightFormatter = EffectTurnStackConverter<string, string>;
+export type EffectWeightOperation = EffectTurnStackConverter<number, void>;
 export interface EffectCalculator {
 	calculate: EffectOperandResolver;
-	format: (effect: BotTurnEffect, turnStart: TurnStart) => string;
+	format: EffectTurnStackConverter<unknown, string>;
 }
 
 export function ifEffectType<E extends BotTurnEffect>(type: BotTurnEffectType, mapper: (effect: E) => number): EffectOperandResolver {
 	return e => {
+		/* istanbul ignore if */
 		if (e.effectType !== type) {
 			throw new Error(`Effect ${e.effectType} found, but expected: ${type}`);
 		}
@@ -83,6 +85,7 @@ export function ifEffectMatch<E>(
 		if (guard(e)) {
 			return mapper(e);
 		}
+		/* istanbul ignore next */
 		throw new Error(`Effect ${e.effectType} found but unexpected.`);
 	};
 }
@@ -103,9 +106,14 @@ const EFFECT_WEIGHT_OPERAND_RESOLVER: Record<EffectWeightOperand, EffectOperandR
 	[EffectWeightOperand.UnconfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => !t.board.leads[lt].confirmed).length,
 };
 
+export function operandResolver(operand: EffectWeightOperand): EffectOperandResolver {
+	return EFFECT_WEIGHT_OPERAND_RESOLVER[operand];
+}
+
 function unaryOp(name: string, fn: (a: number) => number): EffectWeightOperation {
-	return (e, t, s) => {
+	return (e, t, s: number[]): void => {
 		const a = s.pop();
+		/* istanbul ignore if */
 		if (a === undefined) {
 			throw new Error(`${name} requires at least 1 element.`);
 		}
@@ -114,9 +122,10 @@ function unaryOp(name: string, fn: (a: number) => number): EffectWeightOperation
 }
 
 function binaryOp(name: string, fn: (a: number, b: number) => number): EffectWeightOperation {
-	return (e, t, s) => {
+	return (e, t, s: number[]): void => {
 		const a = s.pop();
 		const b = s.pop();
+		/* istanbul ignore if */
 		if (a === undefined || b === undefined) {
 			throw new Error(`${name} requires at least 2 elements`);
 		}
@@ -153,8 +162,8 @@ function format2(popped: (a: string, b: string) => string): EffectWeightFormatte
 }
 
 function formatPush(op: EffectWeightOperand): EffectWeightFormatter {
-	const resolver = EFFECT_WEIGHT_OPERAND_RESOLVER[op];
-	return (e, t, s): string => {
+	const resolver: EffectOperandResolver = operandResolver(op);
+	return (e, t, s: string[]): string => {
 		const value = String(resolver(e, t));
 		s.push(value);
 		return value;
@@ -162,13 +171,13 @@ function formatPush(op: EffectWeightOperand): EffectWeightFormatter {
 }
 
 const EFFECT_WEIGHT_OPERATION_FORMAT: Record<EffectWeightOp, EffectWeightFormatter> = {
-	[EffectWeightOperator.Add]: format2((a, b) => `${b}+(${a})`),
-	[EffectWeightOperator.Divide]: format2((a, b) => `${b}/(${a})`),
+	[EffectWeightOperator.Add]: format2((a, b) => `(${b})+(${a})`),
+	[EffectWeightOperator.Divide]: format2((a, b) => `(${b})/(${a})`),
 	[EffectWeightOperator.Invert]: format1(a => `1/(${a})`),
-	[EffectWeightOperator.Multiply]: format2((a, b) => `${b}*(${a})`),
-	[EffectWeightOperator.Negate]: format1(a => `-(${a})`),
+	[EffectWeightOperator.Multiply]: format2((a, b) => `(${b})*(${a})`),
+	[EffectWeightOperator.Negate]: format1(a => `0-(${a})`),
 	[EffectWeightOperator.Reverse]: format1(a => `1-(${a})`),
-	[EffectWeightOperator.Subtract]: format2((a, b) => `${b}-(${a})`),
+	[EffectWeightOperator.Subtract]: format2((a, b) => `(${b})-(${a})`),
 	[EffectWeightOperand.AssistRatio]: formatPush(EffectWeightOperand.AssistRatio),
 	[EffectWeightOperand.ConfirmedLeads]: formatPush(EffectWeightOperand.ConfirmedLeads),
 	[EffectWeightOperand.EvidenceTarget]: formatPush(EffectWeightOperand.EvidenceTarget),
@@ -196,8 +205,13 @@ export function isNumber(maybe: unknown): maybe is number {
 	return typeof maybe === "number" && !isNaN(maybe);
 }
 
-export function compileEffectWeight(ops: EffectWeightOp[], type: BotTurnEffectType): EffectCalculator {
+export function compileEffectWeight(
+	ops: EffectWeightOp[],
+	type: BotTurnEffectType,
+	wantFormatter = true,
+): EffectCalculator {
 	if (ops.length < 1) {
+		/* istanbul ignore next */
 		throw new Error(`No ops for effectWeight`);
 	}
 	const math: EffectWeightOperation = ops.reduce((p, c): EffectWeightOperation => {
@@ -206,7 +220,7 @@ export function compileEffectWeight(ops: EffectWeightOp[], type: BotTurnEffectTy
 				if (p != null) {
 					p(e, t, s);
 				}
-				const resolver = EFFECT_WEIGHT_OPERAND_RESOLVER[c];
+				const resolver = operandResolver(c);
 				const value = resolver(e, t);
 				s.push(value);
 			};
@@ -227,7 +241,7 @@ export function compileEffectWeight(ops: EffectWeightOp[], type: BotTurnEffectTy
 			};
 		}
 	}, undefined as unknown as EffectWeightOperation);
-	const formats: EffectWeightFormatter = ops.reduce((p, c): EffectWeightFormatter => {
+	const formats: EffectWeightFormatter = wantFormatter ? ops.reduce((p, c): EffectWeightFormatter => {
 		return (e, t, s): string => {
 			if (p != null) {
 				p(e, t, s);
@@ -240,20 +254,22 @@ export function compileEffectWeight(ops: EffectWeightOp[], type: BotTurnEffectTy
 			const opFormatter = EFFECT_WEIGHT_OPERATION_FORMAT[c];
 			return opFormatter(e, t, s);
 		};
-	}, undefined as unknown as EffectWeightFormatter);
+	}, undefined as unknown as EffectWeightFormatter) : (e, t, s) => { s.push(""); return ""; };
 	function doIt<T>(effect: BotTurnEffect, turnStart: TurnStart, fn: (effect: BotTurnEffect, turnStart: TurnStart, stack: T[]) => void): T {
 		const s: T[] = [];
 		fn(effect, turnStart, s);
 		const value = s.pop();
 		if (value === undefined) {
+			/* istanbul ignore next */
 			throw new Error(`Undefined result from ${type}`);
 		} else if (s.length > 0) {
+			/* istanbul ignore next */
 			throw new Error(`Dirty stack for ${type}`);
 		}
 		return value;
 	}
 	return {
 		calculate: (e: BotTurnEffect, t: TurnStart): number => doIt(e, t, math),
-		format: (e: BotTurnEffect, t: TurnStart): string => doIt(e, t, formats),
+		format: (e: BotTurnEffect, t: TurnStart): string => wantFormatter ? "" : doIt(e, t, formats),
 	};
 }

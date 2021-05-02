@@ -9,6 +9,7 @@
 	"parallel": true,
 	"reporter": "spec",
 	"require": [
+		"esm",
 		"ts-node/register"
 	],
 	"slow": 75,

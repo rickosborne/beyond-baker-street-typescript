@@ -6,3 +6,4 @@ js/
 *.js
 *.d.ts
 *.log
+coverage/

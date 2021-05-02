@@ -28,7 +28,7 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 		private readonly logger: Logger = SILENT_LOGGER,
 	) {
 		const opsFromType = Object.assign({}, DEFAULT_SCORE_FROM_TYPE, scoreFromTypeOverrides);
-		this.scoreFromType = objectMap<BotTurnEffectType, EffectWeightOp[], EffectCalculator>(opsFromType, (ops, et) => compileEffectWeight(ops, et));
+		this.scoreFromType = objectMap<BotTurnEffectType, EffectWeightOp[], EffectCalculator>(opsFromType, (ops, et) => compileEffectWeight(ops, et, this.logger !== SILENT_LOGGER));
 	}
 
 	public formatScoredOptions(scored: ScoredOption[], bot: Bot, turnStart: TurnStart): string {

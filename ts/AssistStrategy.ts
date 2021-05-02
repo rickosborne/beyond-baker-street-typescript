@@ -50,7 +50,7 @@ export interface AssistEffect extends BotTurnEffect, Assisted {
 /**
  * The other person should now know the exact card.
  */
-export interface KnownCardEffect extends AssistEffect {
+export interface AssistKnownCardEffect extends AssistEffect {
 	effectType: BotTurnEffectType.AssistKnown;
 	possibleAfter: 1;
 }
@@ -136,7 +136,7 @@ export class AssistStrategy implements BotTurnStrategy {
 				});
 			}
 			if (knowsValue) {
-				addEffect<KnownCardEffect>(effects, {
+				addEffect<AssistKnownCardEffect>(effects, {
 					assistRatio,
 					effectType: BotTurnEffectType.AssistKnown,
 					possibleAfter: 1,
@@ -178,7 +178,7 @@ export class AssistStrategy implements BotTurnStrategy {
 			}, 0);
 			const assistRatio = assistRatioFromPossible(possibleBefore, possibleAfter);
 			if (knowsType) {
-				addEffect<KnownCardEffect>(effects, {
+				addEffect<AssistKnownCardEffect>(effects, {
 					assistRatio,
 					effectType: BotTurnEffectType.AssistKnown,
 					possibleAfter: 1,
