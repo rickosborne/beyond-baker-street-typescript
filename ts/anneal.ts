@@ -11,6 +11,35 @@ export interface AnnealParams<State> {
 	temperatureMin: number;
 }
 
+export enum AnnealEventType {
+	CalculateEnergy = "CalculateEnergy",
+	Neighbor = "Neighbor",
+}
+
+export interface AnnealEvent {
+	annealEventType: AnnealEventType;
+}
+
+export interface CalculateEnergyEvent<State> extends AnnealEvent {
+	annealEventType: AnnealEventType.CalculateEnergy;
+	state: State;
+}
+
+export function isCalculateEnergyEvent<T>(maybe: unknown): maybe is CalculateEnergyEvent<T> {
+	return (maybe != null) && ((maybe as CalculateEnergyEvent<unknown>).annealEventType === AnnealEventType.CalculateEnergy);
+}
+
+export interface NeighborEvent<State> extends AnnealEvent {
+	annealEventType: AnnealEventType.Neighbor;
+	prng: PseudoRNG;
+	state: State;
+	temp: number;
+}
+
+export function isNeighborEvent<T>(maybe: unknown): maybe is NeighborEvent<T> {
+	return (maybe != null) && ((maybe as NeighborEvent<unknown>).annealEventType === AnnealEventType.Neighbor);
+}
+
 const ANNEAL_DEFAULTS: Partial<AnnealParams<unknown>> = {
 	prng: DEFAULT_PRNG,
 	temperature: temp => temp - 1,

@@ -1,20 +1,20 @@
-import * as fs from "fs";
+import * as sqlite3 from "better-sqlite3";
 import * as process from "process";
 import { anneal, AnnealParams } from "./anneal";
 import { Bot } from "./Bot";
 import { BotTurnEffectType } from "./BotTurn";
 import { CASE_FILE_CARDS } from "./CaseFileCard";
-import { EffectWeightOpsFromType } from "./defaultScores";
+import { EffectWeightOpsFromType, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
 import { EffectWeightOp } from "./EffectWeight";
 import { formatPercent } from "./formatPercent";
 import { Game, GameState } from "./Game";
+import { SILENT_LOGGER } from "./logger";
 import { randomItem } from "./randomItem";
 import { range } from "./range";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { stableJson } from "./stableJson";
 
 interface SimRun {
-	attempts: Record<string, number>;
 	lossRate?: number;
 	weights: Partial<EffectWeightOpsFromType>;
 }
@@ -61,24 +61,65 @@ const historyFileName = process.argv[2];
 if (historyFileName == null) {
 	throw new Error(`Usage: ts-node optimizeWeights.ts "history.json"`);
 }
-const history = fs.existsSync(historyFileName) ? fs.readFileSync(historyFileName, { encoding: "utf8" }) : "{}";
+// const historyFileNameJson = `${historyFileName}.json`;
+const historyFileNameSqlite = `${historyFileName}.sqlite`;
+// const history = fs.existsSync(historyFileNameJson) ? fs.readFileSync(historyFileNameJson, { encoding: "utf8" }) : "{}";
+const db = new sqlite3(historyFileNameSqlite);
+db.pragma("journal_mode = WAL");
+function quit(): void {
+	console.log(`Closing ${historyFileNameSqlite}`);
+	db.close();
+	process.exit();
+}
+process.on("exit", quit);
+process.on("SIGHUP", quit);
+process.on("SIGINT", quit);
+process.on("SIGTERM", quit);
+db.exec("CREATE TABLE IF NOT EXISTS weights_score (weights TEXT NOT NULL PRIMARY KEY, score DECIMAL(8,7))");
+interface SelectWeightsScore {
+	score: number;
+	weights: string;
+}
+const scoreForAttempt = (db => {
+	const selectScore = db.prepare<string>("SELECT score FROM weights_score WHERE (weights = ?)");
+	return function scoreForAttempt(attempt: string): number | undefined {
+		const row: SelectWeightsScore | undefined = selectScore.get(attempt);
+		return row?.score;
+	};
+})(db);
+const addAttemptScore = (db => {
+	const insertAttemptScore = db.prepare<[ string, number ]>("INSERT OR IGNORE INTO weights_score (weights, score) VALUES (?, ?)");
+	return function addAttemptScore(attempt: string, score: number): number {
+		return insertAttemptScore.run(attempt, score).changes;
+	};
+})(db);
+const findBestScore = (db => {
+	const selectLowestScore = db.prepare("SELECT weights, score FROM weights_score ORDER BY score LIMIT 1");
+	return function findBestScore(): SelectWeightsScore | undefined {
+		return selectLowestScore.get();
+	};
+})(db);
+interface SelectAttemptSummary { attempts: number; best: number; }
+const findAttemptSummary = (db => {
+	const selectAttemptSummary = db.prepare("SELECT COUNT(*) as attempts, MIN(score) as best FROM weights_score");
+	return function findAttemptSummary(): SelectAttemptSummary | undefined {
+		return selectAttemptSummary.get();
+	};
+})(db);
+const bestAttemptFromDB: SelectWeightsScore | undefined = findBestScore();
+const bestAttemptWeights: string | undefined = bestAttemptFromDB?.weights;
+const bestAttemptLossRate: number | undefined = bestAttemptFromDB?.score;
 const iterations = 250;
-const attempts: Record<string, number> = JSON.parse(history);
 const IGNORE_TYPES = [ BotTurnEffectType.Win, BotTurnEffectType.Lose ];
 const MUTABLE_TYPES = (Object.keys(FLAT_SCORE_FROM_TYPE) as BotTurnEffectType[])
 	.filter((key: BotTurnEffectType) => !IGNORE_TYPES.includes(key));
-const bestAttemptWeights: string | undefined = Object.keys(attempts)
-	.sort((a, b) => attempts[a] - attempts[b])[0];
-const initialState: SimRun = bestAttemptWeights != null ? {
-	attempts,
-	lossRate: attempts[bestAttemptWeights],
-	weights: JSON.parse(bestAttemptWeights),
-} : {
-	attempts,
-	lossRate: 1,
-	weights: {},
-};
-console.log(`Initial: ${formatPercent(initialState.lossRate as number, 2)}: ${stableJson(initialState.weights, 2)}`);
+
+function getAttemptSummary(): SelectAttemptSummary {
+	return findAttemptSummary() || {
+		attempts: 0,
+		best: 1,
+	};
+}
 
 function calculateEnergy(simRun: SimRun): number {
 	if (simRun.lossRate !== undefined) {
@@ -86,7 +127,8 @@ function calculateEnergy(simRun: SimRun): number {
 	}
 	let losses = 0;
 	for (let i = 0; i < iterations; i++) {
-		const game = new Game(CASE_FILE_CARDS[0], range(1, 4).map(() => new Bot()));
+		const game = new Game(CASE_FILE_CARDS[0], range(1, 4)
+			.map(() => new Bot(SILENT_LOGGER, DEFAULT_PRNG, simRun.weights)));
 		while (game.state === GameState.Playing) {
 			game.step();
 		}
@@ -97,15 +139,17 @@ function calculateEnergy(simRun: SimRun): number {
 	const lossRate = losses / iterations;
 	simRun.lossRate = lossRate;
 	const attempt = stableJson(simRun.weights);
-	attempts[attempt] = lossRate;
-	// console.log(`${formatPercent(lossRate, 2)}: ${attempt}`);
-	// console.log(`${formatPercent(lossRate, 2)}`);
+	addAttemptScore(attempt, lossRate);
 	return lossRate;
 }
 
 function save(bestState: SimRun, bestEnergy: number): void {
-	fs.writeFileSync(historyFileName, stableJson(attempts, "\t"), { encoding: "utf8" });
-	console.log(`Saved ${Object.keys(attempts).length} :: ${formatPercent(bestEnergy, 2)} :: ${JSON.stringify(bestState.weights)}`);
+	// fs.writeFileSync(historyFileNameJson, stableJson(attempts, "\t"), { encoding: "utf8" });
+	if (typeof db.checkpoint === "function") {
+		db.checkpoint();
+	}
+	const summary = getAttemptSummary();
+	console.log(`Saved ${summary.attempts} :: ${formatPercent(bestEnergy, 2)} :: ${formatOrderedEffectWeightOpsFromType(bestState.weights)}`);
 }
 
 function neighbor(simRun: SimRun, temp: number, prng: PseudoRNG): SimRun {
@@ -124,10 +168,9 @@ function neighbor(simRun: SimRun, temp: number, prng: PseudoRNG): SimRun {
 			}
 			const weights = Object.assign({}, priorWeights, override);
 			const json = stableJson(weights);
-			const already = attempts[json];
-			if (already == null) {
+			const already = scoreForAttempt(json);
+			if (already === undefined) {
 				return {
-					attempts,
 					weights,
 				};
 			}
@@ -136,10 +179,20 @@ function neighbor(simRun: SimRun, temp: number, prng: PseudoRNG): SimRun {
 	throw new Error(`Could not find anything to modify`);
 }
 
+const initialState: SimRun = bestAttemptWeights != null ? {
+	lossRate: bestAttemptLossRate,
+	weights: JSON.parse(bestAttemptWeights),
+} : {
+	lossRate: 1,
+	weights: {},
+};
+console.log(`Initial: ${formatPercent(initialState.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(initialState.weights)}`);
+
 let state = initialState;
 
 while (state.lossRate === undefined || state.lossRate > 0.8) {
-	console.log(`Starting with ${Object.keys(attempts).length} attempts and a loss rate of ${formatPercent(state.lossRate || 1, 2)}.`);
+	const summary = getAttemptSummary();
+	console.log(`Starting with ${summary.attempts} attempts and a loss rate of ${formatPercent(state.lossRate || 1, 2)}.`);
 	state = anneal(<AnnealParams<SimRun>> {
 		calculateEnergy,
 		initialState: state,
@@ -153,4 +206,5 @@ while (state.lossRate === undefined || state.lossRate > 0.8) {
 }
 
 console.log("-----");
-console.log(`${formatPercent(state.lossRate as number, 2)}: ${stableJson(state.weights, 2)}`);
+console.log(`${formatPercent(state.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
+

@@ -1,4 +1,4 @@
-import { BotTurnEffectType } from "./BotTurn";
+import { BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
 import { EffectWeightOp, EffectWeightOperand, EffectWeightOperator } from "./EffectWeight";
 
 export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightOp[]>;
@@ -38,3 +38,18 @@ export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.PursuePossible]: [-100],
 	[BotTurnEffectType.Lose]: [-1000],
 };
+
+export function isEffectWeightOpsFromType(maybe: unknown): maybe is EffectWeightOpsFromType {
+	const rec = maybe as Record<string, unknown>;
+	return (maybe != null)
+		&& (typeof maybe === "object")
+		&& (!Array.isArray(maybe))
+		&& (Object.keys(rec).findIndex(k => !isBotTurnEffectType(k) || !Array.isArray(rec[k])) < 0);
+}
+
+export function formatOrderedEffectWeightOpsFromType(weights: Partial<EffectWeightOpsFromType>): string {
+	return (Object.keys(weights) as BotTurnEffectType[])
+		.sort((a, b) => ((weights[b] as EffectWeightOp[])[0] as number) - ((weights[a] as EffectWeightOp[])[0] as number))
+		.map(key => `${key}:${(weights[key] as EffectWeightOp[])[0]}`)
+		.join(" > ");
+}

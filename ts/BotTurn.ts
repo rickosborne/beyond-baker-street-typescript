@@ -35,6 +35,45 @@ export enum BotTurnEffectType {
 	Win = "Win",
 }
 
+export const BOT_TURN_EFFECT_TYPES: BotTurnEffectType[] = [
+	BotTurnEffectType.AssistExactEliminate,
+	BotTurnEffectType.AssistImpossibleType,
+	BotTurnEffectType.AssistKnown,
+	BotTurnEffectType.AssistNarrow,
+	BotTurnEffectType.AssistNextPlayer,
+	BotTurnEffectType.Confirm,
+	BotTurnEffectType.EliminateKnownUnusedValue,
+	BotTurnEffectType.EliminateKnownUsedValue,
+	BotTurnEffectType.EliminateSetsUpExact,
+	BotTurnEffectType.EliminateStompsExact,
+	BotTurnEffectType.EliminateUnknownValue,
+	BotTurnEffectType.EliminateUnusedType,
+	BotTurnEffectType.EliminateUsedType,
+	BotTurnEffectType.EliminateWild,
+	BotTurnEffectType.HolmesImpeded,
+	BotTurnEffectType.HolmesProgress,
+	BotTurnEffectType.ImpossibleAdded,
+	BotTurnEffectType.InvestigateBad,
+	BotTurnEffectType.InvestigateCorrectType,
+	BotTurnEffectType.InvestigateCorrectValue,
+	BotTurnEffectType.InvestigateMaybeBad,
+	BotTurnEffectType.InvestigatePerfect,
+	BotTurnEffectType.InvestigateWild,
+	BotTurnEffectType.Lose,
+	BotTurnEffectType.MaybeLose,
+	BotTurnEffectType.PursueDuplicate,
+	BotTurnEffectType.PursueImpossible,
+	BotTurnEffectType.PursueMaybe,
+	BotTurnEffectType.PursuePossible,
+	BotTurnEffectType.Win,
+];
+
+export function isBotTurnEffectType(maybe: unknown): maybe is BotTurnEffectType {
+	return (maybe != null)
+		&& (typeof maybe === "string")
+		&& BOT_TURN_EFFECT_TYPES.includes(maybe as BotTurnEffectType);
+}
+
 export interface BotTurnEffect {
 	effectType: BotTurnEffectType;
 }
