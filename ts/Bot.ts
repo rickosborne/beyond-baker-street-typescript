@@ -11,6 +11,7 @@ import { BOT_STRATEGIES } from "./BotStrategies";
 import { BotTurnStrategy } from "./BotTurn";
 import { BasicBotTurnEvaluator, BotTurnEvaluator } from "./BotTurnEvaluator";
 import { ConfirmOutcome, isConfirmOutcome } from "./ConfirmAction";
+import { EffectWeightOpsFromType } from "./defaultScores";
 import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
@@ -25,14 +26,14 @@ import {
 } from "./InvestigateAction";
 import { formatLeadCard } from "./LeadCard";
 import { LEAD_TYPES } from "./LeadType";
-import { Logger } from "./logger";
+import { Logger, SILENT_LOGGER } from "./logger";
 import { formatMysteryCard, HasMysteryHand, MysteryCard, MysteryPile } from "./MysteryCard";
 import { OtherHand } from "./OtherHand";
 import { Outcome } from "./Outcome";
 import { ActivePlayer, isSamePlayer } from "./Player";
 import { isPursueOutcome, PursueOutcome } from "./PursueAction";
 import { range } from "./range";
-import { PseudoRNG } from "./rng";
+import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { TurnStart } from "./TurnStart";
 import { unconfirmedLeads } from "./unconfirmedLeads";
 
@@ -61,11 +62,12 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	public readonly remainingEvidence = new MysteryPile();
 
 	constructor(
-		private readonly logger: Logger,
-		private readonly prng: PseudoRNG,
+		private readonly logger: Logger = SILENT_LOGGER,
+		private readonly prng: PseudoRNG = DEFAULT_PRNG,
+		scoreFromTypeOverrides: Partial<EffectWeightOpsFromType> = {},
 		public readonly name: string = nextName(prng),
 		private readonly strategies: BotTurnStrategy[] = BOT_STRATEGIES.slice(),
-		private readonly evaluator: BotTurnEvaluator = new BasicBotTurnEvaluator({}, logger),
+		private readonly evaluator: BotTurnEvaluator = new BasicBotTurnEvaluator(scoreFromTypeOverrides, logger),
 	) {}
 
 	public addCard(index: number, evidenceCard: EvidenceCard | undefined, fromRemainingEvidence: boolean): void {

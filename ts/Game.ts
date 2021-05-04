@@ -31,7 +31,7 @@ import { OtherHand } from "./OtherHand";
 import { Outcome, OutcomeType } from "./Outcome";
 import { ActivePlayer, isSamePlayer, OtherPlayer, Player } from "./Player";
 import { formatPursueOutcome, isPursueAction, PursueAction, PursueOutcome } from "./PursueAction";
-import { PseudoRNG } from "./rng";
+import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { TurnStart } from "./TurnStart";
 import { formatLeadsProgress } from "./VisibleBoard";
 
@@ -138,7 +138,7 @@ export class Game {
 	constructor(
 		public readonly caseFile: CaseFileCard,
 		players: ActivePlayer[],
-		private readonly prng: PseudoRNG,
+		private readonly prng: PseudoRNG = DEFAULT_PRNG,
 		private readonly logger: Logger = SILENT_LOGGER,
 	) {
 		this.board = new Board(caseFile, prng);

@@ -9,6 +9,8 @@ type SeedRandomModule = {
 	default: SeedRandom;
 }
 
+export const DEFAULT_PRNG: PseudoRNG = Math.random;
+
 const sr = "default" in seedrandom ? (seedrandom as unknown as SeedRandomModule).default : seedrandom;
 
 export function buildRNG(

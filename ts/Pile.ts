@@ -1,4 +1,5 @@
 import { PseudoRNG } from "./rng";
+import { shuffleInPlace } from "./shuffle";
 
 export class Pile<C> {
 	protected readonly cards: C[] = [];
@@ -35,12 +36,7 @@ export class Pile<C> {
 	}
 
 	public shuffle(prng: PseudoRNG): void {
-		for (let i = 0; i < this.cards.length; i++) {
-			const j = Math.floor(prng() * this.cards.length);
-			const c = this.cards[i];
-			this.cards[i] = this.cards[j];
-			this.cards[j] = c;
-		}
+		shuffleInPlace(this.cards, prng);
 	}
 
 	public sum(valueExtractor: (card: C) => number, start = 0): number {

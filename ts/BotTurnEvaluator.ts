@@ -1,7 +1,7 @@
 import { Bot } from "./Bot";
 import { BotTurnEffect, BotTurnEffectType, BotTurnOption } from "./BotTurn";
 import { columnarNumber } from "./columnarNumber";
-import { DEFAULT_SCORE_FROM_TYPE } from "./defaultScores";
+import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import { compileEffectWeight, EffectCalculator, EffectWeightOp } from "./EffectWeight";
 import { formatAction } from "./formatAction";
 import { Logger, SILENT_LOGGER } from "./logger";
@@ -24,7 +24,7 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 	private readonly scoreFromType: Record<BotTurnEffectType, EffectCalculator>;
 
 	constructor(
-		scoreFromTypeOverrides: Partial<Record<BotTurnEffectType, number>> = {},
+		scoreFromTypeOverrides: Partial<EffectWeightOpsFromType> = {},
 		private readonly logger: Logger = SILENT_LOGGER,
 	) {
 		const opsFromType = Object.assign({}, DEFAULT_SCORE_FROM_TYPE, scoreFromTypeOverrides);

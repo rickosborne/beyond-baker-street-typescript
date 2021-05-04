@@ -9,6 +9,7 @@
 		"@istanbuljs/nyc-config-typescript": "^1.0.1",
 		"@types/chai": "^4.2.17",
 		"@types/mocha": "^8.2.2",
+		"@types/node": "^15.0.1",
 		"@types/seedrandom": "^3.0.0",
 		"@typescript-eslint/eslint-plugin": "^4.22.0",
 		"@typescript-eslint/parser": "^4.22.0",
@@ -42,6 +43,7 @@
 		"prereinstall": "npm run clean",
 		"recompileAndRun": "npm run compile ; npm run start",
 		"reinstall": "npm install",
+		"optimize": "ts-node ts/optimizeWeights.ts optimizeWeightsAttempts.json",
 		"profile": "node js/index.js",
 		"start": "ts-node index.ts",
 		"test": "mocha --config .mocharc.json ts/*.spec.ts"

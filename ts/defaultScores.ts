@@ -1,8 +1,10 @@
 import { BotTurnEffectType } from "./BotTurn";
 import { EffectWeightOp, EffectWeightOperand, EffectWeightOperator } from "./EffectWeight";
 
+export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightOp[]>;
+
 const HOLMES_MAX = 20;
-export const DEFAULT_SCORE_FROM_TYPE: Record<BotTurnEffectType, EffectWeightOp[]> = {
+export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.Win]: [1000],
 	[BotTurnEffectType.InvestigatePerfect]: [100],
 	[BotTurnEffectType.PursueImpossible]: [50],
@@ -21,9 +23,9 @@ export const DEFAULT_SCORE_FROM_TYPE: Record<BotTurnEffectType, EffectWeightOp[]
 
 	[BotTurnEffectType.InvestigateCorrectValue]: [0],
 
-	[BotTurnEffectType.ImpossibleAdded]: [ EffectWeightOperand.ImpossibleCount, EffectWeightOperator.Negate ],
+	[BotTurnEffectType.ImpossibleAdded]: [ 0, EffectWeightOperand.ImpossibleCount, EffectWeightOperator.Subtract ],
 	[BotTurnEffectType.EliminateUnknownValue]: [-5],
-	[BotTurnEffectType.HolmesProgress]: [ EffectWeightOperand.HolmesLocation, -HOLMES_MAX, EffectWeightOperator.Add ],
+	[BotTurnEffectType.HolmesProgress]: [ -HOLMES_MAX, EffectWeightOperand.HolmesLocation, EffectWeightOperator.Add ],
 	[BotTurnEffectType.InvestigateMaybeBad]: [-10],
 	[BotTurnEffectType.InvestigateWild]: [-12],
 	[BotTurnEffectType.InvestigateBad]: [-15],

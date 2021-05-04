@@ -8,3 +8,4 @@ js/
 *.log
 coverage/
 .nyc_output/
+optimizeWeightsAttempts.json
