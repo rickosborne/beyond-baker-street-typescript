@@ -1,14 +1,12 @@
 import * as sqlite3 from "better-sqlite3";
+import * as os from "os";
 import * as process from "process";
 import { anneal, AnnealParams } from "./anneal";
-import { Bot } from "./Bot";
 import { BotTurnEffectType } from "./BotTurn";
-import { CASE_FILE_CARDS } from "./CaseFileCard";
 import { EffectWeightOpsFromType, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
 import { EffectWeightOp } from "./EffectWeight";
 import { formatPercent } from "./formatPercent";
-import { Game, GameState } from "./Game";
-import { SILENT_LOGGER } from "./logger";
+import { GameWorkerPool } from "./GameWorkerPool";
 import { randomItem } from "./randomItem";
 import { range } from "./range";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
@@ -66,12 +64,14 @@ const historyFileNameSqlite = `${historyFileName}.sqlite`;
 // const history = fs.existsSync(historyFileNameJson) ? fs.readFileSync(historyFileNameJson, { encoding: "utf8" }) : "{}";
 const db = new sqlite3(historyFileNameSqlite);
 db.pragma("journal_mode = WAL");
-function quit(): void {
+function quit(doExit = true): void {
 	console.log(`Closing ${historyFileNameSqlite}`);
 	db.close();
-	process.exit();
+	if (doExit) {
+		process.exit();
+	}
 }
-process.on("exit", quit);
+process.on("exit", () => quit(false));
 process.on("SIGHUP", quit);
 process.on("SIGINT", quit);
 process.on("SIGTERM", quit);
@@ -121,26 +121,17 @@ function getAttemptSummary(): SelectAttemptSummary {
 	};
 }
 
-function calculateEnergy(simRun: SimRun): number {
-	if (simRun.lossRate !== undefined) {
-		return simRun.lossRate;
-	}
-	let losses = 0;
-	for (let i = 0; i < iterations; i++) {
-		const game = new Game(CASE_FILE_CARDS[0], range(1, 4)
-			.map(() => new Bot(SILENT_LOGGER, DEFAULT_PRNG, simRun.weights)));
-		while (game.state === GameState.Playing) {
-			game.step();
-		}
-		if (game.state === GameState.Lost) {
-			losses++;
-		}
-	}
-	const lossRate = losses / iterations;
-	simRun.lossRate = lossRate;
+const gameWorkerPool = new GameWorkerPool(Math.ceil(os.cpus().length / 2));
+
+async function calculateEnergy(simRun: SimRun): Promise<number> {
 	const attempt = stableJson(simRun.weights);
-	addAttemptScore(attempt, lossRate);
-	return lossRate;
+	const existing = scoreForAttempt(attempt);
+	if (existing != null) {
+		return existing;
+	}
+	const result = await gameWorkerPool.scoreGame(simRun.weights, iterations);
+	addAttemptScore(attempt, result.lossRate);
+	return result.lossRate;
 }
 
 function save(bestState: SimRun, bestEnergy: number): void {
@@ -152,9 +143,10 @@ function save(bestState: SimRun, bestEnergy: number): void {
 	console.log(`Saved ${summary.attempts} :: ${formatPercent(bestEnergy, 2)} :: ${formatOrderedEffectWeightOpsFromType(bestState.weights)}`);
 }
 
-function neighbor(simRun: SimRun, temp: number, prng: PseudoRNG): SimRun {
+function neighbors(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
 	const priorWeights = simRun.weights;
 	let variability = Math.floor(temp + 1);
+	const results: SimRun[] = [];
 	while (variability < 50) {
 		variability++;
 		const mods = range(-variability, variability);
@@ -170,13 +162,16 @@ function neighbor(simRun: SimRun, temp: number, prng: PseudoRNG): SimRun {
 			const json = stableJson(weights);
 			const already = scoreForAttempt(json);
 			if (already === undefined) {
-				return {
+				results.push({
 					weights,
-				};
+				});
+				if (results.length >= count) {
+					return results;
+				}
 			}
 		}
 	}
-	throw new Error(`Could not find anything to modify`);
+	return results;
 }
 
 const initialState: SimRun = bestAttemptWeights != null ? {
@@ -188,23 +183,29 @@ const initialState: SimRun = bestAttemptWeights != null ? {
 };
 console.log(`Initial: ${formatPercent(initialState.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(initialState.weights)}`);
 
-let state = initialState;
 
-while (state.lossRate === undefined || state.lossRate > 0.8) {
-	const summary = getAttemptSummary();
-	console.log(`Starting with ${summary.attempts} attempts and a loss rate of ${formatPercent(state.lossRate || 1, 2)}.`);
-	state = anneal(<AnnealParams<SimRun>> {
-		calculateEnergy,
-		initialState: state,
-		neighbor,
-		prng: DEFAULT_PRNG,
-		save,
-		temperature: temp => temp - 0.1,
-		temperatureMax: TEMP_MAX,
-		temperatureMin: TEMP_MIN,
-	});
+async function optimize(
+	initialState: SimRun
+): Promise<SimRun> {
+	let state = initialState;
+	while (state.lossRate === undefined || state.lossRate > 0.8) {
+		const summary = getAttemptSummary();
+		console.log(`Starting with ${summary.attempts} attempts and a loss rate of ${formatPercent(state.lossRate || 1, 2)}.`);
+		state = await anneal(<AnnealParams<SimRun>> {
+			calculateEnergy,
+			initialState: state,
+			neighbors,
+			prng: DEFAULT_PRNG,
+			save,
+			temperature: temp => temp - 0.1,
+			temperatureMax: TEMP_MAX,
+			temperatureMin: TEMP_MIN,
+		});
+	}
+	return state;
 }
 
-console.log("-----");
-console.log(`${formatPercent(state.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
-
+optimize(initialState).then(state => {
+	console.log("-----");
+	console.log(`${formatPercent(state.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
+});

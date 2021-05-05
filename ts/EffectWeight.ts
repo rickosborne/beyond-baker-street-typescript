@@ -3,6 +3,7 @@ import { BotTurnEffect, BotTurnEffectType } from "./BotTurn";
 import { EliminateKnownUnusedValueEffect, EliminateUnusedTypeEffect } from "./EliminateStrategy";
 import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
 import { HOLMES_MAX } from "./Game";
+import { isNumber } from "./isNumber";
 import { LEAD_TYPES } from "./LeadType";
 import { PursueDuplicateEffect } from "./PursueStrategy";
 import { TurnStart } from "./TurnStart";
@@ -199,10 +200,6 @@ export function isEffectWeightOperand(maybe: unknown): maybe is EffectWeightOper
 
 export function isEffectWeightOperator(maybe: unknown): maybe is EffectWeightOperator {
 	return typeof maybe === "string" && EFFECT_WEIGHT_OPERATORS.includes(maybe as EffectWeightOperator);
-}
-
-export function isNumber(maybe: unknown): maybe is number {
-	return typeof maybe === "number" && !isNaN(maybe);
 }
 
 export function compileEffectWeight(
