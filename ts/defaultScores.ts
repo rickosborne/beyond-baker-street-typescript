@@ -1,5 +1,6 @@
-import { BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
+import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
 import { EffectWeightOp, EffectWeightOperand, EffectWeightOperator } from "./EffectWeight";
+import { strictDeepEqual } from "./strictDeepEqual";
 
 export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightOp[]>;
 
@@ -52,4 +53,25 @@ export function formatOrderedEffectWeightOpsFromType(weights: Partial<EffectWeig
 		.sort((a, b) => ((weights[b] as EffectWeightOp[])[0] as number) - ((weights[a] as EffectWeightOp[])[0] as number))
 		.map(key => `${key}:${(weights[key] as EffectWeightOp[])[0]}`)
 		.join(" > ");
+}
+
+export function formatEffectWeightOpsFromTypeDiff(after: Partial<EffectWeightOpsFromType>, before: Partial<EffectWeightOpsFromType>): string {
+	return BOT_TURN_EFFECT_TYPES
+		.map((effectType: BotTurnEffectType): string | undefined => {
+			const a = after[effectType];
+			const b = before[effectType];
+			if (a == null && b == null) {
+				return undefined;  // `!${effectType}`;
+			} else if (a == null && b != null) {
+				return `-${effectType}:[${b?.join(",")}]`;
+			} else if (b == null && a != null) {
+				return `+${effectType}:[${a?.join(",")}]`;
+			} else if (strictDeepEqual(a, b)) {
+				return `=${effectType}:[${a?.join(",")}]`;
+			} else {
+				return `${effectType}:[${b?.join(",")}]=>[${a?.join(",")}]`;
+			}
+		})
+		.filter(s => s != null)
+		.join(" ");
 }

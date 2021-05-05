@@ -1,6 +1,7 @@
 import * as path from "path";
 import { Worker } from "worker_threads";
 import { cpus } from "os";
+import { playSingleGame } from "./playSingleGame";
 import { range } from "./range";
 import { isPlayGameResult, PlayGameRequest, PlayGameResult } from "./WorkerTypes";
 import { EffectWeightOpsFromType } from "./defaultScores";
@@ -22,9 +23,9 @@ export class GameWorkerPool {
 	private readonly workers: Worker[];
 
 	constructor(
-		threadCount: number = cpus().length,
+		public readonly threadCount: number = cpus().length,
 	) {
-		this.workers = range(1, threadCount).map(n => {
+		this.workers = threadCount > 0 ? range(1, threadCount).map(n => {
 			const worker = new Worker(path.resolve(__dirname, "./workerShim.js"), {
 				workerData: {
 					path: path.resolve(__dirname, "./gameWorker.ts"),
@@ -36,15 +37,15 @@ export class GameWorkerPool {
 			worker.on("error", () => this.workerOffline(n, worker));
 			worker.on("exit", () => this.workerOffline(n, worker));
 			return worker;
-		});
+		}) : [];
 		this.ready.push(...this.workers);
 	}
 
-	private nextWorker(id: number): Promise<Worker> {
+	private nextWorker(/* id: number */): Promise<Worker> {
 		const worker = this.ready.shift();
 		if (worker != null) {
 			// console.log(`Handing out ready worker for #${id}`);
-			return Promise.resolve(worker);
+			return Promise.resolve<Worker>(worker);
 		}
 		return new Promise<Worker>((resolve) => {
 			// console.log(`Queuing work for #${id}`);
@@ -73,7 +74,14 @@ export class GameWorkerPool {
 			iterations,
 			weights,
 		};
-		return new Promise((resolve) => {
+		return new Promise<PlayGameResult>((resolve) => {
+			if (this.threadCount === 0) {
+				resolve({
+					lossRate: playSingleGame(weights, iterations),
+					request,
+				});
+				return;
+			}
 			// console.log(`scoreGame registering ${id}`);
 			this.requests[id] = {
 				withResult: result => {
@@ -85,11 +93,17 @@ export class GameWorkerPool {
 					this.workerAvailable(worker);
 				},
 			};
-			this.nextWorker(id).then(worker => {
+			this.nextWorker(/* id */).then(worker => {
 				// console.log(`scoreGame sending ${id}`);
 				worker.postMessage(request);
 			});
 		});
+	}
+
+	public shutdown(): void {
+		for (const worker of this.workers) {
+			this.workerOffline(-1, worker);
+		}
 	}
 
 	private workerAvailable(worker: Worker): void {
@@ -106,5 +120,6 @@ export class GameWorkerPool {
 		const workerIndex = this.workers.indexOf(worker);
 		this.ready.splice(workerIndex, 1);
 		this.workers.splice(workerIndex, 1);
+		worker.terminate();
 	}
 }

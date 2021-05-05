@@ -1,9 +1,12 @@
 import * as sqlite3 from "better-sqlite3";
-import * as os from "os";
 import * as process from "process";
 import { anneal, AnnealParams } from "./anneal";
-import { BotTurnEffectType } from "./BotTurn";
-import { EffectWeightOpsFromType, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
+import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType } from "./BotTurn";
+import {
+	EffectWeightOpsFromType,
+	formatEffectWeightOpsFromTypeDiff,
+	formatOrderedEffectWeightOpsFromType,
+} from "./defaultScores";
 import { EffectWeightOp } from "./EffectWeight";
 import { formatPercent } from "./formatPercent";
 import { GameWorkerPool } from "./GameWorkerPool";
@@ -18,10 +21,10 @@ interface SimRun {
 }
 
 const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
-	[BotTurnEffectType.Win]: [100],
+	[BotTurnEffectType.Win]: [1000],
 	[BotTurnEffectType.InvestigatePerfect]: [0],
 	[BotTurnEffectType.PursueImpossible]: [0],
-	[BotTurnEffectType.AssistExactEliminate]: [40],
+	[BotTurnEffectType.AssistExactEliminate]: [0],
 	[BotTurnEffectType.PursueDuplicate]: [0],
 	[BotTurnEffectType.EliminateKnownUnusedValue]: [0],
 	[BotTurnEffectType.EliminateUnusedType]: [0],
@@ -51,9 +54,49 @@ const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.PursuePossible]: [0],
 	[BotTurnEffectType.Lose]: [-1000],
 };
+// 90.8% InvestigatePerfect:145 > InvestigateWild:77 > Confirm:75 > PursueImpossible:48 > AssistKnown:46
+// > EliminateSetsUpExact:42 > AssistNextPlayer:31 > AssistExactEliminate:25 > EliminateUnusedType:23
+// > EliminateUnknownValue:19 > AssistImpossibleType:18 > PursueDuplicate:16 > EliminateStompsExact:15
+// > EliminateKnownUnusedValue:10 > HolmesProgress:8 > InvestigateCorrectType:8 > HolmesImpeded:4
+// > EliminateUsedType:2 > PursueMaybe:-1 > ImpossibleAdded:-14 > InvestigateMaybeBad:-24
+// > InvestigateCorrectValue:-29 > InvestigateBad:-31 > MaybeLose:-47 > AssistNarrow:-49 > EliminateWild:-51
+// > EliminateKnownUsedValue:-59 > PursuePossible:-70
+// 92.4 InvestigatePerfect:61 > InvestigateWild:48 > InvestigateCorrectType:36 > PursueImpossible:34 > PursueDuplicate:22 > EliminateKnownUnusedValue:19 > AssistExactEliminate:17 > AssistNextPlayer:9 > EliminateUnknownValue:8 > HolmesProgress:8 > InvestigateBad:6 > InvestigateMaybeBad:5 > ImpossibleAdded:4 > EliminateKnownUsedValue:3 > HolmesImpeded:2 > AssistNarrow:2 > AssistKnown:-1 > EliminateSetsUpExact:-1 > Confirm:-1 > InvestigateCorrectValue:-4 > EliminateUnusedType:-10 > EliminateStompsExact:-10 > AssistImpossibleType:-14 > EliminateWild:-21 > PursueMaybe:-23 > MaybeLose:-36 > EliminateUsedType:-41 > PursuePossible:-52
+const HANDMADE_FROM_TYPE: EffectWeightOpsFromType = {
+	[BotTurnEffectType.Win]: [1000],
+	[BotTurnEffectType.InvestigatePerfect]: [20],
+	[BotTurnEffectType.PursueImpossible]: [19],
+	[BotTurnEffectType.AssistExactEliminate]: [12],
+	[BotTurnEffectType.PursueDuplicate]: [11],
+	[BotTurnEffectType.EliminateKnownUnusedValue]: [10],
+	[BotTurnEffectType.EliminateUnusedType]: [9],
+	[BotTurnEffectType.AssistKnown]: [8],
+	[BotTurnEffectType.InvestigateCorrectType]: [7],
+	[BotTurnEffectType.EliminateSetsUpExact]: [6],
+	[BotTurnEffectType.Confirm]: [5],
+	[BotTurnEffectType.HolmesImpeded]: [4],
+	[BotTurnEffectType.AssistImpossibleType]: [3],
+	[BotTurnEffectType.AssistNarrow]: [2],
+	[BotTurnEffectType.AssistNextPlayer]: [1],
+	[BotTurnEffectType.InvestigateCorrectValue]: [0],
+	[BotTurnEffectType.ImpossibleAdded]: [-1],
+	[BotTurnEffectType.EliminateUnknownValue]: [-2],
+	[BotTurnEffectType.HolmesProgress]: [-3],
+	[BotTurnEffectType.InvestigateMaybeBad]: [-4],
+	[BotTurnEffectType.InvestigateWild]: [-5],
+	[BotTurnEffectType.InvestigateBad]: [-6],
+	[BotTurnEffectType.EliminateUsedType]: [-7],
+	[BotTurnEffectType.PursueMaybe]: [-8],
+	[BotTurnEffectType.EliminateKnownUsedValue]: [-9],
+	[BotTurnEffectType.EliminateStompsExact]: [-10],
+	[BotTurnEffectType.EliminateWild]: [-11],
+	[BotTurnEffectType.MaybeLose]: [-12],
+	[BotTurnEffectType.PursuePossible]: [-13],
+	[BotTurnEffectType.Lose]: [-1000],
+};
 
-const TEMP_MAX = 30;
-const TEMP_MIN = 10;
+const TEMP_MAX = 10;
+const TEMP_MIN = 1;
 
 const historyFileName = process.argv[2];
 if (historyFileName == null) {
@@ -64,17 +107,17 @@ const historyFileNameSqlite = `${historyFileName}.sqlite`;
 // const history = fs.existsSync(historyFileNameJson) ? fs.readFileSync(historyFileNameJson, { encoding: "utf8" }) : "{}";
 const db = new sqlite3(historyFileNameSqlite);
 db.pragma("journal_mode = WAL");
+const gameWorkerPool = new GameWorkerPool(6);
 function quit(doExit = true): void {
 	console.log(`Closing ${historyFileNameSqlite}`);
+	gameWorkerPool.shutdown();
 	db.close();
 	if (doExit) {
 		process.exit();
 	}
 }
+process.on("beforeExit", () => quit(false));
 process.on("exit", () => quit(false));
-process.on("SIGHUP", quit);
-process.on("SIGINT", quit);
-process.on("SIGTERM", quit);
 db.exec("CREATE TABLE IF NOT EXISTS weights_score (weights TEXT NOT NULL PRIMARY KEY, score DECIMAL(8,7))");
 interface SelectWeightsScore {
 	score: number;
@@ -93,10 +136,16 @@ const addAttemptScore = (db => {
 		return insertAttemptScore.run(attempt, score).changes;
 	};
 })(db);
-const findBestScore = (db => {
-	const selectLowestScore = db.prepare("SELECT weights, score FROM weights_score ORDER BY score LIMIT 1");
-	return function findBestScore(): SelectWeightsScore | undefined {
-		return selectLowestScore.get();
+const findBestScores: () => SelectWeightsScore[] = (db => {
+	const selectLowestScore = db.prepare("SELECT MIN(score) as s FROM weights_score");
+	const selectWeightsByScore = db.prepare<number>("SELECT weights FROM weights_score WHERE (score = ?)");
+	return function findBestScores(): SelectWeightsScore[] {
+		const score: number = selectLowestScore.get().s;
+		const allWeights: Partial<EffectWeightOpsFromType>[] = selectWeightsByScore.all(score).map(row => JSON.parse(row.weights));
+		return allWeights.map(weights => <SelectWeightsScore> {
+			score,
+			weights,
+		});
 	};
 })(db);
 interface SelectAttemptSummary { attempts: number; best: number; }
@@ -106,9 +155,6 @@ const findAttemptSummary = (db => {
 		return selectAttemptSummary.get();
 	};
 })(db);
-const bestAttemptFromDB: SelectWeightsScore | undefined = findBestScore();
-const bestAttemptWeights: string | undefined = bestAttemptFromDB?.weights;
-const bestAttemptLossRate: number | undefined = bestAttemptFromDB?.score;
 const iterations = 250;
 const IGNORE_TYPES = [ BotTurnEffectType.Win, BotTurnEffectType.Lose ];
 const MUTABLE_TYPES = (Object.keys(FLAT_SCORE_FROM_TYPE) as BotTurnEffectType[])
@@ -121,8 +167,6 @@ function getAttemptSummary(): SelectAttemptSummary {
 	};
 }
 
-const gameWorkerPool = new GameWorkerPool(Math.ceil(os.cpus().length / 2));
-
 async function calculateEnergy(simRun: SimRun): Promise<number> {
 	const attempt = stableJson(simRun.weights);
 	const existing = scoreForAttempt(attempt);
@@ -130,26 +174,22 @@ async function calculateEnergy(simRun: SimRun): Promise<number> {
 		return existing;
 	}
 	const result = await gameWorkerPool.scoreGame(simRun.weights, iterations);
-	addAttemptScore(attempt, result.lossRate);
-	return result.lossRate;
-}
-
-function save(bestState: SimRun, bestEnergy: number): void {
-	// fs.writeFileSync(historyFileNameJson, stableJson(attempts, "\t"), { encoding: "utf8" });
-	if (typeof db.checkpoint === "function") {
-		db.checkpoint();
-	}
-	const summary = getAttemptSummary();
-	console.log(`Saved ${summary.attempts} :: ${formatPercent(bestEnergy, 2)} :: ${formatOrderedEffectWeightOpsFromType(bestState.weights)}`);
+	const lossRate = result.lossRate;
+	// console.log(`${formatPercent(result.lossRate, 2)} ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
+	simRun.lossRate = lossRate;
+	addAttemptScore(attempt, lossRate);
+	return lossRate;
 }
 
 function neighbors(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
+	const start = Date.now();
 	const priorWeights = simRun.weights;
 	let variability = Math.floor(temp + 1);
 	const results: SimRun[] = [];
 	while (variability < 50) {
 		variability++;
 		const mods = range(-variability, variability);
+		mods.push(...mods.map(() => 0));
 		for (let comboAttempt = 0; comboAttempt < 250; comboAttempt++) {
 			const override: Partial<EffectWeightOpsFromType> = {};
 			for (const effectType of MUTABLE_TYPES) {
@@ -165,47 +205,82 @@ function neighbors(count: number, simRun: SimRun, temp: number, prng: PseudoRNG)
 				results.push({
 					weights,
 				});
+				// console.log(formatEffectWeightOpsFromTypeDiff(weights, simRun.weights));
 				if (results.length >= count) {
+					// const endDate = Date.now();
+					// console.log(`Took ${endDate - start}ms to find ${results.length}`);
 					return results;
 				}
 			}
 		}
 	}
+	const endDate = Date.now();
+	console.log(`Gave up after ${endDate - start}ms to find ${results.length}`);
 	return results;
 }
 
-const initialState: SimRun = bestAttemptWeights != null ? {
-	lossRate: bestAttemptLossRate,
-	weights: JSON.parse(bestAttemptWeights),
-} : {
-	lossRate: 1,
-	weights: {},
-};
-console.log(`Initial: ${formatPercent(initialState.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(initialState.weights)}`);
+function improvement(afterState: SimRun, afterEnergy: number, beforeState: SimRun, beforeEnergy: number, temp: number): void {
+	console.log(`${formatPercent(afterEnergy, 2)} < ${formatPercent(beforeEnergy, 2)} :: ${temp} :: ${formatEffectWeightOpsFromTypeDiff(afterState.weights, beforeState.weights)}`);
+}
 
+// const initialState: SimRun = bestAttemptWeights != null ? {
+// 	lossRate: bestAttemptLossRate,
+// 	weights: JSON.parse(bestAttemptWeights),
+// } : {
+// 	lossRate: 1,
+// 	weights: {},
+// };
+// const initialState = {
+// 	lossRate: 1,
+// 	weights: Object.assign({}, HANDMADE_FROM_TYPE),
+// };
+// const initialState: SimRun = {
+// 	lossRate: 1,
+// 	weights: HANDMADE_FROM_TYPE,
+// };
+// console.log(`Initial: ${initialState.lossRate == null ? "?" : formatPercent(initialState.lossRate, 2)}: ${formatOrderedEffectWeightOpsFromType(initialState.weights)}`);
+const initialState: SimRun[] = findBestScores().map(sws => <SimRun> {
+	lossRate: sws.score,
+	weights: sws.weights,
+});
+
+initialState.forEach(state => {
+	console.log(`${formatPercent(state.lossRate || 1, 2)} ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
+});
 
 async function optimize(
-	initialState: SimRun
-): Promise<SimRun> {
+	initialState: SimRun[]
+): Promise<SimRun[]> {
 	let state = initialState;
-	while (state.lossRate === undefined || state.lossRate > 0.8) {
-		const summary = getAttemptSummary();
-		console.log(`Starting with ${summary.attempts} attempts and a loss rate of ${formatPercent(state.lossRate || 1, 2)}.`);
+	let summary = getAttemptSummary();
+	let gameCount: number;
+	do {
+		const start = Date.now();
+		console.log(`Starting with ${summary.attempts} attempts, ${state.length} initial${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}.`);
 		state = await anneal(<AnnealParams<SimRun>> {
 			calculateEnergy,
+			improvement,
 			initialState: state,
 			neighbors,
 			prng: DEFAULT_PRNG,
-			save,
-			temperature: temp => temp - 0.1,
+			temperature: temp => temp - 0.5,
 			temperatureMax: TEMP_MAX,
 			temperatureMin: TEMP_MIN,
+			threadCount: Math.max(1, gameWorkerPool.threadCount),
 		});
-	}
+		const elapsed = Date.now() - start;
+		const endSummary = getAttemptSummary();
+		gameCount = endSummary.attempts - summary.attempts;
+		summary = endSummary;
+		const rate = gameCount / (elapsed / 1000);
+		console.log(`${Math.round(rate * 100) / 100} games/sec`);
+	} while (gameCount > 0);
 	return state;
 }
 
-optimize(initialState).then(state => {
+optimize(initialState).then(states => {
 	console.log("-----");
-	console.log(`${formatPercent(state.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
+	for (const state of states) {
+		console.log(`${formatPercent(state.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
+	}
 });

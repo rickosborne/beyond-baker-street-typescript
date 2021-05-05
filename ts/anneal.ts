@@ -1,12 +1,13 @@
 import * as os from "os";
+import { randomItem } from "./randomItem";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 
 export interface AnnealParams<State> {
 	calculateEnergy: (state: State) => Promise<number>;
-	initialState: State;
+	improvement: (afterState: State, afterEnergy: number, beforeState: State, beforeEnergy: number, temp: number) => void;
+	initialState: State[];
 	neighbors: (count: number, state: State, temp: number, prng: PseudoRNG) => State[];
 	prng: PseudoRNG;
-	save: (bestState: State, bestEnergy: number) => void;
 	temperature: (temp: number) => number;
 	temperatureMax: number;
 	temperatureMin: number;
@@ -23,57 +24,60 @@ const ANNEAL_DEFAULTS: Partial<AnnealParams<unknown>> = {
 
 export async function anneal<State>(
 	params: Partial<AnnealParams<State>>,
-): Promise<State> {
+): Promise<State[]> {
 	const effectiveParams: AnnealParams<State> = Object.assign({}, ANNEAL_DEFAULTS as AnnealParams<State>, params);
-	const { calculateEnergy, initialState, neighbors, prng, save, temperature, temperatureMax, temperatureMin, threadCount } = effectiveParams;
-	if (calculateEnergy == null || initialState == null || neighbors == null || prng == null || save == null || temperature == null || temperatureMax == null || temperatureMin == null || threadCount == null) {
+	const { calculateEnergy, improvement, initialState, neighbors, prng, temperature, temperatureMax, temperatureMin, threadCount } = effectiveParams;
+	if (calculateEnergy == null || improvement == null || initialState == null || neighbors == null || prng == null || temperature == null || temperatureMax == null || temperatureMin == null || threadCount == null) {
 		throw new Error(`Missing some params:\n${JSON.stringify(params, null, 2)}`);
 	}
+	if (initialState.length < 1) {
+		throw new Error(`Need at least one initial state`);
+	}
 	let temp: number = temperatureMax;
-	let lastState: State = initialState;
-	let currentState: State = lastState;
-	let bestState: State = lastState;
-	let lastEnergy: number = await calculateEnergy(initialState);
-	let currentEnergy: number = lastEnergy;
-	let bestEnergy: number = lastEnergy;
-	let count = 0;
-	let doSave = false;
+	const bestStates: State[] = initialState.slice();
+	const lastStates: State[] = initialState.slice();
+	let currentState: State = randomItem(initialState);
+	let currentEnergy: number = await calculateEnergy(currentState);
+	let lastEnergy: number = currentEnergy;
+	let bestEnergy: number = currentEnergy;
 	do {
-		count++;
-		if ((count % 250) === 0) {
-			doSave = true;
-		}
+		let lastState = randomItem(lastStates);
 		const states = neighbors(threadCount, lastState, temp, prng);
 		const energies = await Promise.all(states.map(state => calculateEnergy(state)));
 		for (let i = 0; i < states.length; i++) {
 			currentState = states[i];
 			currentEnergy = energies[i];
-			if (currentEnergy <= lastEnergy) {
-				console.log(`Improvement: ${lastEnergy} > ${currentEnergy}`);
-				lastState = currentState;
+			if (currentEnergy < lastEnergy && currentState !== lastState) {
+				improvement(currentState, currentEnergy, lastState, lastEnergy, temp);
 				lastEnergy = currentEnergy;
-				doSave = true;
+				lastState = currentState;
+				lastStates.splice(0, lastStates.length);
+				lastStates.push(currentState);
+			} else if (currentEnergy === lastEnergy && currentState !== lastState) {
+				lastEnergy = currentEnergy;
+				lastState = currentState;
+				if (!lastStates.includes(currentState)) {
+					lastStates.push(currentState);
+				}
 			} else if (prng() <= Math.exp(0 - ((currentEnergy - lastEnergy) / temp))) {
-				// console.log(`Revert to best: ${bestEnergy}`);
-				lastState = bestState;
 				lastEnergy = bestEnergy;
+				lastState = randomItem(bestStates);
+				lastStates.splice(0, lastStates.length);
+				lastStates.push(...bestStates);
 			}
-			// else {
-			// 	console.log(`Regression: ${lastEnergy} <= ${currentEnergy}`);
-			// }
 			if (lastEnergy < bestEnergy) {
-				console.log("New best.");
-				bestEnergy = lastEnergy;
-				bestState = lastState;
-				doSave = true;
-			}
-			if (doSave) {
-				save(bestState, bestEnergy);
-				doSave = false;
+				const bestState = bestStates[0];
+				improvement(currentState, currentEnergy, bestState, bestEnergy, temp);
+				bestEnergy = currentEnergy;
+				bestStates.splice(0, bestStates.length);
+				bestStates.push(...lastStates);
+				console.log(`Best has ${bestStates.length}`);
+			} else if (lastEnergy === bestEnergy && !bestStates.includes(lastState)) {
+				bestStates.push(lastState);
+				console.log(`Best has ${bestStates.length}`);
 			}
 		}
 		temp = temperature(temp);
 	} while (temp > temperatureMin);
-	save(bestState, bestEnergy);
-	return bestState;
+	return bestStates;
 }
