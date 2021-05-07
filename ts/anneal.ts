@@ -1,12 +1,16 @@
 import * as os from "os";
 import { randomItem } from "./randomItem";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
+import { strictDeepEqual } from "./strictDeepEqual";
+
+export type NeighborsGenerator<State> = (count: number, state: State, temp: number, prng: PseudoRNG) => State[];
 
 export interface AnnealParams<State> {
 	calculateEnergy: (state: State) => Promise<number>;
+	formatState: (state: State, energy: number) => string,
 	improvement: (afterState: State, afterEnergy: number, beforeState: State, beforeEnergy: number, temp: number) => void;
 	initialState: State[];
-	neighbors: (count: number, state: State, temp: number, prng: PseudoRNG) => State[];
+	neighbors: NeighborsGenerator<State>;
 	prng: PseudoRNG;
 	temperature: (temp: number) => number;
 	temperatureMax: number;
@@ -26,8 +30,8 @@ export async function anneal<State>(
 	params: Partial<AnnealParams<State>>,
 ): Promise<State[]> {
 	const effectiveParams: AnnealParams<State> = Object.assign({}, ANNEAL_DEFAULTS as AnnealParams<State>, params);
-	const { calculateEnergy, improvement, initialState, neighbors, prng, temperature, temperatureMax, temperatureMin, threadCount } = effectiveParams;
-	if (calculateEnergy == null || improvement == null || initialState == null || neighbors == null || prng == null || temperature == null || temperatureMax == null || temperatureMin == null || threadCount == null) {
+	const { calculateEnergy, formatState, improvement, initialState, neighbors, prng, temperature, temperatureMax, temperatureMin, threadCount } = effectiveParams;
+	if (calculateEnergy == null || formatState == null || improvement == null || initialState == null || neighbors == null || prng == null || temperature == null || temperatureMax == null || temperatureMin == null || threadCount == null) {
 		throw new Error(`Missing some params:\n${JSON.stringify(params, null, 2)}`);
 	}
 	if (initialState.length < 1) {
@@ -40,13 +44,18 @@ export async function anneal<State>(
 	let currentEnergy: number = await calculateEnergy(currentState);
 	let lastEnergy: number = currentEnergy;
 	let bestEnergy: number = currentEnergy;
+	let energies: number[];
+	let states: State[];
 	do {
 		let lastState = randomItem(lastStates);
-		const states = neighbors(threadCount, lastState, temp, prng);
-		const energies = await Promise.all(states.map(state => calculateEnergy(state)));
+		states = neighbors(threadCount, lastState, temp, prng);
+		energies = await Promise.all(states.map(state => calculateEnergy(state)));
 		for (let i = 0; i < states.length; i++) {
 			currentState = states[i];
 			currentEnergy = energies[i];
+			if (strictDeepEqual(lastState, currentState)) {
+				throw new Error(`Equal states: ${formatState(lastState, lastEnergy)}`);
+			}
 			if (currentEnergy < lastEnergy && currentState !== lastState) {
 				improvement(currentState, currentEnergy, lastState, lastEnergy, temp);
 				lastEnergy = currentEnergy;
@@ -74,10 +83,10 @@ export async function anneal<State>(
 				console.log(`Best has ${bestStates.length}`);
 			} else if (lastEnergy === bestEnergy && !bestStates.includes(lastState)) {
 				bestStates.push(lastState);
-				console.log(`Best has ${bestStates.length}`);
+				console.log(`Best has ${bestStates.length}: ${formatState(lastState, lastEnergy)}`);
 			}
 		}
 		temp = temperature(temp);
-	} while (temp > temperatureMin);
+	} while (temp > temperatureMin && states.length > 0);
 	return bestStates;
 }

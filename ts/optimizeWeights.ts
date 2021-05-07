@@ -1,19 +1,24 @@
 import * as sqlite3 from "better-sqlite3";
 import * as process from "process";
-import { anneal, AnnealParams } from "./anneal";
-import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType } from "./BotTurn";
+import { anneal, AnnealParams, NeighborsGenerator } from "./anneal";
+import { BotTurnEffectType } from "./BotTurn";
 import {
+	DEFAULT_SCORE_FROM_TYPE,
 	EffectWeightOpsFromType,
 	formatEffectWeightOpsFromTypeDiff,
 	formatOrderedEffectWeightOpsFromType,
 } from "./defaultScores";
 import { EffectWeightOp } from "./EffectWeight";
+import { formatDecimal } from "./formatDecimal";
 import { formatPercent } from "./formatPercent";
 import { GameWorkerPool } from "./GameWorkerPool";
+import { objectMap } from "./objectMap";
 import { randomItem } from "./randomItem";
 import { range } from "./range";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
+import { shuffleInPlace } from "./shuffle";
 import { stableJson } from "./stableJson";
+import { strictDeepEqual } from "./strictDeepEqual";
 
 interface SimRun {
 	lossRate?: number;
@@ -107,7 +112,8 @@ const historyFileNameSqlite = `${historyFileName}.sqlite`;
 // const history = fs.existsSync(historyFileNameJson) ? fs.readFileSync(historyFileNameJson, { encoding: "utf8" }) : "{}";
 const db = new sqlite3(historyFileNameSqlite);
 db.pragma("journal_mode = WAL");
-const gameWorkerPool = new GameWorkerPool(6);
+const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
+const gameWorkerPool = new GameWorkerPool(isDebug ? 0 : 6);
 function quit(doExit = true): void {
 	console.log(`Closing ${historyFileNameSqlite}`);
 	gameWorkerPool.shutdown();
@@ -130,6 +136,9 @@ const scoreForAttempt = (db => {
 		return row?.score;
 	};
 })(db);
+function scoreForWeights(weights: Partial<EffectWeightOpsFromType>): number | undefined {
+	return scoreForAttempt(stableJson(weights));
+}
 const addAttemptScore = (db => {
 	const insertAttemptScore = db.prepare<[ string, number ]>("INSERT OR IGNORE INTO weights_score (weights, score) VALUES (?, ?)");
 	return function addAttemptScore(attempt: string, score: number): number {
@@ -181,7 +190,7 @@ async function calculateEnergy(simRun: SimRun): Promise<number> {
 	return lossRate;
 }
 
-function neighbors(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
+function neighborsViaVariance(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
 	const start = Date.now();
 	const priorWeights = simRun.weights;
 	let variability = Math.floor(temp + 1);
@@ -199,9 +208,7 @@ function neighbors(count: number, simRun: SimRun, temp: number, prng: PseudoRNG)
 				override[effectType] = [updated];
 			}
 			const weights = Object.assign({}, priorWeights, override);
-			const json = stableJson(weights);
-			const already = scoreForAttempt(json);
-			if (already === undefined) {
+			if (scoreForWeights(weights) === undefined) {
 				results.push({
 					weights,
 				});
@@ -218,6 +225,88 @@ function neighbors(count: number, simRun: SimRun, temp: number, prng: PseudoRNG)
 	console.log(`Gave up after ${endDate - start}ms to find ${results.length}`);
 	return results;
 }
+
+const neighborsViaSwap = (function (): NeighborsGenerator<SimRun> {
+	let previousRun: SimRun;
+	const allRuns: SimRun[] = [];
+	const maxDistance = 6;
+	return function neighborsViaSwap(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
+		function addRunIfNovel(weights: EffectWeightOpsFromType, ): void {
+			if (!strictDeepEqual(weights, simRun.weights) && scoreForWeights(weights) === undefined) {
+				allRuns.push({
+					weights,
+				});
+			}
+		}
+		if (!strictDeepEqual(previousRun, simRun)) {
+			previousRun = simRun;
+			allRuns.splice(0, allRuns.length);
+			const weights: EffectWeightOpsFromType = MUTABLE_TYPES.reduce((w, effectType) => {
+				const ops = simRun.weights[effectType] || DEFAULT_SCORE_FROM_TYPE[effectType];
+				const base = ops[0];
+				w[effectType] = [base];
+				return w;
+			}, {} as EffectWeightOpsFromType);
+			const orderedKeys = (Object.keys(weights) as BotTurnEffectType[]).slice()
+				.sort((a, b) => (weights[a][0] as number) - (weights[b][0] as number));
+			const keyCount = orderedKeys.length;
+			const lastIndex = keyCount - 1;
+			addRunIfNovel(objectMap(weights, (ops, type, index) => [Math.floor(lastIndex / 2) - index]));
+			const smallest = orderedKeys
+				.map(type => weights[type][0] as number)
+				.filter(v => v > 0)
+				.reduce((p, c) => Math.min(p, c), 1000);
+			if (smallest > 1) {
+				addRunIfNovel(objectMap(weights, ops => [Math.round((ops[0] as number) / smallest)]));
+				addRunIfNovel(objectMap(weights, ops => [(ops[0] as number) - smallest]));
+			}
+			const rotate = (sourceIndex: number, destIndex: number, weights: EffectWeightOpsFromType): void => {
+				const direction = sourceIndex < destIndex ? 1 : -1;
+				const first = weights[orderedKeys[sourceIndex]];
+				for (let index = sourceIndex; index !== destIndex; index += direction) {
+					weights[orderedKeys[index]] = weights[orderedKeys[index + direction]];
+				}
+				weights[orderedKeys[destIndex]] = first;
+			};
+			for (let distance = -maxDistance; distance <= maxDistance; distance++) {
+				if (distance === 0) {
+					continue;
+				}
+				for (let sourceIndex = 0; sourceIndex < keyCount; sourceIndex++) {
+					const destIndex = sourceIndex + distance;
+					if (destIndex < 0 || destIndex > lastIndex) {
+						continue;
+					}
+					const farSwap = Object.assign({}, weights);
+					const destKey = orderedKeys[destIndex];
+					const sourceKey = orderedKeys[sourceIndex];
+					[ farSwap[destKey], farSwap[sourceKey] ] = [ farSwap[sourceKey], farSwap[destKey] ];
+					addRunIfNovel(farSwap);
+					if (!strictDeepEqual(farSwap, simRun.weights) && scoreForWeights(farSwap) === undefined) {
+						allRuns.push({ weights: farSwap });
+					}
+					if (distance > 1) {
+						const left = Object.assign({}, weights);
+						const right = Object.assign({}, weights);
+						rotate(sourceIndex, destIndex, right);
+						rotate(destIndex, sourceIndex, left);
+						addRunIfNovel(left);
+						addRunIfNovel(right);
+					}
+				}
+			}
+			console.log(`Swapped neighbors: ${allRuns.length}`);
+			shuffleInPlace(allRuns, prng);
+		}
+		if (allRuns.length === 0) {
+			console.log(`Falling back to variance`);
+			allRuns.push(...neighborsViaVariance(1000, simRun, temp, prng));
+		}
+		const runs: SimRun[] = [];
+		runs.push(...allRuns.splice(0, count));
+		return runs;
+	};
+})();
 
 function improvement(afterState: SimRun, afterEnergy: number, beforeState: SimRun, beforeEnergy: number, temp: number): void {
 	console.log(`${formatPercent(afterEnergy, 2)} < ${formatPercent(beforeEnergy, 2)} :: ${temp} :: ${formatEffectWeightOpsFromTypeDiff(afterState.weights, beforeState.weights)}`);
@@ -254,14 +343,15 @@ async function optimize(
 	let state = initialState;
 	let summary = getAttemptSummary();
 	let gameCount: number;
+	console.log(`Starting with ${summary.attempts} attempts, ${state.length} best${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}.`);
 	do {
 		const start = Date.now();
-		console.log(`Starting with ${summary.attempts} attempts, ${state.length} initial${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}.`);
 		state = await anneal(<AnnealParams<SimRun>> {
 			calculateEnergy,
+			formatState: (simRun, lossRate) => `${formatPercent(lossRate, 2)} ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`,
 			improvement,
 			initialState: state,
-			neighbors,
+			neighbors: neighborsViaSwap,
 			prng: DEFAULT_PRNG,
 			temperature: temp => temp - 0.5,
 			temperatureMax: TEMP_MAX,
@@ -273,7 +363,7 @@ async function optimize(
 		gameCount = endSummary.attempts - summary.attempts;
 		summary = endSummary;
 		const rate = gameCount / (elapsed / 1000);
-		console.log(`${Math.round(rate * 100) / 100} games/sec`);
+		console.log(`Completed ${summary.attempts} attempts, ${state.length} best${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}, ${formatDecimal(rate, 2)} games/sec.`);
 	} while (gameCount > 0);
 	return state;
 }
@@ -283,4 +373,5 @@ optimize(initialState).then(states => {
 	for (const state of states) {
 		console.log(`${formatPercent(state.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
 	}
+	quit(true);
 });

@@ -55,7 +55,11 @@ export function formatOrderedEffectWeightOpsFromType(weights: Partial<EffectWeig
 		.join(" > ");
 }
 
-export function formatEffectWeightOpsFromTypeDiff(after: Partial<EffectWeightOpsFromType>, before: Partial<EffectWeightOpsFromType>): string {
+export function formatEffectWeightOpsFromTypeDiff(
+	after: Partial<EffectWeightOpsFromType>,
+	before: Partial<EffectWeightOpsFromType>,
+	showEqual = true,
+): string {
 	return BOT_TURN_EFFECT_TYPES
 		.map((effectType: BotTurnEffectType): string | undefined => {
 			const a = after[effectType];
@@ -67,7 +71,7 @@ export function formatEffectWeightOpsFromTypeDiff(after: Partial<EffectWeightOps
 			} else if (b == null && a != null) {
 				return `+${effectType}:[${a?.join(",")}]`;
 			} else if (strictDeepEqual(a, b)) {
-				return `=${effectType}:[${a?.join(",")}]`;
+				return showEqual ? `=${effectType}:[${a?.join(",")}]` : undefined;
 			} else {
 				return `${effectType}:[${b?.join(",")}]=>[${a?.join(",")}]`;
 			}
