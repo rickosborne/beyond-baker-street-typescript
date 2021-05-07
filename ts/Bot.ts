@@ -16,6 +16,7 @@ import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
+import { InspectorType } from "./InspectorType";
 import {
 	BadInvestigateOutcome,
 	DeadLeadInvestigateOutcome,
@@ -65,7 +66,8 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		private readonly logger: Logger = SILENT_LOGGER,
 		private readonly prng: PseudoRNG = DEFAULT_PRNG,
 		scoreFromTypeOverrides: Partial<EffectWeightOpsFromType> = {},
-		public readonly name: string = nextName(prng),
+		public readonly inspector: InspectorType | undefined,
+		public readonly name: string = inspector == null ? nextName(prng) : inspector,
 		private readonly strategies: BotTurnStrategy[] = BOT_STRATEGIES.slice(),
 		private readonly evaluator: BotTurnEvaluator = new BasicBotTurnEvaluator(scoreFromTypeOverrides, logger),
 	) {}

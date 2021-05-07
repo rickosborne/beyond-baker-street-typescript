@@ -76,8 +76,9 @@ export class GameWorkerPool {
 		};
 		return new Promise<PlayGameResult>((resolve) => {
 			if (this.threadCount === 0) {
+				const { lossRate } = playSingleGame(weights, iterations);
 				resolve({
-					lossRate: playSingleGame(weights, iterations),
+					lossRate: lossRate,
 					request,
 				});
 				return;
@@ -120,6 +121,6 @@ export class GameWorkerPool {
 		const workerIndex = this.workers.indexOf(worker);
 		this.ready.splice(workerIndex, 1);
 		this.workers.splice(workerIndex, 1);
-		worker.terminate();
+		worker.terminate().catch(err => console.error(err));
 	}
 }
