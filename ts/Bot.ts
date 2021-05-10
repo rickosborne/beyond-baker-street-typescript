@@ -11,7 +11,7 @@ import {
 import { isBaskervilleOutcome } from "./Baskerville";
 import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
 import { BOT_STRATEGIES } from "./BotStrategies";
-import { BotTurnEffect, BotTurnOption, BotTurnStrategy } from "./BotTurn";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategy } from "./BotTurn";
 import { BasicBotTurnEvaluator, BotTurnEvaluator } from "./BotTurnEvaluator";
 import { isConfirmOutcome } from "./ConfirmAction";
 import { Consumer } from "./Consumer";
@@ -154,7 +154,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 			const evidenceCard = blackwellTurn.evidences[i];
 			const mysteryCard = MysteryCard.fromEvidenceCard(evidenceCard);
 			const { evidenceType } = evidenceCard;
-			const effects: BotTurnEffect[] = [];
+			const effects: BotTurnEffectType[] = [];
 			for (const lead of leads.filter(l => l.leadCard.evidenceType === evidenceType)) {
 				const investigateEffects = this.investigateStrategy.buildEffectsForLeadWithCard(lead, mysteryCard);
 				effects.push(...investigateEffects);

@@ -1,18 +1,13 @@
-import { addEffect } from "./addEffect";
-import { BotTurnEffect, BotTurnEffectType, BotTurnStrategyType } from "./BotTurn";
+import { addEffectsIfNotPresent } from "./addEffect";
+import { BotTurnEffectType, BotTurnStrategyType } from "./BotTurn";
 import { CardType } from "./CardType";
 import { HOLMES_MOVE_PROGRESS } from "./Game";
 import { addHolmesProgressEffects } from "./HolmesProgressEffect";
 import { InspectorType } from "./InspectorType";
-import { TurnStart } from "./TurnStart";
 import { HasVisibleBoard } from "./VisibleBoard";
 
-export interface ImpossibleAddedEffect extends BotTurnEffect {
-    effectType: BotTurnEffectType.ImpossibleAdded;
-}
-
 export function addImpossibleAddedEffects(
-	effects: BotTurnEffect[],
+	effects: BotTurnEffectType[],
 	impossibleCount: number,
 	impossibleLimit: number,
 	holmesLocation: number,
@@ -23,9 +18,7 @@ export function addImpossibleAddedEffects(
 	if (inspector === InspectorType.Wiggins && cardType === CardType.Lead && strategy === BotTurnStrategyType.Pursue) {
 		// Wiggins does not add the pursued Lead to the Impossible
 	} else {
-		addEffect<ImpossibleAddedEffect>(effects, {
-			effectType: BotTurnEffectType.ImpossibleAdded,
-		});
+		addEffectsIfNotPresent(effects, BotTurnEffectType.ImpossibleAdded);
 	}
 	if (impossibleCount + 1 > impossibleLimit) {
 		if (inspector === InspectorType.Lestrade && strategy === BotTurnStrategyType.Eliminate && cardType === CardType.Evidence) {
@@ -37,7 +30,7 @@ export function addImpossibleAddedEffects(
 }
 
 export function addImpossibleAddedEffectsFromTurn(
-	effects: BotTurnEffect[],
+	effects: BotTurnEffectType[],
 	turn: HasVisibleBoard,
 	cardType: CardType,
 	strategy: BotTurnStrategyType,

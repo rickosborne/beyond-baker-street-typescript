@@ -13,11 +13,15 @@ export function isPlayGameRequest(maybe: unknown): maybe is PlayGameRequest {
 }
 
 export interface PlayGameResult {
-	readonly lossRate: number;
+	readonly errors: string | undefined;
+	readonly lossRate: number | undefined;
 	readonly request: PlayGameRequest;
 }
 
 export function isPlayGameResult(maybe: unknown): maybe is PlayGameResult {
 	const pgr = maybe as PlayGameResult;
-	return (pgr != null) && isPlayGameRequest(pgr.request) && isNumber(pgr.lossRate);
+	// noinspection SuspiciousTypeOfGuard
+	return (pgr != null) && isPlayGameRequest(pgr.request)
+		&& (pgr.lossRate === undefined || isNumber(pgr.lossRate))
+		&& (pgr.errors === undefined || (typeof pgr.errors === "string"));
 }

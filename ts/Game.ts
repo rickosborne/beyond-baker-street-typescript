@@ -140,7 +140,6 @@ export const HOLMES_MAX = 15;
 export const INVESTIGATION_MARKER_GOAL = 20;
 export const HOLMES_MOVE_PROGRESS = -1;
 export const HOLMES_MOVE_IMPEDE = 1;
-export const HOLMES_MOVE_IMPEDE_BAYNES = 2;
 
 export interface GameStart {
 	playerNames: string[];
@@ -177,7 +176,7 @@ export enum ReturnEvidenceVisibility {
 
 export class Game {
 	// noinspection JSMismatchedCollectionQueryUpdate
-	private readonly _log: string[] = [];
+	private _state: GameState = GameState.Playing;
 	private readonly actionHandlers: Record<ActionType, BiFunction<Action, GamePlayer, Outcome | undefined>> = {
 		[ActionType.Adler]: buildActionHandler(isAdlerAction, (a, p) => this.applyAdler(a, p)),
 		[ActionType.Assist]: buildActionHandler(isAssistAction, (a, p) => this.applyAssist(a, p)),
@@ -244,14 +243,13 @@ export class Game {
 			outcome,
 			turnNumber: this.turnCount,
 		});
-		const state = this.state;
-		if (state !== GameState.Playing) {
+		if (this._state !== GameState.Playing) {
 			const gameEnd: GameEnd = {
-				state,
+				state: this._state,
 				turnCount: this.turnCount,
 			};
 			this.logger.json(gameEnd);
-			this.logger.info(() => state);
+			this.logger.info(() => this._state);
 		}
 		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
 			const evidence = this.dealEvidence(activePlayer);
@@ -265,8 +263,7 @@ export class Game {
 		if (!isPlayerInspector(activePlayer, InspectorType.Adler)) {
 			throw new Error(`You are not Adler: ${formatPlayer(activePlayer)}`);
 		}
-		this.board.moveHolmes(HOLMES_MOVE_IMPEDE);
-		const holmesLocation = this.board.holmesLocation;
+		const holmesLocation = this.moveHolmes(HOLMES_MOVE_IMPEDE);
 		const outcome: AdlerOutcome = {
 			action,
 			activePlayer,
@@ -290,13 +287,14 @@ export class Game {
 		} else {
 			throw new Error(`Unknown assist type: ${action}`);
 		}
+		let holmesLocation = this.board.holmesLocation;
 		if (moveHolmes) {
-			this.board.moveHolmes(HOLMES_MOVE_PROGRESS);
+			holmesLocation = this.moveHolmes(HOLMES_MOVE_PROGRESS);
 		}
 		const outcome: AssistOutcome = {
 			action,
 			activePlayer,
-			holmesLocation: this.board.holmesLocation,
+			holmesLocation,
 			identifiedHandIndexes: assistedPlayer.hand
 				.map((card, index) => cardMatcher(card) ? index : -1)
 				.filter(index => index >= 0),
@@ -345,12 +343,13 @@ export class Game {
 			throw new Error(`Cannot confirm that lead with gap ${gap}: ${formatConfirm(action, activePlayer, this.board.holmesLocation)}`);
 		}
 		this.board.confirm(action.leadType);
-		this.board.moveHolmes(HOLMES_MOVE_IMPEDE);
+		const holmesLocation = this.moveHolmes(HOLMES_MOVE_IMPEDE);
+		this.checkGameCompletion();
 		const outcome: ConfirmOutcome = {
 			action,
 			activePlayer,
 			confirmedLeadTypes: LEAD_TYPES.filter(leadType => this.board.isConfirmed(leadType)),
-			holmesLocation: this.board.holmesLocation,
+			holmesLocation,
 			outcomeType: OutcomeType.Confirm,
 			unconfirmedLeadTypes: LEAD_TYPES.filter(leadType => !this.board.isConfirmed(leadType)),
 		};
@@ -365,6 +364,7 @@ export class Game {
 		}
 		const returnedEvidence = this.board.removeEvidenceFor(leadType);
 		this.returnEvidence(returnedEvidence, true, BottomOrTop.Bottom, ReturnEvidenceVisibility.All);
+		this.checkGameCompletion();
 		return returnedEvidence;
 	}
 
@@ -375,6 +375,7 @@ export class Game {
 		}
 		this.board.addImpossible(evidenceCard, activePlayer.inspector !== InspectorType.Lestrade);
 		const investigationMarker = this.board.moveInvestigationMarker(evidenceCard.evidenceValue);
+		this.checkGameCompletion();
 		const impossibleCards = this.board.impossibleCards;
 		const impossibleFaceDownCount = impossibleCards.filter(c => isLeadReverseCard(c)).length;
 		const outcome: EliminateOutcome = {
@@ -548,6 +549,18 @@ export class Game {
 		}
 	}
 
+	private checkGameCompletion(): void {
+		if (this.board.allConfirmed) {
+			if (this.board.investigationComplete) {
+				this._state = GameState.Won;
+			} else {
+				this._state = GameState.Lost;
+			}
+		} else if (this.board.anyEmptyLeads || this.board.holmesWon || this.board.investigationOver) {
+			this._state = GameState.Lost;
+		}
+	}
+
 	private dealEvidence(activePlayer?: GamePlayer | undefined): EvidenceCard | undefined {
 		const wantEvidenceCount = activePlayer?.inspector === InspectorType.Blackwell ? 2 : 1;
 		const evidences = range(1, wantEvidenceCount)
@@ -592,6 +605,12 @@ export class Game {
 		return this.players.filter(p => isSamePlayer(p, player))[0];
 	}
 
+	private moveHolmes(delta: number): number {
+		const holmesLocation = this.board.moveHolmes(delta);
+		this.checkGameCompletion();
+		return holmesLocation;
+	}
+
 	private playerAfter(activePlayer: GamePlayer): GamePlayer {
 		return this.players[(this.players.indexOf(activePlayer) + 1) % this.players.length];
 	}
@@ -602,7 +621,7 @@ export class Game {
 		bottomOrTop: BottomOrTop,
 		visibility: ReturnEvidenceVisibility,
 	): void {
-		this._log.push(`returnEvidence ${bottomOrTop} visible to ${visibility} ${evidences.map(e => formatEvidence(e)).join(", ")}`);
+		this.logger.trace(() => `returnEvidence ${bottomOrTop} visible to ${visibility} ${evidences.map(e => formatEvidence(e)).join(", ")}`);
 		this.board.returnEvidence(evidences, shuffle, bottomOrTop);
 		for (const player of this.players) {
 			const visible = visibility === ReturnEvidenceVisibility.All || (visibility === ReturnEvidenceVisibility.Toby && player.inspector === InspectorType.Toby) ? evidences : [];
@@ -611,24 +630,11 @@ export class Game {
 	}
 
 	public get state(): GameState {
-		const allConfirmed = this.board.allConfirmed;
-		const investigationMarker = this.board.investigationMarker;
-		if (allConfirmed && (investigationMarker === INVESTIGATION_MARKER_GOAL)) {
-			return GameState.Won;
-		}
-		if (
-			(this.board.holmesLocation <= HOLMES_GOAL)
-			|| (investigationMarker > INVESTIGATION_MARKER_GOAL)
-			|| this.board.anyEmptyLeads
-			|| allConfirmed
-		) {
-			return GameState.Lost;
-		}
-		return GameState.Playing;
+		return this._state;
 	}
 
 	public step(): void {
-		if (this.state !== GameState.Playing) {
+		if (this._state !== GameState.Playing) {
 			throw new Error(`Game is already finished`);
 		}
 		this.activePlayerNum = (this.activePlayerNum + 1) % this.players.length;

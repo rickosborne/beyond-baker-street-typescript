@@ -1,5 +1,5 @@
 import { ActionType } from "./ActionType";
-import { addEffect } from "./addEffect";
+import { addEffectsIfNotPresent } from "./addEffect";
 import {
 	askOtherPlayersAboutTheirHands,
 	OtherCardKnowledge,
@@ -7,7 +7,6 @@ import {
 } from "./askOtherPlayersAboutTheirHands";
 import {
 	AssistAction,
-	Assisted,
 	assistRatioFromPossible,
 	AssistType,
 	isTypeAssistAction,
@@ -15,13 +14,12 @@ import {
 	TypeAssistAction,
 	ValueAssistAction,
 } from "./AssistAction";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
 import { HOLMES_MOVE_PROGRESS, INVESTIGATION_MARKER_GOAL } from "./Game";
 import { addHolmesProgressEffects } from "./HolmesProgressEffect";
 import { isSamePlayer, OtherPlayer } from "./Player";
-import { strictDeepEqual } from "./strictDeepEqual";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
 import { VisibleLead } from "./VisibleBoard";
@@ -42,54 +40,6 @@ export interface ValueAssistTurnOption extends AssistTurnOption {
 	action: ValueAssistAction;
 	assistType: AssistType.Value;
 	evidenceValue: EvidenceValue;
-}
-
-export interface AssistEffect extends BotTurnEffect, Assisted {
-}
-
-/**
- * The other person should now know the exact card.
- */
-export interface AssistKnownCardEffect extends AssistEffect {
-	effectType: BotTurnEffectType.AssistKnown;
-	evidenceType: EvidenceType;  // to avoid duplicates
-	evidenceValue: EvidenceValue;  // to avoid duplicates
-	playerName: string;  // to avoid duplicates
-	possibleAfter: 1;
-}
-
-/**
- * Generic "you now know more than you did" assist.
- */
-export interface NarrowCardEffect extends AssistEffect {
-	effectType: BotTurnEffectType.AssistNarrow;
-	evidenceType: EvidenceType;  // to avoid duplicates
-	evidenceValue: EvidenceValue;  // to avoid duplicates
-	playerName: string;  // to avoid duplicates
-	remainingPossibilities: number;
-}
-
-/**
- * When you reveal a type not used by any leads.
- */
-export interface AssistImpossibleTypeEffect extends AssistEffect {
-	effectType: BotTurnEffectType.AssistImpossibleType;
-	evidenceType: EvidenceType;
-	playerName: string;  // to avoid duplicates
-}
-
-/**
- * Assist the player right after you (presumably helping them on their turn).
- */
-export interface AssistNextPlayerEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.AssistNextPlayer;
-}
-
-/**
- * Give information leading to perfectly landing the Investigation Marker.
- */
-export interface AssistExactEliminateEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.AssistExactEliminate;
 }
 
 export function isSameAssistAction(a: AssistAction, b: AssistAction): boolean {
@@ -127,14 +77,10 @@ export class AssistStrategy implements BotTurnStrategy {
 		for (const option of options) {
 			addHolmesProgressEffects(option.effects, HOLMES_MOVE_PROGRESS, holmesLocation);
 			if (isSamePlayer(otherPlayer, turn.nextPlayer)) {
-				addEffect<AssistNextPlayerEffect>(option.effects, {
-					effectType: BotTurnEffectType.AssistNextPlayer,
-				});
+				addEffectsIfNotPresent(option.effects, BotTurnEffectType.AssistNextPlayer);
 			}
 			if (matchingLeads.length === 0 && (investigateGap === evidenceValue)) {
-				addEffect<AssistExactEliminateEffect>(option.effects, {
-					effectType: BotTurnEffectType.AssistExactEliminate,
-				});
+				addEffectsIfNotPresent(option.effects, BotTurnEffectType.AssistExactEliminate);
 			}
 		}
 	}
@@ -148,7 +94,6 @@ export class AssistStrategy implements BotTurnStrategy {
 	): AssistTurnOption[] {
 		const options: AssistTurnOption[] = [];
 		const otherPlayer = otherPlayerKnowledge.otherPlayer;
-		const playerName = otherPlayer.name;
 		const otherCards = otherPlayerKnowledge.knowledge.filter((k, i) => i !== otherCardKnowledge.handIndex);
 		const { evidenceCard, unknownCard } = otherCardKnowledge;
 		const { evidenceType, evidenceValue } = evidenceCard;
@@ -165,10 +110,10 @@ export class AssistStrategy implements BotTurnStrategy {
 		}
 		const matchingLeads = leads.filter(lead => lead.leadCard.evidenceType === evidenceType);
 		if (!knowsType) {
-			this.buildTypeAssistOption(otherPlayerKnowledge, evidenceType, possibleBefore, matchingLeads, playerName, knowsValue, evidenceValue, possibleValues, otherPlayer, options);
+			this.buildTypeAssistOption(otherPlayerKnowledge, evidenceType, possibleBefore, matchingLeads, knowsValue, otherPlayer, options);
 		}
 		if (!knowsValue) {
-			this.buildValueAssistOption(otherPlayerKnowledge, evidenceValue, possibleBefore, knowsType, evidenceType, playerName, possibleTypes, otherPlayer, options);
+			this.buildValueAssistOption(otherPlayerKnowledge, evidenceValue, possibleBefore, knowsType, otherPlayer, options);
 		}
 		this.addUsualAssistEffects(options, holmesLocation, otherPlayer, turn, matchingLeads, investigateGap, evidenceValue);
 		return options;
@@ -184,7 +129,7 @@ export class AssistStrategy implements BotTurnStrategy {
 			.reduce((options, option) => {
 				const existing = options.find(o => isSameAssistAction(o.action, option.action));
 				if (existing != null) {
-					this.mergeEffects(existing.effects, option.effects);
+					addEffectsIfNotPresent(existing.effects, ...option.effects);
 				} else {
 					options.push(option);
 				}
@@ -199,42 +144,26 @@ export class AssistStrategy implements BotTurnStrategy {
 			;
 	}
 
-	private buildTypeAssistOption(otherPlayerKnowledge: OtherPlayerKnowledge, evidenceType: EvidenceType, possibleBefore: number, matchingLeads: VisibleLead[], playerName: string, knowsValue: boolean, evidenceValue: number, possibleValues: EvidenceValue[], otherPlayer: OtherPlayer, options: AssistTurnOption[]): void {
+	private buildTypeAssistOption(
+		otherPlayerKnowledge: OtherPlayerKnowledge,
+		evidenceType: EvidenceType,
+		possibleBefore: number,
+		matchingLeads: VisibleLead[],
+		knowsValue: boolean,
+		otherPlayer: OtherPlayer,
+		options: AssistTurnOption[]
+	): void {
 		// Assist with Type
 		const possibleAfter = this.getPossibleAfterTypes(otherPlayerKnowledge, evidenceType);
 		const assistRatio = assistRatioFromPossible(possibleBefore, possibleAfter);
-		const effects: BotTurnEffect[] = [];
+		const effects: BotTurnEffectType[] = [];
 		if (matchingLeads.length === 0) {
-			addEffect<AssistImpossibleTypeEffect>(effects, {
-				assistRatio,
-				effectType: BotTurnEffectType.AssistImpossibleType,
-				evidenceType,
-				playerName,
-				possibleAfter,
-				possibleBefore,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.AssistImpossibleType);
 		}
 		if (knowsValue) {
-			addEffect<AssistKnownCardEffect>(effects, {
-				assistRatio,
-				effectType: BotTurnEffectType.AssistKnown,
-				evidenceType,
-				evidenceValue,
-				playerName,
-				possibleAfter: 1,
-				possibleBefore,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.AssistKnown);
 		} else {
-			addEffect<NarrowCardEffect>(effects, {
-				assistRatio,
-				effectType: BotTurnEffectType.AssistNarrow,
-				evidenceType,
-				evidenceValue,
-				playerName,
-				possibleAfter,
-				possibleBefore,
-				remainingPossibilities: possibleValues.length,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.AssistNarrow);
 		}
 		const assistType: TypeAssistTurnOption = {
 			action: {
@@ -254,31 +183,21 @@ export class AssistStrategy implements BotTurnStrategy {
 		options.push(assistType);
 	}
 
-	private buildValueAssistOption(otherPlayerKnowledge: OtherPlayerKnowledge, evidenceValue: number, possibleBefore: number, knowsType: boolean, evidenceType: EvidenceType, playerName: string, possibleTypes: EvidenceType[], otherPlayer: OtherPlayer, options: AssistTurnOption[]): void {
-		const effects: BotTurnEffect[] = [];
+	private buildValueAssistOption(
+		otherPlayerKnowledge: OtherPlayerKnowledge,
+		evidenceValue: number,
+		possibleBefore: number,
+		knowsType: boolean,
+		otherPlayer: OtherPlayer,
+		options: AssistTurnOption[],
+	): void {
+		const effects: BotTurnEffectType[] = [];
 		const possibleAfter = this.getPossibleAfterValues(otherPlayerKnowledge, evidenceValue);
 		const assistRatio = assistRatioFromPossible(possibleBefore, possibleAfter);
 		if (knowsType) {
-			addEffect<AssistKnownCardEffect>(effects, {
-				assistRatio,
-				effectType: BotTurnEffectType.AssistKnown,
-				evidenceType,
-				evidenceValue,
-				playerName,
-				possibleAfter: 1,
-				possibleBefore,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.AssistKnown);
 		} else {
-			addEffect<NarrowCardEffect>(effects, {
-				assistRatio,
-				effectType: BotTurnEffectType.AssistNarrow,
-				evidenceType,
-				evidenceValue,
-				playerName,
-				possibleAfter,
-				possibleBefore,
-				remainingPossibilities: possibleTypes.length,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.AssistNarrow);
 		}
 		const assistValue: ValueAssistTurnOption = {
 			action: {
@@ -314,13 +233,5 @@ export class AssistStrategy implements BotTurnStrategy {
 			const after = values.includes(evidenceValue) ? Math.round(card.possibleCount / values.length) : card.possibleCount;
 			return prev + after;
 		}, 0);
-	}
-
-	private mergeEffects(destination: BotTurnEffect[], source: BotTurnEffect[]): void {
-		for (const effect of source) {
-			if (destination.findIndex(existing => strictDeepEqual(existing, effect)) < 0) {
-				destination.push(effect);
-			}
-		}
 	}
 }

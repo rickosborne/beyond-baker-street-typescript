@@ -2,7 +2,6 @@ import { Action } from "./Action";
 import { ActionType } from "./ActionType";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
 import { HOLMES_MAX } from "./Game";
-import { HolmesImpededEffect } from "./HolmesProgressEffect";
 import { OncePerGameInspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
 import { Outcome, OutcomeType } from "./Outcome";
@@ -11,6 +10,7 @@ import { TurnStart } from "./TurnStart";
 
 export interface AdlerOption extends BotTurnOption {
 	action: AdlerAction;
+	effects: [BotTurnEffectType.HolmesImpeded];
 	strategyType: BotTurnStrategyType.Inspector;
 }
 
@@ -52,13 +52,7 @@ export class AdlerInspectorStrategy extends OncePerGameInspectorStrategy {
 					action: {
 						actionType: ActionType.Adler,
 					},
-					effects: [
-						<HolmesImpededEffect>{
-							delta: 1,
-							effectType: BotTurnEffectType.HolmesImpeded,
-							inspector: InspectorType.Adler,
-						},
-					],
+					effects: [BotTurnEffectType.HolmesImpeded],
 					strategyType: BotTurnStrategyType.Inspector,
 				});
 			}

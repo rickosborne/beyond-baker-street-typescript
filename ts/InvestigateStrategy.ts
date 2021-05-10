@@ -1,9 +1,7 @@
 import { ActionType } from "./ActionType";
-import { addEffect } from "./addEffect";
+import { addEffectsIfNotPresent } from "./addEffect";
 import { Bot } from "./Bot";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
-import { EvidenceType } from "./EvidenceType";
-import { EvidenceValue } from "./EvidenceValue";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { InvestigateAction } from "./InvestigateAction";
 import { MysteryCard } from "./MysteryCard";
 import { TurnStart } from "./TurnStart";
@@ -15,48 +13,15 @@ export interface InvestigateOption extends BotTurnOption {
 	strategyType: BotTurnStrategyType.Investigate,
 }
 
-export interface InvestigateBadEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.InvestigateBad;
-	wouldAdd: number[];
-}
-
-export interface InvestigatePerfectEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.InvestigatePerfect;
-}
-
-export interface InvestigateCorrectValueEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.InvestigateCorrectValue;
-	possibleTypes: EvidenceType[];
-}
-
-export interface InvestigateCorrectTypeEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.InvestigateCorrectType;
-	possibleValues: EvidenceValue[];
-}
-
-export interface InvestigateMaybeOverEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.InvestigateMaybeBad;
-	maybeOver: number;
-	possibleTypes: EvidenceType[];
-	possibleValues: EvidenceValue[];
-}
-
-export interface InvestigateWildEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.InvestigateWild;
-	maybeOver: number;
-	possibleTypes: EvidenceType[];
-	possibleValues: EvidenceValue[];
-}
-
 export class InvestigateStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Investigate;
 
 	public buildEffectsForLeadWithCard(
 		lead: VisibleLead,
 		mysteryCard: MysteryCard,
-	): BotTurnEffect[] {
+	): BotTurnEffectType[] {
 		const { evidenceType, evidenceTarget } = lead.leadCard;
-		const effects: BotTurnEffect[] = [];
+		const effects: BotTurnEffectType[] = [];
 		const { possibleTypes, possibleValues } = mysteryCard;
 		const singleType = possibleTypes.length === 1;
 		const exactType = singleType && possibleTypes[0] === evidenceType;
@@ -67,38 +32,17 @@ export class InvestigateStrategy implements BotTurnStrategy {
 		const possibleType = exactType || possibleTypes.includes(evidenceType);
 		const maybeOver = possibleValues.filter(v => v > gap).length;
 		if (!possibleType) {
-			addEffect<InvestigateBadEffect>(effects, {
-				effectType: BotTurnEffectType.InvestigateBad,
-				wouldAdd: possibleValues.slice(),
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigateBad);
 		} else if (exactType && exactValue) {
-			addEffect<InvestigatePerfectEffect>(effects, {
-				effectType: BotTurnEffectType.InvestigatePerfect,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigatePerfect);
 		} else if (exactValue) {
-			addEffect<InvestigateCorrectValueEffect>(effects, {
-				effectType: BotTurnEffectType.InvestigateCorrectValue,
-				possibleTypes: possibleTypes.slice(),
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigateCorrectValue);
 		} else if (maybeOver > 0) {
-			addEffect<InvestigateMaybeOverEffect>(effects, {
-				effectType: BotTurnEffectType.InvestigateMaybeBad,
-				maybeOver,
-				possibleTypes: possibleTypes.slice(),
-				possibleValues: possibleValues.slice(),
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigateMaybeBad);
 		} else if (exactType) {
-			addEffect<InvestigateCorrectTypeEffect>(effects, {
-				effectType: BotTurnEffectType.InvestigateCorrectType,
-				possibleValues: possibleValues.slice(),
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigateCorrectType);
 		} else {
-			addEffect<InvestigateWildEffect>(effects, {
-				effectType: BotTurnEffectType.InvestigateWild,
-				maybeOver,
-				possibleTypes: possibleTypes.slice(),
-				possibleValues: possibleValues.slice(),
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigateWild);
 		}
 		return effects;
 	}

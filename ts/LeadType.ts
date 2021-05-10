@@ -10,6 +10,8 @@ export const LEAD_TYPES: LeadType[] = [
 	LeadType.Suspect,
 ];
 
+export const LEAD_COUNT = LEAD_TYPES.length;
+
 export function isLeadType(maybe: unknown): maybe is LeadType {
 	return (typeof maybe === "string")
 		&& (LEAD_TYPES.indexOf(maybe as LeadType) >= 0);

@@ -1,5 +1,5 @@
 import { Bot } from "./Bot";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption } from "./BotTurn";
+import { BotTurnEffectType, BotTurnOption } from "./BotTurn";
 import { columnarNumber } from "./columnarNumber";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import { compileEffectWeight, EffectCalculator, EffectWeightOp } from "./EffectWeight";
@@ -13,7 +13,7 @@ import { TurnStart } from "./TurnStart";
 import { HasVisibleBoard } from "./VisibleBoard";
 
 export interface BotTurnEvaluator {
-	scoreEffects(effects: BotTurnEffect[], hasVisibleBoard: HasVisibleBoard): BotEffectScore;
+	scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): BotEffectScore;
 	selectOption(options: BotTurnOption[], bot: Bot, hasVisibleBoard: HasVisibleBoard): BotTurnOption;
 }
 
@@ -40,18 +40,18 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 		const hidden = scored.length - toShow.length;
 		const tail = hidden > 0 ? `\n  ... plus ${hidden} more options.` : "";
 		//  ${s.formula}
-		return `  ${toShow.map(s => `${columnarNumber(s.score, 7, 1)}: ${formatAction(s.option.action, bot, turnStart)} [${s.option.effects.map(e => e.effectType).join(", ")}]`).join("\n  ")}${tail}`;
+		return `  ${toShow.map(s => `${columnarNumber(s.score, 7, 1)}: ${formatAction(s.option.action, bot, turnStart)} [${s.option.effects.join(", ")}]`).join("\n  ")}${tail}`;
 	}
 
-	private scoreEffect(effect: BotTurnEffect, hasVisibleBoard: HasVisibleBoard): BotEffectScore {
-		const operation = this.scoreFromType[effect.effectType];
+	private scoreEffect(effect: BotTurnEffectType, hasVisibleBoard: HasVisibleBoard): BotEffectScore {
+		const operation = this.scoreFromType[effect];
 		return {
 			formula: operation.format(effect, hasVisibleBoard),
 			score: operation.calculate(effect, hasVisibleBoard),
 		};
 	}
 
-	public scoreEffects(effects: BotTurnEffect[], hasVisibleBoard: HasVisibleBoard): BotEffectScore {
+	public scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): BotEffectScore {
 		return effects.map(e => this.scoreEffect(e, hasVisibleBoard)).reduce((p, c) => ({
 			formula: p.formula === "" ? c.formula : `${p.formula} ++ ${c.formula}`,
 			score: p.score + c.score,

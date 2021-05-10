@@ -1,11 +1,8 @@
 import { Action } from "./Action";
 import { ActionType } from "./ActionType";
-import { addEffect } from "./addEffect";
-import { assistRatioFromPossible } from "./AssistAction";
-import { AssistKnownCardEffect } from "./AssistStrategy";
+import { addEffectsEvenIfDuplicate } from "./addEffect";
 import { Bot } from "./Bot";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
-import { EliminateSetsUpExactEffect, EliminateUnusedTypeEffect } from "./EliminateStrategy";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
 import { EVIDENCE_CARD_VALUE_MAX, EvidenceCard, formatEvidence } from "./EvidenceCard";
 import { EVIDENCE_TYPES, EvidenceType } from "./EvidenceType";
 import { Callable } from "./Function";
@@ -62,7 +59,6 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 
 	private addGregsonOptions(
 		options: PikeOption[],
-		botName: string,
 		turn: TurnStart,
 		gregson: OtherPlayer,
 		hand: MysteryCard[],
@@ -79,9 +75,7 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 						const otherUnknownCard = otherHand[otherHandIndexBefore];
 						const otherEvidence = gregson.hand[otherHandIndexBefore];
 						if (otherEvidence.evidenceValue !== evidenceValue) {
-							this.addOption(options, botName, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, gregson, <EliminateSetsUpExactEffect>{
-								effectType: BotTurnEffectType.EliminateSetsUpExact,
-							});
+							this.addOption(options, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, gregson, BotTurnEffectType.EliminateSetsUpExact);
 						}
 					}
 				}
@@ -91,7 +85,6 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 
 	private addLestradeOptions(
 		options: PikeOption[],
-		botName: string,
 		turn: TurnStart,
 		lestrade: OtherPlayer,
 		hand: MysteryCard[],
@@ -112,11 +105,7 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 					if ((otherEvidence.evidenceValue > investigationGap) && unusedEvidenceTypes.includes(otherEvidence.evidenceType)) {
 						// do nothing
 					} else {
-						this.addOption(options, botName, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, lestrade, <EliminateUnusedTypeEffect>{
-							effectType: BotTurnEffectType.EliminateUnusedType,
-							probability4plus: givenMysteryCard.probabilityOf(c => c.evidenceValue >= 4),
-							unusedEvidenceTypes,
-						});
+						this.addOption(options, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, lestrade, BotTurnEffectType.EliminateUnusedType);
 					}
 				}
 			}
@@ -126,36 +115,19 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 	// noinspection JSMethodCanBeStatic
 	private addOption(
 		options: PikeOption[],
-		botName: string,
 		activeHandIndexBefore: number,
 		givenMysteryCard: MysteryCard,
 		otherEvidence: EvidenceCard,
 		otherHandIndexBefore: number,
 		otherUnknownCard: UnknownCard,
 		otherPlayer: Player,
-		...effects: BotTurnEffect[]
+		...effects: BotTurnEffectType[]
 	): void {
 		if (otherUnknownCard.possibleCount > 1) {
-			addEffect<AssistKnownCardEffect>(effects, {
-				assistRatio: assistRatioFromPossible(otherUnknownCard.possibleCount, 1),
-				effectType: BotTurnEffectType.AssistKnown,
-				evidenceType: otherEvidence.evidenceType,
-				evidenceValue: otherEvidence.evidenceValue,
-				playerName: otherPlayer.name,
-				possibleAfter: 1,
-				possibleBefore: otherUnknownCard.possibleCount,
-			}, true);
+			addEffectsEvenIfDuplicate(effects, BotTurnEffectType.AssistKnown);
 		}
 		if (givenMysteryCard.possibleCount > 1) {
-			addEffect<AssistKnownCardEffect>(effects, {
-				assistRatio: assistRatioFromPossible(givenMysteryCard.possibleCount, 1),
-				effectType: BotTurnEffectType.AssistKnown,
-				evidenceType: givenMysteryCard.possibleTypes[0],  // doesn't matter
-				evidenceValue: givenMysteryCard.possibleValues[0],  // doesn't matter
-				playerName: botName,
-				possibleAfter: 1,
-				possibleBefore: givenMysteryCard.possibleCount,
-			}, true);
+			addEffectsEvenIfDuplicate(effects, BotTurnEffectType.AssistKnown);
 		}
 		options.push({
 			action: {
@@ -173,7 +145,6 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 
 	private addOtherOptions(
 		options: PikeOption[],
-		botName: string,
 		turn: TurnStart,
 		otherPlayers: OtherPlayer[],
 		hand: MysteryCard[]
@@ -193,7 +164,7 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 						mostPossible = possibleCount;
 					}
 					if (possibleCount === mostPossible) {
-						optionAdders.push(() => this.addOption(options, botName, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, otherPlayer));
+						optionAdders.push(() => this.addOption(options, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, otherPlayer));
 					}
 				}
 			}
@@ -216,14 +187,14 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 			const usedEvidenceTypes = unfinishedLeads(turn).map(lead => lead.leadCard.evidenceType);
 			const unusedEvidenceTypes = EVIDENCE_TYPES.filter(t => !usedEvidenceTypes.includes(t));
 			if ((gregson != null) && (doubleGap > 0) && (doubleGap <= EVIDENCE_CARD_VALUE_MAX)) {
-				this.addGregsonOptions(options, bot.name, turn, gregson, hand, doubleGap);
+				this.addGregsonOptions(options, turn, gregson, hand, doubleGap);
 			}
 			const lestrade = turn.otherPlayers.find(op => op.inspector === InspectorType.Lestrade);
 			if ((lestrade != null) && (investigationGap <= EVIDENCE_CARD_VALUE_MAX)) {
-				this.addLestradeOptions(options, bot.name, turn, lestrade, hand, investigationGap, unusedEvidenceTypes);
+				this.addLestradeOptions(options, turn, lestrade, hand, investigationGap, unusedEvidenceTypes);
 			}
 			const otherPlayers = turn.otherPlayers.filter(op => op.inspector !== InspectorType.Gregson && op.inspector !== InspectorType.Lestrade);
-			this.addOtherOptions(options, bot.name, turn, otherPlayers, hand);
+			this.addOtherOptions(options, turn, otherPlayers, hand);
 		});
 		return options;
 	}

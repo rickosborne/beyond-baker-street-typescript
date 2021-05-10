@@ -34,7 +34,7 @@ export class GameWorkerPool {
 			});
 			// console.log(`Worker ${n} online`);
 			worker.on("message", data => this.onResult(n, data, worker));
-			worker.on("error", () => this.workerOffline(n, worker));
+			worker.on("error", err => this.workerOffline(n, worker, err));
 			worker.on("exit", () => this.workerOffline(n, worker));
 			return worker;
 		}) : [];
@@ -55,6 +55,9 @@ export class GameWorkerPool {
 
 	private onResult(workerNum: number, result: unknown, worker: Worker): void {
 		if (isPlayGameResult(result)) {
+			if (result.errors != null) {
+				console.error(result.errors);
+			}
 			// console.log(`withResult @${workerNum} #${result.request.id}`);
 			const onResult = this.requests[result.request.id];
 			onResult.withWorker(worker);
@@ -76,8 +79,16 @@ export class GameWorkerPool {
 		};
 		return new Promise<PlayGameResult>((resolve) => {
 			if (this.threadCount === 0) {
-				const { lossRate } = playSingleGame(weights, iterations);
+				let errors: string | undefined = undefined;
+				let lossRate: number | undefined = undefined;
+				try {
+					const outcome = playSingleGame(weights, iterations);
+					lossRate = outcome.lossRate;
+				} catch (e) {
+					errors = String(e);
+				}
 				resolve({
+					errors,
 					lossRate: lossRate,
 					request,
 				});
@@ -116,8 +127,12 @@ export class GameWorkerPool {
 		}
 	}
 
-	private workerOffline(workerNum: number, worker: Worker): void {
-		console.log(`Worker ${workerNum} offline.`);
+	private workerOffline(workerNum: number, worker: Worker, error?: Error): void {
+		if (error != null) {
+			console.error(error);
+		} else {
+			console.log(`Worker ${workerNum} offline.`);
+		}
 		const workerIndex = this.workers.indexOf(worker);
 		this.ready.splice(workerIndex, 1);
 		this.workers.splice(workerIndex, 1);

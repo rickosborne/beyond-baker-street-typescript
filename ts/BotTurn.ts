@@ -1,6 +1,6 @@
 import { Action } from "./Action";
-import { TurnStart } from "./TurnStart";
 import { Bot } from "./Bot";
+import { TurnStart } from "./TurnStart";
 
 export enum BotTurnEffectType {
 	AssistExactEliminate = "AssistExactEliminate",
@@ -82,13 +82,9 @@ export function isBotTurnEffectType(maybe: unknown): maybe is BotTurnEffectType 
 		&& BOT_TURN_EFFECT_TYPES.includes(maybe as BotTurnEffectType);
 }
 
-export interface BotTurnEffect {
-	effectType: BotTurnEffectType;
-}
-
 export interface BotTurnOption {
 	action: Action;
-	effects: BotTurnEffect[];
+	effects: BotTurnEffectType[];
 	strategyType: BotTurnStrategyType;
 }
 

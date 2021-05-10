@@ -15,7 +15,7 @@ const infoOnly = buildLogger({
 	[LogLevel.trace]: false,
 });
 const forceInspectors: InspectorType[] = [];  // [ InspectorType.Toby, InspectorType.Blackwell ];
-const { losses, lossRate, plays, turnsAvg, turns } = playSingleGame({}, config.gamesToPlay, undefined, config.gamesToPlay === 1 ? infoOnly : undefined, undefined, forceInspectors);
+const { losses, lossRate, plays, turnsAvg, turns } = playSingleGame({}, config.gamesToPlay, undefined, config.gamesToPlay === 1 ? infoOnly : undefined, undefined, forceInspectors, []);
 if (plays === 1) {
 	console.log(`${losses === 0 ? "Won" : "Lost"}, with ${turns} turns in ${elapsed()}ms.`);
 } else {

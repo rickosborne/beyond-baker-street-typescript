@@ -1,14 +1,13 @@
 import { ActionType } from "./ActionType";
-import { addEffect } from "./addEffect";
+import { addEffectsIfNotPresent } from "./addEffect";
 import { Bot } from "./Bot";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { CardType } from "./CardType";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
 import { addImpossibleAddedEffectsFromTurn } from "./ImpossibleAdded";
 import { LEAD_TYPES } from "./LeadType";
-import { addLoseEffect } from "./LoseEffect";
 import { MysteryCard } from "./MysteryCard";
 import { PursueAction } from "./PursueAction";
 import { allPathsTo, MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
@@ -20,36 +19,6 @@ import { VisibleLead } from "./VisibleBoard";
 export interface PursueOption extends BotTurnOption {
 	action: PursueAction;
 	strategyType: BotTurnStrategyType.Pursue;
-}
-
-/**
- * Pursue a lead which is known to be impossible to complete.
- */
-export interface PursueImpossibleEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.PursueImpossible;
-}
-
-/**
- * Pursue a lead which might be possible or impossible to complete.
- */
-export interface PursueMaybeEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.PursueMaybe;
-	pathCount: number;
-}
-
-/**
- * Pursue a lead which we know is possible to complete.
- */
-export interface PursuePossibleEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.PursuePossible;
-}
-
-/**
- * Pursue a lead where another lead shares the same evidence type.
- */
-export interface PursueDuplicateEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.PursueDuplicate;
-	evidenceTarget: EvidenceValue;
 }
 
 export class PursueStrategy implements BotTurnStrategy {
@@ -68,33 +37,24 @@ export class PursueStrategy implements BotTurnStrategy {
 		const { evidenceTarget, evidenceType } = lead.leadCard;
 		const totalValue = lead.badValue + evidenceTarget;
 		const gap = totalValue - lead.evidenceValue;
-		const effects: BotTurnEffect[] = [];
+		const effects: BotTurnEffectType[] = [];
 		addImpossibleAddedEffectsFromTurn(effects, turn, CardType.Lead, this.strategyType, bot.inspector);
 		if (lead.leadCount === 1) {
-			addLoseEffect(effects);
+			addEffectsIfNotPresent(effects, BotTurnEffectType.Lose);
 		}
 		const otherLeads = allLeads.filter(l => l !== lead);
 		if (lead.evidenceCards.length === 0 && otherLeads.find(l => l.leadCard.evidenceType === evidenceType) != null) {
-			addEffect<PursueDuplicateEffect>(effects, {
-				effectType: BotTurnEffectType.PursueDuplicate,
-				evidenceTarget: evidenceTarget,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.PursueDuplicate);
 		}
 		if (gap < 1) {
-			addEffect<PursuePossibleEffect>(effects, {
-				effectType: BotTurnEffectType.PursuePossible,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.PursuePossible);
 		} else if (totalValue > MAX_POSSIBLE_EVIDENCE_VALUE) {
-			addEffect<PursueImpossibleEffect>(effects, {
-				effectType: BotTurnEffectType.PursueImpossible,
-			});
+			addEffectsIfNotPresent(effects, BotTurnEffectType.PursueImpossible);
 		} else {
 			const knownValues = this.gatherEvidence(evidenceType, turn, bot.hand);
 			const pathCount = summingPathsTo(gap, knownValues);
 			if (pathCount > 0) {
-				addEffect<PursuePossibleEffect>(effects, {
-					effectType: BotTurnEffectType.PursuePossible,
-				});
+				addEffectsIfNotPresent(effects, BotTurnEffectType.PursuePossible);
 			} else {
 				const impossibleValues: EvidenceValue[] = [];
 				this.gatherEvidenceFromImpossible(evidenceType, turn, impossibleValues);
@@ -105,14 +65,9 @@ export class PursueStrategy implements BotTurnStrategy {
 				}
 				const paths = allPaths.filter(p => impossibleValues.findIndex(i => p.includes(i)) < 0);
 				if (impossibleValues.length > 0 && paths.length === 0) {
-					addEffect<PursueImpossibleEffect>(effects, {
-						effectType: BotTurnEffectType.PursueImpossible,
-					});
+					addEffectsIfNotPresent(effects, BotTurnEffectType.PursueImpossible);
 				} else {
-					addEffect<PursueMaybeEffect>(effects, {
-						effectType: BotTurnEffectType.PursueMaybe,
-						pathCount: paths.length,
-					});
+					addEffectsIfNotPresent(effects, BotTurnEffectType.PursueMaybe);
 				}
 			}
 		}

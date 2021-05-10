@@ -3,10 +3,10 @@ import { CaseFileCard } from "./CaseFileCard";
 import { EVIDENCE_CARDS, EvidenceCard, formatEvidence, isEvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
-import { HOLMES_MOVE_PROGRESS } from "./Game";
+import { HOLMES_GOAL, HOLMES_MAX, HOLMES_MOVE_PROGRESS, INVESTIGATION_MARKER_GOAL } from "./Game";
 import { ImpossibleCard } from "./Impossible";
 import { LeadCard, randomLeadCards } from "./LeadCard";
-import { LEAD_TYPES, LeadType } from "./LeadType";
+import { LEAD_COUNT, LEAD_TYPES, LeadType } from "./LeadType";
 import { Pile } from "./Pile";
 import { PseudoRNG } from "./rng";
 import { BottomOrTop } from "./Toby";
@@ -95,6 +95,7 @@ class BoardLead implements VisibleLead {
 }
 
 export class Board implements VisibleBoard {
+	private _confirmedCount = 0;
 	private _impossibleLimit: number;
 	private holmesValue: number;
 	private readonly impossible: Pile<ImpossibleCard> = new Pile<ImpossibleCard>();
@@ -132,7 +133,7 @@ export class Board implements VisibleBoard {
 	}
 
 	public get allConfirmed(): boolean {
-		return LEAD_TYPES.find(leadType => !this.leads[leadType].confirmed) == null;
+		return this._confirmedCount === LEAD_COUNT;
 	}
 
 	public get anyEmptyLeads(): boolean {
@@ -167,7 +168,16 @@ export class Board implements VisibleBoard {
 	}
 
 	public confirm(leadType: LeadType): void {
-		this.leads[leadType].confirm();
+		const lead = this.leads[leadType];
+		if (lead.confirmed) {
+			throw new Error(`Lead ${leadType} is already confirmed.`);
+		}
+		lead.confirm();
+		this._confirmedCount++;
+	}
+
+	public get confirmedCount(): number {
+		return this._confirmedCount;
 	}
 
 	public dealEvidence(): EvidenceCard | undefined {
@@ -176,6 +186,10 @@ export class Board implements VisibleBoard {
 
 	public evidenceTypeFor(leadType: LeadType): EvidenceType {
 		return this.leadFor(leadType).evidenceType;
+	}
+
+	public get holmesWon(): boolean {
+		return this.holmesValue === HOLMES_GOAL;
 	}
 
 	public get holmesLocation(): number {
@@ -203,8 +217,16 @@ export class Board implements VisibleBoard {
 		this.remainingEvidence.shuffle(this.prng);
 	}
 
+	public get investigationComplete(): boolean {
+		return this.investigationValue === INVESTIGATION_MARKER_GOAL;
+	}
+
 	public get investigationMarker(): number {
 		return this.investigationValue;
+	}
+
+	public get investigationOver(): boolean {
+		return this.investigationValue > INVESTIGATION_MARKER_GOAL;
 	}
 
 	public isConfirmed(leadType: LeadType): boolean {
@@ -215,8 +237,9 @@ export class Board implements VisibleBoard {
 		return this.leads[leadType].leadCard;
 	}
 
-	public moveHolmes(delta: number): void {
-		this.holmesValue += delta;
+	public moveHolmes(delta: number): number {
+		this.holmesValue = Math.max(Math.min(this.holmesValue + delta, HOLMES_MAX), HOLMES_GOAL);
+		return this.holmesValue;
 	}
 
 	public moveInvestigationMarker(delta: number): number {

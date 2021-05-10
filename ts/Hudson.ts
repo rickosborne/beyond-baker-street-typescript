@@ -1,8 +1,7 @@
 import { Action } from "./Action";
 import { ActionType } from "./ActionType";
-import { addEffect } from "./addEffect";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
-import { ConfirmEventuallyEffect } from "./ConfirmStrategy";
+import { addEffectsIfNotPresent } from "./addEffect";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
 import { EvidenceCard, formatEvidence, isEvidenceCard } from "./EvidenceCard";
 import { InspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
@@ -61,18 +60,14 @@ export class HudsonInspectorStrategy extends InspectorStrategy {
 					continue;
 				}
 				const evidenceValue = impossibleEvidence.evidenceValue;
-				const effects: BotTurnEffect[] = [];
+				const effects: BotTurnEffectType[] = [];
 				if (leadGap === evidenceValue) {
-					addEffect<ConfirmEventuallyEffect>(effects, {
-						effectType: BotTurnEffectType.ConfirmEventually,
-					});
+					addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
 				} else if (leadGap > evidenceValue) {
 					const remain = leadGap - evidenceValue;
 					const values = evidenceValues();
 					if (summingPathsTo(remain, values) > 0) {
-						addEffect<ConfirmEventuallyEffect>(effects, {
-							effectType: BotTurnEffectType.ConfirmEventually,
-						});
+						addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
 					}
 				}
 				if (effects.length > 0) {

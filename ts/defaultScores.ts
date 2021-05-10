@@ -1,10 +1,9 @@
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
-import { EffectWeightOp, EffectWeightOperand, EffectWeightOperator } from "./EffectWeight";
+import { EffectWeightOp } from "./EffectWeight";
 import { strictDeepEqual } from "./strictDeepEqual";
 
 export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightOp[]>;
 // {"AssistExactEliminate":[17],"AssistImpossibleType":[-25],"AssistKnown":[7],"AssistNarrow":[5],"AssistNextPlayer":[7],"Confirm":[3],"EliminateKnownUnusedValue":[43],"EliminateKnownUsedValue":[10],"EliminateSetsUpExact":[4],"EliminateStompsExact":[7],"EliminateUnknownValue":[-2],"EliminateUnusedType":[16],"EliminateUsedType":[7],"EliminateWild":[-3],"HolmesImpeded":[0],"HolmesProgress":[-17],"ImpossibleAdded":[7],"InvestigateBad":[-12],"InvestigateCorrectType":[8],"InvestigateCorrectValue":[-3],"InvestigateMaybeBad":[-21],"InvestigatePerfect":[17],"InvestigateWild":[-8],"Lose":[-1000],"MaybeLose":[-24],"PursueDuplicate":[31],"PursueImpossible":[36],"PursueMaybe":[-11],"PursuePossible":[-29],"Win":[1000]}
-const HOLMES_MAX = 20;
 export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.AssistExactEliminate]: [17],
 	[BotTurnEffectType.AssistImpossibleType]: [-25],

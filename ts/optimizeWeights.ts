@@ -146,7 +146,7 @@ function getAttemptSummary(): SelectAttemptSummary {
 	};
 }
 
-async function calculateEnergy(simRun: SimRun): Promise<number> {
+async function calculateEnergy(simRun: SimRun): Promise<number | undefined> {
 	const attempt = stableJson(simRun.weights);
 	const existing = scoreForAttempt(attempt);
 	if (existing != null) {
@@ -156,7 +156,9 @@ async function calculateEnergy(simRun: SimRun): Promise<number> {
 	const lossRate = result.lossRate;
 	// console.log(`${formatPercent(result.lossRate, 2)} ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
 	simRun.lossRate = lossRate;
-	addAttemptScore(attempt, lossRate);
+	if (lossRate != null) {
+		addAttemptScore(attempt, lossRate);
+	}
 	return lossRate;
 }
 

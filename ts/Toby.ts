@@ -1,7 +1,7 @@
 import { Action } from "./Action";
 import { ActionType } from "./ActionType";
 import { Bot } from "./Bot";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
 import { EvidenceCard, formatEvidence } from "./EvidenceCard";
 import { INVESTIGATION_MARKER_GOAL } from "./Game";
 import { InspectorStrategy } from "./InspectorStrategy";
@@ -23,13 +23,9 @@ export interface TobyAction extends Action {
 	onReveal: (evidenceCard: EvidenceCard) => BottomOrTop;
 }
 
-export interface TobyEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.Toby;
-}
-
 export interface TobyOption extends BotTurnOption {
 	action: TobyAction;
-	effects: TobyEffect[];
+	effects: [BotTurnEffectType.Toby];
 	strategyType: BotTurnStrategyType.Inspector;
 }
 
@@ -112,9 +108,7 @@ export class TobyInspectorStrategy extends InspectorStrategy {
 						return BottomOrTop.Bottom;
 					},
 				},
-				effects: [{
-					effectType: BotTurnEffectType.Toby,
-				}],
+				effects: [BotTurnEffectType.Toby],
 				strategyType: BotTurnStrategyType.Inspector,
 			});
 		}

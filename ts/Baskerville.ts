@@ -1,13 +1,11 @@
 import { Action } from "./Action";
 import { ActionType } from "./ActionType";
-import { addEffect } from "./addEffect";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
-import { ConfirmEventuallyEffect, ConfirmReadyEffect } from "./ConfirmStrategy";
+import { addEffectsIfNotPresent } from "./addEffect";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
 import { EvidenceCard, formatEvidence, isEvidenceCard } from "./EvidenceCard";
 import { INVESTIGATION_MARKER_GOAL } from "./Game";
 import { OncePerGameInspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
-import { InvestigationCompleteEffect } from "./InvestigationCompleteEffect";
 import { LeadType } from "./LeadType";
 import { Outcome, OutcomeType } from "./Outcome";
 import { Player, PlayerInspector } from "./Player";
@@ -60,7 +58,7 @@ export class BaskervilleInspectorStrategy extends OncePerGameInspectorStrategy {
 		impossibleEvidence: EvidenceCard,
 		leadType: LeadType,
 		leadEvidence: EvidenceCard,
-		...effects: BotTurnEffect[]
+		...effects: BotTurnEffectType[]
 	): void {
 		options.push(<BaskervilleOption>{
 			action: {
@@ -90,27 +88,21 @@ export class BaskervilleInspectorStrategy extends OncePerGameInspectorStrategy {
 					for (const impossibleEvidence of impossibleEvidences) {
 						const leadAdds = impossibleEvidence.evidenceValue - leadEvidence.evidenceValue;
 						const investigationAdds = -leadAdds;
-						const effects: BotTurnEffect[] = [];
+						const effects: BotTurnEffectType[] = [];
 						const updatedInvestigationMarker = turn.board.investigationMarker + investigationAdds;
 						if (updatedInvestigationMarker > INVESTIGATION_MARKER_GOAL || leadAdds > leadGap) {
 							// swapping would lose the game, or invalidate the lead
 							continue;
 						} else if (updatedInvestigationMarker === INVESTIGATION_MARKER_GOAL) {
-							addEffect<InvestigationCompleteEffect>(effects, {
-								effectType: BotTurnEffectType.InvestigationComplete,
-							});
+							addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigationComplete);
 						}
 						if (leadAdds === leadGap) {
-							addEffect<ConfirmReadyEffect>(effects, {
-								effectType: BotTurnEffectType.ConfirmReady,
-							});
+							addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmReady);
 						} else {
 							const remaining = leadGap - leadAdds;
 							const values = evidenceValues();
 							if (summingPathsTo(remaining, values) > 0) {
-								addEffect<ConfirmEventuallyEffect>(effects, {
-									effectType: BotTurnEffectType.ConfirmEventually,
-								});
+								addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
 							}
 						}
 						if (effects.length > 0) {

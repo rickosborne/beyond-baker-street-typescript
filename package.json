@@ -32,8 +32,8 @@
 	"main": "index.js",
 	"name": "beyond-baker-street-typescript",
 	"scripts": {
-		"clean": "rm -R ./node_modules *.log */*.js */*.d.ts */*.js.map || true",
-		"cleancompile": "rm -R *.log */*.js */*.d.ts */*.js.map ./.nyc_output ./coverage ./js || true",
+		"clean": "rm -R ./node_modules *.log */*.d.ts || true",
+		"cleancompile": "rm -R *.log */*.d.ts ./.nyc_output ./coverage ./js || true",
 		"compile": "ttsc -p tsconfig.json",
 		"coverage2": "NODE_OPTIONS='--experimental-loader=@istanbuljs/esm-loader-hook --experimental-specifier-resolution=node' nyc mocha --config .mocharc.json ts/*.spec.ts",
 		"precoverage": "npm run compile",

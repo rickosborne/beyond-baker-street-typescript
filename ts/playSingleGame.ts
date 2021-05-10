@@ -24,11 +24,12 @@ export function playSingleGame(
 	logger: Logger = plays === 1 ? CONSOLE_LOGGER_NO_JSON : SILENT_LOGGER,
 	botCount = 4,
 	forceInspectors: InspectorType[] = [],
+	availableInspectors: InspectorType[] = INSPECTOR_TYPES,
 ): SingleGameOutcome {
 	let losses = 0;
 	let turns = 0;
 	for (let i = 0; i < plays; i++) {
-		const inspectors = shuffleInPlace(INSPECTOR_TYPES.slice(), prng);
+		const inspectors = shuffleInPlace(availableInspectors.slice(), prng);
 		forceInspectors.forEach(f => {
 			removeIf(inspectors, i => f === i);
 			inspectors.unshift(f);

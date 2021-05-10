@@ -6,7 +6,7 @@ import { strictDeepEqual } from "./strictDeepEqual";
 export type NeighborsGenerator<State> = (count: number, state: State, temp: number, prng: PseudoRNG) => State[];
 
 export interface AnnealParams<State> {
-	calculateEnergy: (state: State) => Promise<number>;
+	calculateEnergy: (state: State) => Promise<number | undefined>;
 	formatState: (state: State, energy: number) => string,
 	improvement: (afterState: State, afterEnergy: number, beforeState: State, beforeEnergy: number, temp: number) => void;
 	initialState: State[];
@@ -41,7 +41,10 @@ export async function anneal<State>(
 	const bestStates: State[] = initialState.slice();
 	const lastStates: State[] = initialState.slice();
 	let currentState: State = randomItem(initialState);
-	let currentEnergy: number = await calculateEnergy(currentState);
+	let currentEnergy: number | undefined = await calculateEnergy(currentState);
+	if (currentEnergy == null) {
+		throw new Error(`Initial energy cannot be null.`);
+	}
 	let lastEnergy: number = currentEnergy;
 	let bestEnergy: number = currentEnergy;
 	let energies: number[];
@@ -49,7 +52,7 @@ export async function anneal<State>(
 	do {
 		let lastState = randomItem(lastStates);
 		states = neighbors(threadCount, lastState, temp, prng);
-		energies = await Promise.all(states.map(state => calculateEnergy(state)));
+		energies = (await Promise.all(states.map(state => calculateEnergy(state)))).filter(e => e != null) as number[];
 		for (let i = 0; i < states.length; i++) {
 			currentState = states[i];
 			currentEnergy = energies[i];

@@ -1,12 +1,10 @@
 import { Assisted, isAssisted } from "./AssistAction";
-import { BotTurnEffect, BotTurnEffectType } from "./BotTurn";
-import { EliminateKnownUnusedValueEffect, EliminateUnusedTypeEffect } from "./EliminateStrategy";
+import { BotTurnEffectType } from "./BotTurn";
 import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
 import { formatDecimal } from "./formatDecimal";
 import { HOLMES_MAX } from "./Game";
 import { isNumber } from "./isNumber";
 import { LEAD_TYPES } from "./LeadType";
-import { PursueDuplicateEffect } from "./PursueStrategy";
 import { HasVisibleBoard } from "./VisibleBoard";
 
 export enum EffectWeightOperator {
@@ -60,7 +58,7 @@ export const EFFECT_WEIGHT_OPERANDS: EffectWeightOperand[] = [
 ];
 
 export type EffectWeightOp = EffectWeightOperator | EffectWeightOperand | number;
-export type EffectTurnStackConverter<S, R extends S | void> = S extends (string | number) ? (effect: BotTurnEffect, turnStart: HasVisibleBoard, stack: S[]) => R : (effect: BotTurnEffect, turnStart: HasVisibleBoard) => R;
+export type EffectTurnStackConverter<S, R extends S | void> = S extends (string | number) ? (effect: BotTurnEffectType, turnStart: HasVisibleBoard, stack: S[]) => R : (effect: BotTurnEffectType, turnStart: HasVisibleBoard) => R;
 export type EffectOperandResolver = EffectTurnStackConverter<unknown, number>;
 export type EffectWeightFormatter = EffectTurnStackConverter<string, string>;
 export type EffectWeightOperation = EffectTurnStackConverter<number, void>;
@@ -69,11 +67,11 @@ export interface EffectCalculator {
 	format: EffectTurnStackConverter<unknown, string>;
 }
 
-export function ifEffectType<E extends BotTurnEffect>(type: BotTurnEffectType, mapper: (effect: E) => number): EffectOperandResolver {
+export function ifEffectType<E extends BotTurnEffectType>(type: BotTurnEffectType, mapper: (effect: E) => number): EffectOperandResolver {
 	return e => {
 		/* istanbul ignore if */
-		if (e.effectType !== type) {
-			throw new Error(`Effect ${e.effectType} found, but expected: ${type}`);
+		if (e !== type) {
+			throw new Error(`Effect ${e} found, but expected: ${type}`);
 		}
 		return mapper(e as E);
 	};
@@ -88,7 +86,7 @@ export function ifEffectMatch<E>(
 			return mapper(e);
 		}
 		/* istanbul ignore next */
-		throw new Error(`Effect ${e.effectType} found but unexpected.`);
+		throw new Error(`Effect ${e} found but unexpected.`);
 	};
 }
 
@@ -96,14 +94,20 @@ export function ifEffectMatch<E>(
 const EFFECT_WEIGHT_OPERAND_RESOLVER: Record<EffectWeightOperand, EffectOperandResolver> = {
 	[EffectWeightOperand.AssistRatio]: ifEffectMatch<Assisted>(isAssisted, a => a.assistRatio),
 	[EffectWeightOperand.ConfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => t.board.leads[lt].confirmed).length,
-	[EffectWeightOperand.EvidenceTarget]: ifEffectType<PursueDuplicateEffect>(BotTurnEffectType.PursueDuplicate, e => e.evidenceTarget),
-	[EffectWeightOperand.EvidenceValue]: ifEffectType<EliminateKnownUnusedValueEffect>(BotTurnEffectType.EliminateKnownUnusedValue, e => e.evidenceValue),
+	[EffectWeightOperand.EvidenceTarget]: ifEffectType(BotTurnEffectType.PursueDuplicate, () => {
+		throw new Error(`TODO: EffectWeightOperand.EvidenceTarget`);
+	}),
+	[EffectWeightOperand.EvidenceValue]: ifEffectType(BotTurnEffectType.EliminateKnownUnusedValue, () => {
+		throw new Error(`TODO: EffectWeightOperand.EvidenceValue`);
+	}),
 	[EffectWeightOperand.EvidenceValueMax]: () => EVIDENCE_CARD_VALUE_MAX,
 	[EffectWeightOperand.HolmesLocation]: (e, t) => t.board.holmesLocation,
 	[EffectWeightOperand.HolmesProgress]: (e, t) => (HOLMES_MAX - t.board.holmesLocation) / HOLMES_MAX,
 	[EffectWeightOperand.ImpossibleCount]: (e, t) => t.board.impossibleCards.length,
 	[EffectWeightOperand.ImpossiblePastLimit]: (e, t) => Math.max(0, t.board.impossibleCards.length - t.board.impossibleLimit),
-	[EffectWeightOperand.Probability4Plus]: ifEffectType<EliminateUnusedTypeEffect>(BotTurnEffectType.EliminateUnusedType, e => e.probability4plus),
+	[EffectWeightOperand.Probability4Plus]: ifEffectType(BotTurnEffectType.EliminateUnusedType, () => {
+		throw new Error(`TODO: EffectWeightOperand.Probability4Plus`);
+	}),
 	[EffectWeightOperand.RemainingCount]: (e, t) => t.board.remainingEvidenceCount,
 	[EffectWeightOperand.UnconfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => !t.board.leads[lt].confirmed).length,
 };
@@ -253,7 +257,7 @@ export function compileEffectWeight(
 			return opFormatter(e, t, s);
 		};
 	}, undefined as unknown as EffectWeightFormatter) : (e, t, s) => { s.push(""); return ""; };
-	function doIt<T>(effect: BotTurnEffect, turnStart: HasVisibleBoard, fn: (effect: BotTurnEffect, turnStart: HasVisibleBoard, stack: T[]) => void): T {
+	function doIt<T>(effect: BotTurnEffectType, turnStart: HasVisibleBoard, fn: (effect: BotTurnEffectType, turnStart: HasVisibleBoard, stack: T[]) => void): T {
 		const s: T[] = [];
 		fn(effect, turnStart, s);
 		const value = s.pop();
@@ -267,7 +271,7 @@ export function compileEffectWeight(
 		return value;
 	}
 	return {
-		calculate: (e: BotTurnEffect, t: HasVisibleBoard): number => doIt(e, t, math),
-		format: (e: BotTurnEffect, t: HasVisibleBoard): string => wantFormatter ? doIt(e, t, formats) : "",
+		calculate: (e: BotTurnEffectType, t: HasVisibleBoard): number => doIt(e, t, math),
+		format: (e: BotTurnEffectType, t: HasVisibleBoard): string => wantFormatter ? doIt(e, t, formats) : "",
 	};
 }

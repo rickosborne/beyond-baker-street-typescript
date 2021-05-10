@@ -1,31 +1,15 @@
 import { ActionType } from "./ActionType";
-import { addEffect } from "./addEffect";
+import { addEffectsEvenIfDuplicate, addEffectsIfNotPresent } from "./addEffect";
 import { Bot } from "./Bot";
-import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
+import { BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { ConfirmAction } from "./ConfirmAction";
-import { HOLMES_MOVE_IMPEDE, HOLMES_MOVE_IMPEDE_BAYNES, INVESTIGATION_MARKER_GOAL } from "./Game";
-import { HolmesImpededEffect } from "./HolmesProgressEffect";
+import { INVESTIGATION_MARKER_GOAL } from "./Game";
 import { InspectorType } from "./InspectorType";
-import { LEAD_TYPES } from "./LeadType";
-import { addLoseEffect } from "./LoseEffect";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
-import { addWinEffect } from "./WinEffect";
 
 export interface ConfirmOption extends BotTurnOption {
 	strategyType: BotTurnStrategyType.Confirm;
-}
-
-export interface ConfirmEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.Confirm;
-}
-
-export interface ConfirmReadyEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.ConfirmReady;
-}
-
-export interface ConfirmEventuallyEffect extends BotTurnEffect {
-	effectType: BotTurnEffectType.ConfirmEventually;
 }
 
 export function isConfirmOption(maybe: unknown): maybe is ConfirmOption {
@@ -45,33 +29,22 @@ export class ConfirmStrategy implements BotTurnStrategy {
 				wantValues.push(wantValues[0] - 1);
 			}
 			if (wantValues.includes(lead.evidenceValue)) {
-				const effects: BotTurnEffect[] = [];
-				const delta = bot.inspector === InspectorType.Baynes ? HOLMES_MOVE_IMPEDE_BAYNES : HOLMES_MOVE_IMPEDE;
-				addEffect<ConfirmEffect>(effects, {
-					effectType: BotTurnEffectType.Confirm,
-				});
-				addEffect<HolmesImpededEffect>(effects, {
-					delta,
-					effectType: BotTurnEffectType.HolmesImpeded,
-					inspector: undefined,
-				});
+				const effects: BotTurnEffectType[] = [];
+				addEffectsIfNotPresent(effects, BotTurnEffectType.Confirm);
+				addEffectsIfNotPresent(effects, BotTurnEffectType.HolmesImpeded);
 				if (bot.inspector === InspectorType.Baynes) {
 					// add it a second time, for twice the impact!
-					addEffect<HolmesImpededEffect>(effects, {
-						delta,
-						effectType: BotTurnEffectType.HolmesImpeded,
-						inspector: bot.inspector,
-					}, true);
+					addEffectsEvenIfDuplicate(effects, BotTurnEffectType.HolmesImpeded);
 				}
 				if (unfinished.length === 1) {
 					if (turn.board.investigationMarker === INVESTIGATION_MARKER_GOAL) {
-						addWinEffect(effects);
+						addEffectsIfNotPresent(effects, BotTurnEffectType.Win);
 					} else {
-						addLoseEffect(effects);
+						addEffectsIfNotPresent(effects, BotTurnEffectType.Lose);
 					}
 				}
-				options.push(<ConfirmOption> {
-					action: <ConfirmAction> {
+				options.push(<ConfirmOption>{
+					action: <ConfirmAction>{
 						actionType: ActionType.Confirm,
 						leadType,
 					},

@@ -31,6 +31,7 @@ export enum LogLevel {
 export interface LogWithLevel {
 	level: LogLevel;
 	message: string;
+	time: number;
 }
 
 export type CachingLogger = Logger & {
@@ -40,7 +41,11 @@ export type CachingLogger = Logger & {
 // noinspection JSUnusedGlobalSymbols
 export function cachingLoggerFactory(): CachingLogger {
 	const messages: LogWithLevel[] = [];
-	const log = (level: LogLevel) => (messageBuilder: () => string) => messages.push({ level, message: messageBuilder() });
+	const log = (level: LogLevel) => (messageBuilder: () => string) => messages.push({
+		level,
+		message: typeof messageBuilder === "function" ? messageBuilder() : JSON.stringify(messageBuilder),
+		time: Date.now(),
+	});
 	return {
 		info: log(LogLevel.info),
 		json: log(LogLevel.json),

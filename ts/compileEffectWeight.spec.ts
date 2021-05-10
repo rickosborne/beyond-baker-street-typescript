@@ -1,35 +1,17 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import { assistRatioFromPossible } from "./AssistAction";
-import { AssistKnownCardEffect } from "./AssistStrategy";
-import { BotTurnEffect, BotTurnEffectType } from "./BotTurn";
+import { BotTurnEffectType } from "./BotTurn";
 import { CaseFileCard } from "./CaseFileCard";
 import { compileEffectWeight, EffectWeightOp, EffectWeightOperand, EffectWeightOperator } from "./EffectWeight";
-import { EliminateKnownUnusedValueEffect, EliminateUnusedTypeEffect } from "./EliminateStrategy";
 import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
-import { EvidenceType } from "./EvidenceType";
 import { HOLMES_MAX } from "./Game";
 import { LeadType } from "./LeadType";
-import { PursueDuplicateEffect } from "./PursueStrategy";
 import { randomInt, randomPercent } from "./rng";
 import { TurnStart } from "./TurnStart";
 import { VisibleBoard, VisibleLead } from "./VisibleBoard";
 
-const NO_EFFECT: BotTurnEffect = undefined as unknown as BotTurnEffect;
+const NO_EFFECT: BotTurnEffectType = undefined as unknown as BotTurnEffectType;
 const NO_TURN: TurnStart = undefined as unknown as TurnStart;
-
-function assistKnownCardEffect(): AssistKnownCardEffect {
-	const possibleBefore = randomInt();
-	return {
-		assistRatio: assistRatioFromPossible(possibleBefore, 1),
-		effectType: BotTurnEffectType.AssistKnown,
-		evidenceType: EvidenceType.Clue,
-		evidenceValue: randomInt(1, 20),
-		playerName: "Bot",
-		possibleAfter: 1,
-		possibleBefore,
-	};
-}
 
 function testBoth(
 	ops: EffectWeightOp[],
@@ -57,16 +39,16 @@ function unaryTestBoth(op: EffectWeightOperator, math: (a: number) => number, fo
 }
 
 
-const SOME_CONFIRMED = <TurnStart> {
-	board: <VisibleBoard> {
+const SOME_CONFIRMED = <TurnStart>{
+	board: <VisibleBoard>{
 		leads: {
-			[LeadType.Motive]: <VisibleLead> {
+			[LeadType.Motive]: <VisibleLead>{
 				confirmed: false,
 			},
-			[LeadType.Opportunity]: <VisibleLead> {
+			[LeadType.Opportunity]: <VisibleLead>{
 				confirmed: true,
 			},
-			[LeadType.Suspect]: <VisibleLead> {
+			[LeadType.Suspect]: <VisibleLead>{
 				confirmed: true,
 			},
 		},
@@ -107,39 +89,28 @@ describe("compileEffectWeight", function () {
 		unaryTestBoth(EffectWeightOperator.Reverse, a => 1 - a, a => `1-(${a})`);
 	});
 
-	it("handles AssistRatio", function () {
-		const knownCardEffect = assistKnownCardEffect();
-		testBoth([EffectWeightOperand.AssistRatio], knownCardEffect.assistRatio, String(knownCardEffect.assistRatio), knownCardEffect);
-	});
-
 	it("handles ConfirmedLeads", function () {
 		testBoth([EffectWeightOperand.ConfirmedLeads], 2, "2", NO_EFFECT, SOME_CONFIRMED);
 	});
 
 	it("handles EvidenceTarget", function () {
 		const evidenceTarget = randomInt();
-		testBoth([EffectWeightOperand.EvidenceTarget], evidenceTarget, String(evidenceTarget), <PursueDuplicateEffect> {
-			effectType: BotTurnEffectType.PursueDuplicate,
-			evidenceTarget,
-		});
+		testBoth([EffectWeightOperand.EvidenceTarget], evidenceTarget, String(evidenceTarget), BotTurnEffectType.PursueDuplicate);
 	});
 
-	it ("handles EvidenceValue", function () {
+	it("handles EvidenceValue", function () {
 		const evidenceValue = randomInt();
-		testBoth([EffectWeightOperand.EvidenceValue], evidenceValue, String(evidenceValue), <EliminateKnownUnusedValueEffect> {
-			effectType: BotTurnEffectType.EliminateKnownUnusedValue,
-			evidenceValue,
-		});
+		testBoth([EffectWeightOperand.EvidenceValue], evidenceValue, String(evidenceValue), BotTurnEffectType.EliminateKnownUnusedValue);
 	});
 
-	it ("handles EvidenceValueMax", function () {
+	it("handles EvidenceValueMax", function () {
 		testBoth([EffectWeightOperand.EvidenceValueMax], EVIDENCE_CARD_VALUE_MAX, String(EVIDENCE_CARD_VALUE_MAX));
 	});
 
 	it("handles HolmesLocation", function () {
 		const holmesLocation = randomInt();
-		testBoth([EffectWeightOperand.HolmesLocation], holmesLocation, String(holmesLocation), NO_EFFECT, <TurnStart> {
-			board: <VisibleBoard> {
+		testBoth([EffectWeightOperand.HolmesLocation], holmesLocation, String(holmesLocation), NO_EFFECT, <TurnStart>{
+			board: <VisibleBoard>{
 				holmesLocation,
 			},
 		});
@@ -148,8 +119,8 @@ describe("compileEffectWeight", function () {
 	it("handles HolmesProgress", function () {
 		const holmesLocation = randomInt(HOLMES_MAX);
 		const holmesProgress = (HOLMES_MAX - holmesLocation) / HOLMES_MAX;
-		testBoth([EffectWeightOperand.HolmesProgress], holmesProgress, String(holmesProgress), NO_EFFECT, <TurnStart> {
-			board: <VisibleBoard> {
+		testBoth([EffectWeightOperand.HolmesProgress], holmesProgress, String(holmesProgress), NO_EFFECT, <TurnStart>{
+			board: <VisibleBoard>{
 				holmesLocation,
 			},
 		});
@@ -157,8 +128,8 @@ describe("compileEffectWeight", function () {
 
 	it("handles ImpossibleCount", function () {
 		const impossibleCount = randomInt();
-		testBoth([EffectWeightOperand.ImpossibleCount], impossibleCount, String(impossibleCount), NO_EFFECT, <TurnStart> {
-			board: <VisibleBoard> {
+		testBoth([EffectWeightOperand.ImpossibleCount], impossibleCount, String(impossibleCount), NO_EFFECT, <TurnStart>{
+			board: <VisibleBoard>{
 				impossibleCards: new Array(impossibleCount),
 			},
 		});
@@ -168,9 +139,9 @@ describe("compileEffectWeight", function () {
 		const impossibleTarget = randomInt(5, 1);
 		const impossibleOver = randomInt(5, 1);
 		const impossibleCount = impossibleTarget + impossibleOver;
-		testBoth([EffectWeightOperand.ImpossiblePastLimit], impossibleOver, String(impossibleOver), NO_EFFECT, <TurnStart> {
-			board: <VisibleBoard> {
-				caseFile: <CaseFileCard> {
+		testBoth([EffectWeightOperand.ImpossiblePastLimit], impossibleOver, String(impossibleOver), NO_EFFECT, <TurnStart>{
+			board: <VisibleBoard>{
+				caseFile: <CaseFileCard>{
 					impossibleCount: impossibleTarget,
 				},
 				impossibleCards: new Array(impossibleCount),
@@ -181,16 +152,13 @@ describe("compileEffectWeight", function () {
 
 	it("handles Probability4Plus", function () {
 		const probability4plus = randomPercent();
-		testBoth([EffectWeightOperand.Probability4Plus], probability4plus, String(probability4plus), <EliminateUnusedTypeEffect> {
-			effectType: BotTurnEffectType.EliminateUnusedType,
-			probability4plus,
-		});
+		testBoth([EffectWeightOperand.Probability4Plus], probability4plus, String(probability4plus), BotTurnEffectType.EliminateUnusedType);
 	});
 
 	it("handles RemainingCount", function () {
 		const remainingEvidenceCount = randomInt();
-		testBoth([EffectWeightOperand.RemainingCount], remainingEvidenceCount, String(remainingEvidenceCount), NO_EFFECT, <TurnStart> {
-			board: <VisibleBoard> {
+		testBoth([EffectWeightOperand.RemainingCount], remainingEvidenceCount, String(remainingEvidenceCount), NO_EFFECT, <TurnStart>{
+			board: <VisibleBoard>{
 				remainingEvidenceCount,
 			},
 		});
@@ -198,17 +166,5 @@ describe("compileEffectWeight", function () {
 
 	it("handles UnconfirmedLeads", function () {
 		testBoth([EffectWeightOperand.UnconfirmedLeads], 1, "1", NO_EFFECT, SOME_CONFIRMED);
-	});
-
-	it("handles complex expressions", function () {
-		const base = randomInt();
-		const knownCardEffect = assistKnownCardEffect();
-		testBoth([
-			base,
-			EffectWeightOperand.UnconfirmedLeads,
-			EffectWeightOperator.Add,
-			EffectWeightOperand.AssistRatio,
-			EffectWeightOperator.Multiply,
-		], (base + 1) * knownCardEffect.assistRatio, `((${base})+(1))*(${knownCardEffect.assistRatio})`, knownCardEffect, SOME_CONFIRMED);
 	});
 });
