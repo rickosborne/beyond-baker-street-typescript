@@ -1,4 +1,4 @@
-import { Action } from "./Action";
+import { Action, isActionOfType } from "./Action";
 import { ActionType } from "./ActionType";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
 import { HOLMES_MAX } from "./Game";
@@ -27,6 +27,11 @@ export interface AdlerOutcome extends Outcome {
 
 export function isAdlerAction(maybe: unknown): maybe is AdlerAction {
 	return (maybe != null) && ((maybe as AdlerAction).actionType === ActionType.Adler);
+}
+
+export function isAdlerOption(maybe: unknown): maybe is AdlerOption {
+	const ao = maybe as AdlerOption;
+	return (maybe != null) && (ao.strategyType === BotTurnStrategyType.Inspector && isActionOfType(ao.action, ActionType.Adler));
 }
 
 export function isAdlerOutcome(maybe: unknown): maybe is AdlerOutcome {

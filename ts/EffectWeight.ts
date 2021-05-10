@@ -30,14 +30,11 @@ export const EFFECT_WEIGHT_OPERATORS: EffectWeightOperator[] = [
 export enum EffectWeightOperand {
 	AssistRatio = "AssistRatio",
 	ConfirmedLeads = "ConfirmedLeads",
-	EvidenceTarget = "EvidenceTarget",
-	EvidenceValue = "EvidenceValue",
 	EvidenceValueMax = "EvidenceValueMax",
 	HolmesLocation = "HolmesLocation",
 	HolmesProgress = "HolmesProgress",
 	ImpossibleCount = "ImpossibleCount",
 	ImpossiblePastLimit = "ImpossiblePastLimit",
-	Probability4Plus = "Probability4Plus",
 	RemainingCount = "RemainingCount",
 	UnconfirmedLeads = "UnconfirmedLeads",
 }
@@ -45,14 +42,11 @@ export enum EffectWeightOperand {
 export const EFFECT_WEIGHT_OPERANDS: EffectWeightOperand[] = [
 	EffectWeightOperand.AssistRatio,
 	EffectWeightOperand.ConfirmedLeads,
-	EffectWeightOperand.EvidenceTarget,
-	EffectWeightOperand.EvidenceValue,
 	EffectWeightOperand.EvidenceValueMax,
 	EffectWeightOperand.HolmesLocation,
 	EffectWeightOperand.HolmesProgress,
 	EffectWeightOperand.ImpossibleCount,
 	EffectWeightOperand.ImpossiblePastLimit,
-	EffectWeightOperand.Probability4Plus,
 	EffectWeightOperand.RemainingCount,
 	EffectWeightOperand.UnconfirmedLeads,
 ];
@@ -94,20 +88,11 @@ export function ifEffectMatch<E>(
 const EFFECT_WEIGHT_OPERAND_RESOLVER: Record<EffectWeightOperand, EffectOperandResolver> = {
 	[EffectWeightOperand.AssistRatio]: ifEffectMatch<Assisted>(isAssisted, a => a.assistRatio),
 	[EffectWeightOperand.ConfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => t.board.leads[lt].confirmed).length,
-	[EffectWeightOperand.EvidenceTarget]: ifEffectType(BotTurnEffectType.PursueDuplicate, () => {
-		throw new Error(`TODO: EffectWeightOperand.EvidenceTarget`);
-	}),
-	[EffectWeightOperand.EvidenceValue]: ifEffectType(BotTurnEffectType.EliminateKnownUnusedValue, () => {
-		throw new Error(`TODO: EffectWeightOperand.EvidenceValue`);
-	}),
 	[EffectWeightOperand.EvidenceValueMax]: () => EVIDENCE_CARD_VALUE_MAX,
 	[EffectWeightOperand.HolmesLocation]: (e, t) => t.board.holmesLocation,
 	[EffectWeightOperand.HolmesProgress]: (e, t) => (HOLMES_MAX - t.board.holmesLocation) / HOLMES_MAX,
 	[EffectWeightOperand.ImpossibleCount]: (e, t) => t.board.impossibleCards.length,
 	[EffectWeightOperand.ImpossiblePastLimit]: (e, t) => Math.max(0, t.board.impossibleCards.length - t.board.impossibleLimit),
-	[EffectWeightOperand.Probability4Plus]: ifEffectType(BotTurnEffectType.EliminateUnusedType, () => {
-		throw new Error(`TODO: EffectWeightOperand.Probability4Plus`);
-	}),
 	[EffectWeightOperand.RemainingCount]: (e, t) => t.board.remainingEvidenceCount,
 	[EffectWeightOperand.UnconfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => !t.board.leads[lt].confirmed).length,
 };
@@ -186,17 +171,13 @@ const EFFECT_WEIGHT_OPERATION_FORMAT: Record<EffectWeightOp, EffectWeightFormatt
 	[EffectWeightOperator.Subtract]: format2((a, b) => `(${b})-(${a})`),
 	[EffectWeightOperand.AssistRatio]: formatPush(EffectWeightOperand.AssistRatio),
 	[EffectWeightOperand.ConfirmedLeads]: formatPush(EffectWeightOperand.ConfirmedLeads),
-	[EffectWeightOperand.EvidenceTarget]: formatPush(EffectWeightOperand.EvidenceTarget),
-	[EffectWeightOperand.EvidenceValue]: formatPush(EffectWeightOperand.EvidenceValue),
 	[EffectWeightOperand.EvidenceValueMax]: formatPush(EffectWeightOperand.EvidenceValueMax),
 	[EffectWeightOperand.HolmesLocation]: formatPush(EffectWeightOperand.HolmesLocation),
 	[EffectWeightOperand.HolmesProgress]: formatPush(EffectWeightOperand.HolmesProgress),
 	[EffectWeightOperand.ImpossibleCount]: formatPush(EffectWeightOperand.ImpossibleCount),
 	[EffectWeightOperand.ImpossiblePastLimit]: formatPush(EffectWeightOperand.ImpossiblePastLimit),
-	[EffectWeightOperand.Probability4Plus]: formatPush(EffectWeightOperand.Probability4Plus),
 	[EffectWeightOperand.RemainingCount]: formatPush(EffectWeightOperand.RemainingCount),
 	[EffectWeightOperand.UnconfirmedLeads]: formatPush(EffectWeightOperand.UnconfirmedLeads),
-
 };
 
 export function isEffectWeightOperand(maybe: unknown): maybe is EffectWeightOperand {

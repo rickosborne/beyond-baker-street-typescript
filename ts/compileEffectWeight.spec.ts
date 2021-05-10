@@ -6,7 +6,8 @@ import { compileEffectWeight, EffectWeightOp, EffectWeightOperand, EffectWeightO
 import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
 import { HOLMES_MAX } from "./Game";
 import { LeadType } from "./LeadType";
-import { randomInt, randomPercent } from "./rng";
+import { randomInt } from "./rng";
+import { roundTo } from "./roundTo";
 import { TurnStart } from "./TurnStart";
 import { VisibleBoard, VisibleLead } from "./VisibleBoard";
 
@@ -93,16 +94,6 @@ describe("compileEffectWeight", function () {
 		testBoth([EffectWeightOperand.ConfirmedLeads], 2, "2", NO_EFFECT, SOME_CONFIRMED);
 	});
 
-	it("handles EvidenceTarget", function () {
-		const evidenceTarget = randomInt();
-		testBoth([EffectWeightOperand.EvidenceTarget], evidenceTarget, String(evidenceTarget), BotTurnEffectType.PursueDuplicate);
-	});
-
-	it("handles EvidenceValue", function () {
-		const evidenceValue = randomInt();
-		testBoth([EffectWeightOperand.EvidenceValue], evidenceValue, String(evidenceValue), BotTurnEffectType.EliminateKnownUnusedValue);
-	});
-
 	it("handles EvidenceValueMax", function () {
 		testBoth([EffectWeightOperand.EvidenceValueMax], EVIDENCE_CARD_VALUE_MAX, String(EVIDENCE_CARD_VALUE_MAX));
 	});
@@ -119,7 +110,7 @@ describe("compileEffectWeight", function () {
 	it("handles HolmesProgress", function () {
 		const holmesLocation = randomInt(HOLMES_MAX);
 		const holmesProgress = (HOLMES_MAX - holmesLocation) / HOLMES_MAX;
-		testBoth([EffectWeightOperand.HolmesProgress], holmesProgress, String(holmesProgress), NO_EFFECT, <TurnStart>{
+		testBoth([EffectWeightOperand.HolmesProgress], holmesProgress, String(roundTo(holmesProgress, 2)), NO_EFFECT, <TurnStart>{
 			board: <VisibleBoard>{
 				holmesLocation,
 			},
@@ -148,11 +139,6 @@ describe("compileEffectWeight", function () {
 				impossibleLimit: impossibleTarget,
 			},
 		});
-	});
-
-	it("handles Probability4Plus", function () {
-		const probability4plus = randomPercent();
-		testBoth([EffectWeightOperand.Probability4Plus], probability4plus, String(probability4plus), BotTurnEffectType.EliminateUnusedType);
 	});
 
 	it("handles RemainingCount", function () {

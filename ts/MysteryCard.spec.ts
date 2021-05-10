@@ -41,7 +41,7 @@ describe("MysteryCard", function () {
 		expect(card.couldBeType(EvidenceType.Witness)).is.true;
 		expect(card.couldBeType(EvidenceType.Clue)).is.true;
 		expect(card.couldBeType(EvidenceType.Document)).is.true;
-		expect(card.possibleTypes).deep.equals([ EvidenceType.Witness, EvidenceType.Clue, EvidenceType.Document ]);
+		expect(card.possibleTypes).has.members([ EvidenceType.Witness, EvidenceType.Clue, EvidenceType.Document ]);
 		expect(card.possibleValues).deep.equals(EVIDENCE_CARD_VALUES);
 		expect(card.isKnown).is.false;
 		expect(card.probabilityOf(c => c.evidenceType === EvidenceType.Track)).equals(0);
@@ -54,7 +54,7 @@ describe("MysteryCard", function () {
 	it("throws if you end up empty", function () {
 		const card = new MysteryCard();
 		card.eliminateType(EvidenceType.Witness);
-		expect(formatMysteryCard(card)).equals("!Contact-*");
+		expect(formatMysteryCard(card)).equals("!Witness-*");
 		card.eliminateType(EvidenceType.Clue);
 		expect(formatMysteryCard(card)).equals("Document|Track-*");
 		card.eliminateType(EvidenceType.Document);
