@@ -1,7 +1,7 @@
 import { BotTurnOption } from "./BotTurn";
 
 export interface ScoredOption {
-    formula: string;
-    option: BotTurnOption;
-    score: number;
+	readonly formula: string;
+	readonly option: BotTurnOption;
+	readonly score: number;
 }

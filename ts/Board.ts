@@ -1,13 +1,15 @@
+import { BaskervilleAction } from "./Baskerville";
 import { CaseFileCard } from "./CaseFileCard";
-import { EVIDENCE_CARDS, EvidenceCard } from "./EvidenceCard";
+import { EVIDENCE_CARDS, EvidenceCard, formatEvidence, isEvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
-import { HOLMES_MOVE_IMPOSSIBLE } from "./Game";
+import { HOLMES_MOVE_PROGRESS } from "./Game";
 import { ImpossibleCard } from "./Impossible";
 import { LeadCard, randomLeadCards } from "./LeadCard";
 import { LEAD_TYPES, LeadType } from "./LeadType";
 import { Pile } from "./Pile";
 import { PseudoRNG } from "./rng";
+import { BottomOrTop } from "./Toby";
 import { toRecord } from "./toRecord";
 import { VisibleBoard, VisibleLead } from "./VisibleBoard";
 
@@ -39,6 +41,16 @@ class BoardLead implements VisibleLead {
 
 	public get badValue(): number {
 		return this.bad.sum(b => b.evidenceValue);
+	}
+
+	public baskervilleSwap(leadEvidence: EvidenceCard, impossibleEvidence: EvidenceCard): void {
+		const removedGood = this.good.removeIf(c => isSameEvidenceCard(c, leadEvidence));
+		const removedBad = this.bad.removeIf(c => isSameEvidenceCard(c, leadEvidence));
+		if ((removedGood + removedBad) !== 1) {
+			throw new Error(`Pile should have had ${formatEvidence(leadEvidence)}`);
+		}
+		const pile = (impossibleEvidence.evidenceType === this.leadCard.evidenceType) ? this.good : this.bad;
+		pile.addToTop(impossibleEvidence);
 	}
 
 	public confirm(): void {
@@ -83,6 +95,7 @@ class BoardLead implements VisibleLead {
 }
 
 export class Board implements VisibleBoard {
+	private _impossibleLimit: number;
 	private holmesValue: number;
 	private readonly impossible: Pile<ImpossibleCard> = new Pile<ImpossibleCard>();
 	private investigationValue: number;
@@ -97,6 +110,7 @@ export class Board implements VisibleBoard {
 		this.investigationValue = 0;
 		this.leads = toRecord(LEAD_TYPES, lt => lt, leadType => new BoardLead(leadType, prng));
 		this.init();
+		this._impossibleLimit = caseFile.impossibleCount;
 	}
 
 	public addBad(leadType: LeadType, evidence: EvidenceCard): void {
@@ -107,10 +121,13 @@ export class Board implements VisibleBoard {
 		this.leads[leadType].addEvidence(evidence);
 	}
 
-	public addImpossible(card: ImpossibleCard): void {
+	public addImpossible(
+		card: ImpossibleCard,
+		moveHolmes = true,
+	): void {
 		this.impossible.addToTop(card);
-		if (this.impossible.count > this.caseFile.impossibleCount) {
-			this.moveHolmes(HOLMES_MOVE_IMPOSSIBLE);
+		if ((this.impossible.count > this._impossibleLimit) && moveHolmes) {
+			this.moveHolmes(HOLMES_MOVE_PROGRESS);
 		}
 	}
 
@@ -120,6 +137,17 @@ export class Board implements VisibleBoard {
 
 	public get anyEmptyLeads(): boolean {
 		return LEAD_TYPES.find(leadType => this.leads[leadType].empty) != null;
+	}
+
+	public baskervilleSwap(action: BaskervilleAction): number {
+		const impossibleEvidence = action.impossibleEvidence;
+		const leadEvidence = action.leadEvidence;
+		const lead = this.leads[action.leadType];
+		this.impossible.swap(leadEvidence, c => isEvidenceCard(c) && isSameEvidenceCard(c, impossibleEvidence));
+		lead.baskervilleSwap(leadEvidence, impossibleEvidence);
+		const investigationDelta = leadEvidence.evidenceValue - impossibleEvidence.evidenceValue;
+		this.moveInvestigationMarker(investigationDelta);
+		return investigationDelta;
 	}
 
 	public calculateBadFor(leadType: LeadType): number {
@@ -162,6 +190,10 @@ export class Board implements VisibleBoard {
 		return this.impossible.count;
 	}
 
+	public get impossibleLimit(): number {
+		return this._impossibleLimit;
+	}
+
 	private init(): void {
 		this.remainingEvidence.empty();
 		this.impossible.empty();
@@ -192,6 +224,10 @@ export class Board implements VisibleBoard {
 		return this.investigationValue;
 	}
 
+	public raiseImpossibleLimitBy1(): void {
+		this._impossibleLimit++;
+	}
+
 	public get remainingEvidenceCount(): number {
 		return this.remainingEvidence.count;
 	}
@@ -200,15 +236,30 @@ export class Board implements VisibleBoard {
 		return this.leads[leadType].removeAllEvidence();
 	}
 
+	public removeFromImpossible(impossibleEvidence: EvidenceCard): number {
+		this.investigationValue -= impossibleEvidence.evidenceValue;
+		return this.impossible.removeIf(c => isEvidenceCard(c) && isSameEvidenceCard(c, impossibleEvidence));
+	}
+
 	public removeLead(leadType: LeadType): void {
 		this.leads[leadType].removeLead();
 	}
 
-	public returnEvidence(evidence: EvidenceCard[]): void {
+	public returnEvidence(
+		evidence: EvidenceCard[],
+		shuffle: boolean,
+		bottomOrTop: BottomOrTop,
+	): void {
 		for (const evidenceCard of evidence) {
-			this.remainingEvidence.addToBottom(evidenceCard);
+			if (bottomOrTop === BottomOrTop.Top) {
+				this.remainingEvidence.addToTop(evidenceCard);
+			} else {
+				this.remainingEvidence.addToBottom(evidenceCard);
+			}
 		}
-		this.remainingEvidence.shuffle(this.prng);
+		if (shuffle) {
+			this.remainingEvidence.shuffle(this.prng);
+		}
 	}
 
 	public targetForLead(leadType: LeadType): EvidenceValue {

@@ -51,17 +51,10 @@ export interface InvestigateWildEffect extends BotTurnEffect {
 export class InvestigateStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Investigate;
 
-	public buildOptions(turn: TurnStart, bot: Bot): InvestigateOption[] {
-		return unfinishedLeads(turn)
-			.flatMap(lead => bot.hand.map((mysteryCard, handIndex) => this.buildOptionsForLeadWithCard(lead, mysteryCard, handIndex)))
-			;
-	}
-
-	private buildOptionsForLeadWithCard(
+	public buildEffectsForLeadWithCard(
 		lead: VisibleLead,
 		mysteryCard: MysteryCard,
-		handIndex: number,
-	): InvestigateOption {
+	): BotTurnEffect[] {
 		const { evidenceType, evidenceTarget } = lead.leadCard;
 		const effects: BotTurnEffect[] = [];
 		const { possibleTypes, possibleValues } = mysteryCard;
@@ -107,14 +100,28 @@ export class InvestigateStrategy implements BotTurnStrategy {
 				possibleValues: possibleValues.slice(),
 			});
 		}
+		return effects;
+	}
+
+	public buildOptionForLeadWithCard(
+		lead: VisibleLead,
+		mysteryCard: MysteryCard,
+		handIndex: number,
+	): InvestigateOption {
 		return {
 			action: {
 				actionType: ActionType.Investigate,
 				handIndex,
 				leadType: lead.leadCard.leadType,
 			},
-			effects,
+			effects: this.buildEffectsForLeadWithCard(lead, mysteryCard),
 			strategyType: BotTurnStrategyType.Investigate,
 		};
+	}
+
+	public buildOptions(turn: TurnStart, bot: Bot): InvestigateOption[] {
+		return unfinishedLeads(turn)
+			.flatMap(lead => bot.hand.map((mysteryCard, handIndex) => this.buildOptionForLeadWithCard(lead, mysteryCard, handIndex)))
+			;
 	}
 }

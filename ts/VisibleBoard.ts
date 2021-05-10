@@ -18,9 +18,14 @@ export interface VisibleBoard {
 	readonly caseFile: CaseFileCard;
 	readonly holmesLocation: number;
 	readonly impossibleCards: ImpossibleCard[];
+	readonly impossibleLimit: number;
 	readonly investigationMarker: number;
 	readonly leads: Record<LeadType, VisibleLead>;
 	readonly remainingEvidenceCount: number;
+}
+
+export interface HasVisibleBoard {
+	readonly board: VisibleBoard;
 }
 
 export function formatLeadProgress(lead: VisibleLead): string {
@@ -32,7 +37,7 @@ export function formatLeadsProgress(board: VisibleBoard): string {
 }
 
 export function leadIsFinished(lead: VisibleLead): boolean {
-	return lead.evidenceValue === (lead.leadCard.evidenceTarget + lead.badValue);
+	return lead.leadCard == null || (lead.evidenceValue === (lead.leadCard.evidenceTarget + lead.badValue));
 }
 
 export function leadIsUnfinished(lead: VisibleLead): boolean {

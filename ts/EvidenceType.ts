@@ -1,15 +1,15 @@
 export enum EvidenceType {
-	Contact = "Contact",
-	Detail = "Detail",
+	Clue = "Clue",
 	Document = "Document",
 	Track = "Track",
+	Witness = "Witness",
 }
 
 export const EVIDENCE_TYPES: EvidenceType[] = [
-	EvidenceType.Contact,
-	EvidenceType.Detail,
+	EvidenceType.Clue,
 	EvidenceType.Document,
 	EvidenceType.Track,
+	EvidenceType.Witness,
 ];
 
 export function isEvidenceType(maybe: unknown): maybe is EvidenceType {

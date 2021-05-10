@@ -2,18 +2,21 @@ import { ActionType } from "./ActionType";
 import { addEffect } from "./addEffect";
 import { Bot } from "./Bot";
 import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
+import { CardType } from "./CardType";
 import { EliminateAction } from "./EliminateAction";
 import { EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
 import { INVESTIGATION_MARKER_GOAL } from "./Game";
 import { addImpossibleAddedEffectsFromTurn } from "./ImpossibleAdded";
+import { InspectorType } from "./InspectorType";
+import { InvestigationCompleteEffect } from "./InvestigationCompleteEffect";
 import { addLoseEffect, MaybeLoseEffect } from "./LoseEffect";
 import { MysteryCard } from "./MysteryCard";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
 import { uniqueReducer } from "./unique";
-import { VisibleLead } from "./VisibleBoard";
+import { HasVisibleBoard, VisibleLead } from "./VisibleBoard";
 
 export interface EliminateOption extends BotTurnOption {
 	action: EliminateAction;
@@ -38,6 +41,7 @@ export interface EliminateKnownUnusedValueEffect extends BotTurnEffect {
 	evidenceValue: EvidenceValue;
 	impossibleCount: number;
 	investigationMarker: number;
+	markerDelta: number;
 }
 
 export interface EliminateKnownUsedValueEffect extends BotTurnEffect {
@@ -45,6 +49,7 @@ export interface EliminateKnownUsedValueEffect extends BotTurnEffect {
 	evidenceValue: EvidenceValue;
 	impossibleCount: number;
 	investigationMarker: number;
+	markerDelta: number;
 	maybeUsedEvidenceTypes: EvidenceType[];
 }
 
@@ -70,12 +75,12 @@ export interface EliminateSetsUpExactEffect extends BotTurnEffect {
 export class EliminateStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Eliminate;
 
-	// noinspection JSMethodCanBeStatic
-	private buildEffects(
+	public buildEffects(
 		mysteryCard: MysteryCard,
 		unconfirmed: VisibleLead[],
 		otherPlayerEvidence: EvidenceCard[],
-		turn: TurnStart
+		turn: HasVisibleBoard,
+		inspector: InspectorType | undefined,
 	): BotTurnEffect[] {
 		const effects: BotTurnEffect[] = [];
 		const impossibleCount = turn.board.impossibleCards.length + 1;
@@ -85,6 +90,7 @@ export class EliminateStrategy implements BotTurnStrategy {
 		const evidenceValue: EvidenceValue | undefined = possibleValues.length === 1 ? possibleValues[0] : undefined;
 		const evidenceType: EvidenceType | undefined = possibleTypes.length === 1 ? possibleTypes[0] : undefined;
 		const evidenceTypes = unconfirmed.map(lead => lead.leadCard.evidenceType);
+		const markerMultiplier = inspector === InspectorType.Gregson ? 2 : 1;
 		const maybeUsedEvidenceTypes = evidenceTypes
 			.filter(evidenceType => mysteryCard.couldBeType(evidenceType))
 			.reduce(uniqueReducer, [] as EvidenceType[])
@@ -96,9 +102,15 @@ export class EliminateStrategy implements BotTurnStrategy {
 				mysteryCard,
 			});
 		} else if (evidenceValue != null) {
-			if (evidenceValue > investigationGap) {
+			const markerDelta = evidenceValue * markerMultiplier;
+			if (markerDelta > investigationGap) {
 				addLoseEffect(effects);
 			} else {
+				if (markerDelta === investigationGap) {
+					addEffect<InvestigationCompleteEffect>(effects, {
+						effectType: BotTurnEffectType.InvestigationComplete,
+					});
+				}
 				if (otherPlayerEvidence.find(e => !evidenceTypes.includes(e.evidenceType) && (e.evidenceValue + evidenceValue === investigationGap)) != null) {
 					addEffect<EliminateSetsUpExactEffect>(effects, {
 						effectType: BotTurnEffectType.EliminateSetsUpExact,
@@ -111,6 +123,7 @@ export class EliminateStrategy implements BotTurnStrategy {
 						evidenceValue,
 						impossibleCount,
 						investigationMarker: investigationMarker + evidenceValue,
+						markerDelta,
 					});
 				} else {
 					addEffect<EliminateKnownUsedValueEffect>(effects, {
@@ -118,18 +131,12 @@ export class EliminateStrategy implements BotTurnStrategy {
 						evidenceValue,
 						impossibleCount,
 						investigationMarker: investigationMarker + evidenceValue,
+						markerDelta,
 						maybeUsedEvidenceTypes,
 					});
 				}
 			}
 		} else {  // known type, unknown value
-			const couldCauseLoss = possibleValues.filter(v => v > investigationGap).length;
-			if (couldCauseLoss > 0) {
-				addEffect<MaybeLoseEffect>(effects, {
-					chance: couldCauseLoss / possibleValues.length,
-					effectType: BotTurnEffectType.MaybeLose,
-				});
-			}
 			if (maybeUsedEvidenceTypes.length === 0) {
 				addEffect<EliminateUnusedTypeEffect>(effects, {
 					effectType: BotTurnEffectType.EliminateUnusedType,
@@ -148,7 +155,14 @@ export class EliminateStrategy implements BotTurnStrategy {
 				mysteryCard,
 			});
 		}
-		addImpossibleAddedEffectsFromTurn(effects, turn);
+		const couldCauseLoss = possibleValues.filter(v => (v * markerMultiplier) > investigationGap).length;
+		if (couldCauseLoss > 0) {
+			addEffect<MaybeLoseEffect>(effects, {
+				chance: couldCauseLoss / possibleValues.length,
+				effectType: BotTurnEffectType.MaybeLose,
+			});
+		}
+		addImpossibleAddedEffectsFromTurn(effects, turn, CardType.Evidence, this.strategyType, inspector);
 		return effects;
 	}
 
@@ -158,7 +172,7 @@ export class EliminateStrategy implements BotTurnStrategy {
 		const investigationGap = INVESTIGATION_MARKER_GOAL - turn.board.investigationMarker;
 		const stompsExact = otherPlayerEvidence.find(e => e.evidenceValue === investigationGap) != null;
 		return bot.hand
-			.map(mysteryCard => this.buildEffects(mysteryCard, unconfirmed, otherPlayerEvidence, turn))
+			.map(mysteryCard => this.buildEffects(mysteryCard, unconfirmed, otherPlayerEvidence, turn, bot.inspector))
 			.map((effects, handIndex) => {
 				if (stompsExact) {
 					addEffect<EliminateStompsExactEffect>(effects, {
@@ -176,4 +190,10 @@ export class EliminateStrategy implements BotTurnStrategy {
 				return option;
 			});
 	}
+}
+
+export function isEliminateOption(maybe: unknown): maybe is EliminateOption {
+	const eliminate = maybe as EliminateOption;
+	return (maybe != null)
+		&& (eliminate.strategyType === BotTurnStrategyType.Eliminate);
 }

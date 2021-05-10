@@ -1,17 +1,27 @@
-import { Action } from "./Action";
+import { Action, TypedAction } from "./Action";
+import { ActionType } from "./ActionType";
+import { AdlerAction, AdlerOutcome, formatAdlerOutcome, isAdlerAction } from "./Adler";
 import {
 	AssistAction,
 	AssistOutcome,
 	formatAssistOutcome,
+	isAssistAction,
 	isTypeAssistAction,
 	isValueAssistAction,
 } from "./AssistAction";
+import { BaskervilleAction, BaskervilleOutcome, formatBaskervilleOutcome, isBaskervilleAction } from "./Baskerville";
+import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
 import { Board } from "./Board";
 import { CardType } from "./CardType";
 import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
-import { ConfirmAction, ConfirmOutcome, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
+import { ConfirmAction, ConfirmOutcome, formatConfirm, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
 import { EliminateAction, EliminateOutcome, formatEliminateOutcome, isEliminateAction } from "./EliminateAction";
-import { EvidenceCard } from "./EvidenceCard";
+import { EvidenceCard, formatEvidence, isEvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
+import { BiFunction } from "./Function";
+import { Guard } from "./Guard";
+import { formatHopeOutcome, HopeAction, HopeOutcome, isHopeAction } from "./Hope";
+import { formatHudsonOutcome, HudsonAction, HudsonOutcome, isHudsonAction } from "./Hudson";
+import { InspectorType } from "./InspectorType";
 import {
 	BadInvestigateOutcome,
 	DeadLeadInvestigateOutcome,
@@ -29,9 +39,12 @@ import { LEAD_TYPES, LeadType } from "./LeadType";
 import { Logger, SILENT_LOGGER } from "./logger";
 import { OtherHand } from "./OtherHand";
 import { Outcome, OutcomeType } from "./Outcome";
-import { ActivePlayer, isSamePlayer, OtherPlayer, Player } from "./Player";
+import { formatPikeOutcome, isPikeAction, PikeAction, PikeOutcome } from "./Pike";
+import { ActivePlayer, formatPlayer, isPlayerInspector, isSamePlayer, OtherPlayer, Player } from "./Player";
 import { formatPursueOutcome, isPursueAction, PursueAction, PursueOutcome } from "./PursueAction";
+import { range } from "./range";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
+import { BottomOrTop, formatTobyOutcome, isTobyAction, TobyAction, TobyOutcome } from "./Toby";
 import { TurnStart } from "./TurnStart";
 import { formatLeadsProgress } from "./VisibleBoard";
 
@@ -66,8 +79,16 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 		this.player.addCard(index, playerSawCard ? evidenceCard : undefined, fromRemainingEvidence);
 	}
 
+	public chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice {
+		return this.player.chooseForBlackwell(blackwellTurn);
+	}
+
 	public get hand(): EvidenceCard[] {
 		return this._hand.slice();
+	}
+
+	public get inspector(): InspectorType | undefined {
+		return this.player.inspector;
 	}
 
 	public get name(): string {
@@ -83,6 +104,14 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 		this._hand.splice(index, 1);
 		this.player.removeCardAt(index);
 		return card;
+	}
+
+	public sawEvidenceDealt(player: Player): void {
+		this.player.sawEvidenceDealt(player);
+	}
+
+	public sawEvidenceReturned(evidenceCards: EvidenceCard[], bottomOrTop: BottomOrTop, shuffle: boolean): void {
+		this.player.sawEvidenceReturned(evidenceCards, bottomOrTop, shuffle);
 	}
 
 	public sawOutcome(outcome: Outcome): void {
@@ -109,9 +138,9 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 export const HOLMES_GOAL = 0;
 export const HOLMES_MAX = 15;
 export const INVESTIGATION_MARKER_GOAL = 20;
-export const HOLMES_MOVE_ASSIST = -1;
-export const HOLMES_MOVE_IMPOSSIBLE = -1;
-export const HOLMES_MOVE_CONFIRM = 1;
+export const HOLMES_MOVE_PROGRESS = -1;
+export const HOLMES_MOVE_IMPEDE = 1;
+export const HOLMES_MOVE_IMPEDE_BAYNES = 2;
 
 export interface GameStart {
 	playerNames: string[];
@@ -128,7 +157,40 @@ export interface TurnOutcome {
 	turnNumber: number;
 }
 
+function buildActionHandler<T extends ActionType, A extends TypedAction<T>>(
+	guard: Guard<A>,
+	func: BiFunction<A, GamePlayer, Outcome>
+): BiFunction<Action, GamePlayer, Outcome | undefined> {
+	return (action: Action, activePlayer: GamePlayer) => {
+		if (guard(action)) {
+			return func(action, activePlayer);
+		}
+		return undefined;
+	};
+}
+
+export enum ReturnEvidenceVisibility {
+	All = "All",
+	None = "None",
+	Toby = "Toby",
+}
+
 export class Game {
+	// noinspection JSMismatchedCollectionQueryUpdate
+	private readonly _log: string[] = [];
+	private readonly actionHandlers: Record<ActionType, BiFunction<Action, GamePlayer, Outcome | undefined>> = {
+		[ActionType.Adler]: buildActionHandler(isAdlerAction, (a, p) => this.applyAdler(a, p)),
+		[ActionType.Assist]: buildActionHandler(isAssistAction, (a, p) => this.applyAssist(a, p)),
+		[ActionType.Baskerville]: buildActionHandler(isBaskervilleAction, (a, p) => this.applyBaskerville(a, p)),
+		[ActionType.Confirm]: buildActionHandler(isConfirmAction, (a, p) => this.applyConfirm(a, p)),
+		[ActionType.Eliminate]: buildActionHandler(isEliminateAction, (a, p) => this.applyEliminate(a, p)),
+		[ActionType.Hope]: buildActionHandler(isHopeAction, (a, p) => this.applyHope(a, p)),
+		[ActionType.Hudson]: buildActionHandler(isHudsonAction, (a, p) => this.applyHudson(a, p)),
+		[ActionType.Investigate]: buildActionHandler(isInvestigateAction, (a, p) => this.applyInvestigate(a, p)),
+		[ActionType.Pike]: buildActionHandler(isPikeAction, (a, p) => this.applyPike(a, p)),
+		[ActionType.Pursue]: buildActionHandler(isPursueAction, (a, p) => this.applyPursue(a, p)),
+		[ActionType.Toby]: buildActionHandler(isTobyAction, (a, p) => this.applyToby(a, p)),
+	};
 	private activePlayerNum = -1;
 	private readonly board: Board;
 	private readonly cardsPerPlayer: number;
@@ -149,7 +211,7 @@ export class Game {
 		}
 		for (let i = 0; i < this.cardsPerPlayer; i++) {
 			for (const player of this.players) {
-				const evidence = this.board.dealEvidence();
+				const evidence = this.dealEvidence();
 				if (evidence == null) {
 					throw new Error(`Could not deal out all cards`);
 				}
@@ -162,28 +224,23 @@ export class Game {
 			state: GameState.Playing,
 		};
 		this.logger.json(gameStart);
+		for (const player of this.players) {
+			if (player.inspector === InspectorType.Stoner) {
+				this.board.raiseImpossibleLimitBy1();
+			}
+		}
 	}
 
 	private applyAction(
 		action: Action,
 		activePlayer: GamePlayer,
 	): void {
-		let outcome: Outcome;
-		if (isTypeAssistAction(action) || isValueAssistAction(action)) {
-			outcome = this.applyAssist(action, activePlayer);
-		} else if (isConfirmAction(action)) {
-			outcome = this.applyConfirm(action, activePlayer);
-		} else if (isEliminateAction(action)) {
-			outcome = this.applyEliminate(action, activePlayer);
-		} else if (isInvestigateAction(action)) {
-			outcome = this.applyInvestigate(action, activePlayer);
-		} else if (isPursueAction(action)) {
-			outcome = this.applyPursue(action, activePlayer);
-		} else {
+		const outcome: Outcome | undefined = (Object.keys(this.actionHandlers) as ActionType[]).reduce((outcome, actionType) => outcome || this.actionHandlers[actionType](action, activePlayer), undefined as Outcome | undefined);
+		if (outcome == null) {
 			throw new Error(`Unknown action: ${action}`);
 		}
 		this.broadcastOutcome(outcome);
-		this.logger.json(<TurnOutcome> {
+		this.logger.json(<TurnOutcome>{
 			outcome,
 			turnNumber: this.turnCount,
 		});
@@ -197,14 +254,30 @@ export class Game {
 			this.logger.info(() => state);
 		}
 		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
-			const evidence = this.board.dealEvidence();
+			const evidence = this.dealEvidence(activePlayer);
 			if (evidence != null) {
 				activePlayer.addCard(activePlayer.hand.length, evidence, true);
 			}
 		}
 	}
 
-	private applyAssist(action: AssistAction, activePlayer: GamePlayer): AssistOutcome {
+	private applyAdler(action: AdlerAction, activePlayer: GamePlayer): AdlerOutcome {
+		if (!isPlayerInspector(activePlayer, InspectorType.Adler)) {
+			throw new Error(`You are not Adler: ${formatPlayer(activePlayer)}`);
+		}
+		this.board.moveHolmes(HOLMES_MOVE_IMPEDE);
+		const holmesLocation = this.board.holmesLocation;
+		const outcome: AdlerOutcome = {
+			action,
+			activePlayer,
+			holmesLocation,
+			outcomeType: OutcomeType.Adler,
+		};
+		this.logger.info(() => formatAdlerOutcome(outcome));
+		return outcome;
+	}
+
+	private applyAssist(action: AssistAction, activePlayer: GamePlayer, moveHolmes = true): AssistOutcome {
 		if (isSamePlayer(activePlayer, action.player)) {
 			throw new Error(`Cannot assist yourself, ${activePlayer.name}`);
 		}
@@ -217,7 +290,9 @@ export class Game {
 		} else {
 			throw new Error(`Unknown assist type: ${action}`);
 		}
-		this.board.moveHolmes(HOLMES_MOVE_ASSIST);
+		if (moveHolmes) {
+			this.board.moveHolmes(HOLMES_MOVE_PROGRESS);
+		}
 		const outcome: AssistOutcome = {
 			action,
 			activePlayer,
@@ -231,15 +306,46 @@ export class Game {
 		return outcome;
 	}
 
+	private applyBaskerville(action: BaskervilleAction, activePlayer: GamePlayer): BaskervilleOutcome {
+		if (!isPlayerInspector(activePlayer, InspectorType.Baskerville)) {
+			throw new Error(`You are not Baskerville: ${formatPlayer(activePlayer)}`);
+		}
+		const impossibleIndex = this.board.impossibleCards.findIndex(c => isEvidenceCard(c) && isSameEvidenceCard(c, action.impossibleEvidence));
+		if (impossibleIndex < 0) {
+			throw new Error(`Selected evidence is not in the Impossible: ${formatEvidence(action.impossibleEvidence)}`);
+		}
+		const lead = this.board.leads[action.leadType];
+		const leadIndex = lead.evidenceCards.findIndex(c => isSameEvidenceCard(c, action.leadEvidence));
+		if (leadIndex < 0) {
+			throw new Error(`Selected evidence is not in Lead ${action.leadType}: ${formatEvidence(action.leadEvidence)}`);
+		}
+		const investigationDelta = this.board.baskervilleSwap(action);
+		const investigationMarker = this.board.investigationMarker;
+		const outcome: BaskervilleOutcome = {
+			action,
+			activePlayer,
+			investigationDelta,
+			investigationMarker,
+			outcomeType: OutcomeType.Baskerville,
+		};
+		this.logger.info(() => formatBaskervilleOutcome(outcome));
+		return outcome;
+	}
+
 	private applyConfirm(action: ConfirmAction, activePlayer: GamePlayer): ConfirmOutcome {
 		if (this.board.isConfirmed(action.leadType)) {
-			throw new Error(`Already confirmed: ${action}`);
+			throw new Error(`Already confirmed: ${formatConfirm(action, activePlayer, this.board.holmesLocation)}`);
 		}
-		if (this.board.calculateGapFor(action.leadType) !== 0) {
-			throw new Error(`Cannot confirm that lead: ${action}`);
+		const allowedGaps: number[] = [0];
+		if (activePlayer.inspector === InspectorType.Morstan) {
+			allowedGaps.push(1);
+		}
+		const gap = this.board.calculateGapFor(action.leadType);
+		if (!allowedGaps.includes(gap)) {
+			throw new Error(`Cannot confirm that lead with gap ${gap}: ${formatConfirm(action, activePlayer, this.board.holmesLocation)}`);
 		}
 		this.board.confirm(action.leadType);
-		this.board.moveHolmes(HOLMES_MOVE_CONFIRM);
+		this.board.moveHolmes(HOLMES_MOVE_IMPEDE);
 		const outcome: ConfirmOutcome = {
 			action,
 			activePlayer,
@@ -252,11 +358,13 @@ export class Game {
 		return outcome;
 	}
 
-	private applyDeadLead(leadType: LeadType): EvidenceCard[] {
+	private applyDeadLead(leadType: LeadType, inspector: InspectorType | undefined): EvidenceCard[] {
 		this.board.removeLead(leadType);
-		this.board.addImpossible({ cardType: CardType.LeadReverse });
+		if (inspector !== InspectorType.Wiggins) {
+			this.board.addImpossible({ cardType: CardType.LeadReverse });
+		}
 		const returnedEvidence = this.board.removeEvidenceFor(leadType);
-		this.board.returnEvidence(returnedEvidence);
+		this.returnEvidence(returnedEvidence, true, BottomOrTop.Bottom, ReturnEvidenceVisibility.All);
 		return returnedEvidence;
 	}
 
@@ -265,7 +373,7 @@ export class Game {
 		if (evidenceCard == null) {
 			throw new Error(`Unknown card index for ${activePlayer}: ${action.handIndex}`);
 		}
-		this.board.addImpossible(evidenceCard);
+		this.board.addImpossible(evidenceCard, activePlayer.inspector !== InspectorType.Lestrade);
 		const investigationMarker = this.board.moveInvestigationMarker(evidenceCard.evidenceValue);
 		const impossibleCards = this.board.impossibleCards;
 		const impossibleFaceDownCount = impossibleCards.filter(c => isLeadReverseCard(c)).length;
@@ -279,6 +387,41 @@ export class Game {
 			outcomeType: OutcomeType.Eliminate,
 		};
 		this.logger.info(() => formatEliminateOutcome(outcome, this.board));
+		return outcome;
+	}
+
+	private applyHope(action: HopeAction, activePlayer: GamePlayer): HopeOutcome {
+		if (!isPlayerInspector(activePlayer, InspectorType.Hope)) {
+			throw new Error(`You're not Hope: ${formatPlayer(activePlayer)}`);
+		}
+		const assistOutcomes = action.assists.map((assist, index) => this.applyAssist(assist, activePlayer, index === 0));
+		const outcome: HopeOutcome = {
+			action,
+			activePlayer,
+			assistOutcomes,
+			outcomeType: OutcomeType.Hope,
+		};
+		this.logger.info(() => formatHopeOutcome(outcome));
+		return outcome;
+	}
+
+	private applyHudson(action: HudsonAction, activePlayer: GamePlayer): HudsonOutcome {
+		if (!isPlayerInspector(activePlayer, InspectorType.Hudson)) {
+			throw new Error(`You're not Hudson: ${formatPlayer(activePlayer)}`);
+		}
+		const removedCount = this.board.removeFromImpossible(action.impossibleEvidence);
+		if (removedCount !== 1) {
+			throw new Error(`Expected to remove 1, but removed ${removedCount}`);
+		}
+		this.returnEvidence([action.impossibleEvidence], true, BottomOrTop.Bottom, ReturnEvidenceVisibility.All);
+		const investigationMarker = this.board.investigationMarker;
+		const outcome: HudsonOutcome = {
+			action,
+			activePlayer,
+			investigationMarker,
+			outcomeType: OutcomeType.Hudson,
+		};
+		this.logger.info(() => formatHudsonOutcome(outcome));
 		return outcome;
 	}
 
@@ -310,7 +453,7 @@ export class Game {
 		this.board.addEvidence(action.leadType, evidenceCard);
 		const gap = this.board.calculateGapFor(action.leadType);
 		if (gap < 0) {
-			const returnedEvidence = this.applyDeadLead(action.leadType);
+			const returnedEvidence = this.applyDeadLead(action.leadType, activePlayer.inspector);
 			const outcome: DeadLeadInvestigateOutcome = {
 				action,
 				activePlayer,
@@ -339,8 +482,34 @@ export class Game {
 		return outcome;
 	}
 
+	private applyPike(action: PikeAction, activePlayer: GamePlayer): PikeOutcome {
+		if (!isPlayerInspector(activePlayer, InspectorType.Pike)) {
+			throw new Error(`You are not Pike: ${formatPlayer(activePlayer)}`);
+		}
+		const otherPlayer = this.findPlayer(action.otherPlayer);
+		const givenEvidence = activePlayer.removeCardAt(action.activeHandIndexBefore);
+		const otherEvidence = otherPlayer.removeCardAt(action.otherHandIndexBefore);
+		if (!isSameEvidenceCard(action.otherEvidence, otherEvidence)) {
+			throw new Error(`Other player card ${formatEvidence(otherEvidence)} at index ${action.otherHandIndexBefore} does not match the given ${action.otherEvidence}`);
+		}
+		const activeHandIndexAfter = activePlayer.hand.length;
+		activePlayer.addCard(activeHandIndexAfter, otherEvidence, false, true);
+		const otherHandIndexAfter = otherPlayer.hand.length;
+		otherPlayer.addCard(otherHandIndexAfter, givenEvidence, false, true);
+		const outcome: PikeOutcome = {
+			action,
+			activeHandIndexAfter,
+			activePlayer,
+			givenEvidence,
+			otherHandIndexAfter,
+			outcomeType: OutcomeType.Pike,
+		};
+		this.logger.info(() => formatPikeOutcome(outcome));
+		return outcome;
+	}
+
 	private applyPursue(action: PursueAction, activePlayer: GamePlayer): PursueOutcome {
-		const returnedEvidence = this.applyDeadLead(action.leadType);
+		const returnedEvidence = this.applyDeadLead(action.leadType, activePlayer.inspector);
 		const outcome: PursueOutcome = {
 			action,
 			activePlayer,
@@ -353,10 +522,67 @@ export class Game {
 		return outcome;
 	}
 
+	private applyToby(action: TobyAction, activePlayer: GamePlayer): TobyOutcome {
+		if (!isPlayerInspector(activePlayer, InspectorType.Toby)) {
+			throw new Error(`You are not Toby: ${formatPlayer(activePlayer)}`);
+		}
+		const peekedEvidence = this.board.dealEvidence();
+		if (peekedEvidence == null) {
+			throw new Error(`Cannot take evidence from an empty pile.`);
+		}
+		const bottomOrTop = action.onReveal(peekedEvidence);
+		this.returnEvidence([peekedEvidence], false, bottomOrTop, ReturnEvidenceVisibility.Toby);
+		const outcome: TobyOutcome = {
+			action,
+			activePlayer,
+			bottomOrTop,
+			outcomeType: OutcomeType.Toby,
+		};
+		this.logger.info(() => formatTobyOutcome(outcome, peekedEvidence));
+		return outcome;
+	}
+
 	private broadcastOutcome(outcome: Outcome): void {
 		for (const player of this.players) {
 			player.sawOutcome(outcome);
 		}
+	}
+
+	private dealEvidence(activePlayer?: GamePlayer | undefined): EvidenceCard | undefined {
+		const wantEvidenceCount = activePlayer?.inspector === InspectorType.Blackwell ? 2 : 1;
+		const evidences = range(1, wantEvidenceCount)
+			.map(() => this.board.dealEvidence())
+			.filter(e => e != null) as EvidenceCard[];
+		let evidence: EvidenceCard | undefined;
+		if (evidences.length === 2 && isPlayerInspector(activePlayer, InspectorType.Blackwell)) {
+			const nextPlayer = this.playerAfter(activePlayer);
+			const blackwellChoice = nextPlayer.chooseForBlackwell({
+				askBlackwellAboutTheirHand: (): OtherHand => activePlayer.otherHand,
+				askOtherPlayerAboutTheirHand: (otherPlayer: OtherPlayer): OtherHand => {
+					const other = this.findPlayer(otherPlayer);
+					if (isSamePlayer(other, nextPlayer)) {
+						throw new Error(`Cannot ask about your own hand: ${nextPlayer}`);
+					} else if (isSamePlayer(other, activePlayer)) {
+						throw new Error(`Blackwell player should be asked directly`);
+					}
+					return other.otherHand;
+				},
+				blackwell: activePlayer,
+				board: this.board,
+				evidences,
+				otherPlayers: this.players.filter(p => p !== activePlayer && p !== nextPlayer),
+			});
+			this.returnEvidence([blackwellChoice.bury], false, BottomOrTop.Bottom, ReturnEvidenceVisibility.None);
+			evidence = blackwellChoice.keep;
+		} else {
+			evidence = evidences.shift();
+		}
+		if (evidence != null && activePlayer != null) {
+			for (const player of this.players) {
+				player.sawEvidenceDealt(activePlayer);
+			}
+		}
+		return evidence;
 	}
 
 	private findPlayer(player: Player): GamePlayer {
@@ -364,6 +590,24 @@ export class Game {
 			return player;
 		}
 		return this.players.filter(p => isSamePlayer(p, player))[0];
+	}
+
+	private playerAfter(activePlayer: GamePlayer): GamePlayer {
+		return this.players[(this.players.indexOf(activePlayer) + 1) % this.players.length];
+	}
+
+	private returnEvidence(
+		evidences: EvidenceCard[],
+		shuffle: boolean,
+		bottomOrTop: BottomOrTop,
+		visibility: ReturnEvidenceVisibility,
+	): void {
+		this._log.push(`returnEvidence ${bottomOrTop} visible to ${visibility} ${evidences.map(e => formatEvidence(e)).join(", ")}`);
+		this.board.returnEvidence(evidences, shuffle, bottomOrTop);
+		for (const player of this.players) {
+			const visible = visibility === ReturnEvidenceVisibility.All || (visibility === ReturnEvidenceVisibility.Toby && player.inspector === InspectorType.Toby) ? evidences : [];
+			player.sawEvidenceReturned(visible, bottomOrTop, shuffle);
+		}
 	}
 
 	public get state(): GameState {

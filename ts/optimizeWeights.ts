@@ -27,6 +27,9 @@ interface SimRun {
 
 const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.Win]: [1000],
+	[BotTurnEffectType.ConfirmReady]: [0],
+	[BotTurnEffectType.ConfirmEventually]: [0],
+	[BotTurnEffectType.InvestigationComplete]: [0],
 	[BotTurnEffectType.InvestigatePerfect]: [0],
 	[BotTurnEffectType.PursueImpossible]: [0],
 	[BotTurnEffectType.AssistExactEliminate]: [0],
@@ -41,9 +44,7 @@ const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.AssistImpossibleType]: [0],
 	[BotTurnEffectType.AssistNarrow]: [0],
 	[BotTurnEffectType.AssistNextPlayer]: [0],
-
 	[BotTurnEffectType.InvestigateCorrectValue]: [0],
-
 	[BotTurnEffectType.ImpossibleAdded]: [0],
 	[BotTurnEffectType.EliminateUnknownValue]: [0],
 	[BotTurnEffectType.HolmesProgress]: [0],
@@ -57,6 +58,7 @@ const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.EliminateWild]: [0],
 	[BotTurnEffectType.MaybeLose]: [0],
 	[BotTurnEffectType.PursuePossible]: [0],
+	[BotTurnEffectType.Toby]: [0],
 	[BotTurnEffectType.Lose]: [-1000],
 };
 // 90.8% InvestigatePerfect:145 > InvestigateWild:77 > Confirm:75 > PursueImpossible:48 > AssistKnown:46
@@ -67,38 +69,6 @@ const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 // > InvestigateCorrectValue:-29 > InvestigateBad:-31 > MaybeLose:-47 > AssistNarrow:-49 > EliminateWild:-51
 // > EliminateKnownUsedValue:-59 > PursuePossible:-70
 // 92.4 InvestigatePerfect:61 > InvestigateWild:48 > InvestigateCorrectType:36 > PursueImpossible:34 > PursueDuplicate:22 > EliminateKnownUnusedValue:19 > AssistExactEliminate:17 > AssistNextPlayer:9 > EliminateUnknownValue:8 > HolmesProgress:8 > InvestigateBad:6 > InvestigateMaybeBad:5 > ImpossibleAdded:4 > EliminateKnownUsedValue:3 > HolmesImpeded:2 > AssistNarrow:2 > AssistKnown:-1 > EliminateSetsUpExact:-1 > Confirm:-1 > InvestigateCorrectValue:-4 > EliminateUnusedType:-10 > EliminateStompsExact:-10 > AssistImpossibleType:-14 > EliminateWild:-21 > PursueMaybe:-23 > MaybeLose:-36 > EliminateUsedType:-41 > PursuePossible:-52
-const HANDMADE_FROM_TYPE: EffectWeightOpsFromType = {
-	[BotTurnEffectType.Win]: [1000],
-	[BotTurnEffectType.InvestigatePerfect]: [20],
-	[BotTurnEffectType.PursueImpossible]: [19],
-	[BotTurnEffectType.AssistExactEliminate]: [12],
-	[BotTurnEffectType.PursueDuplicate]: [11],
-	[BotTurnEffectType.EliminateKnownUnusedValue]: [10],
-	[BotTurnEffectType.EliminateUnusedType]: [9],
-	[BotTurnEffectType.AssistKnown]: [8],
-	[BotTurnEffectType.InvestigateCorrectType]: [7],
-	[BotTurnEffectType.EliminateSetsUpExact]: [6],
-	[BotTurnEffectType.Confirm]: [5],
-	[BotTurnEffectType.HolmesImpeded]: [4],
-	[BotTurnEffectType.AssistImpossibleType]: [3],
-	[BotTurnEffectType.AssistNarrow]: [2],
-	[BotTurnEffectType.AssistNextPlayer]: [1],
-	[BotTurnEffectType.InvestigateCorrectValue]: [0],
-	[BotTurnEffectType.ImpossibleAdded]: [-1],
-	[BotTurnEffectType.EliminateUnknownValue]: [-2],
-	[BotTurnEffectType.HolmesProgress]: [-3],
-	[BotTurnEffectType.InvestigateMaybeBad]: [-4],
-	[BotTurnEffectType.InvestigateWild]: [-5],
-	[BotTurnEffectType.InvestigateBad]: [-6],
-	[BotTurnEffectType.EliminateUsedType]: [-7],
-	[BotTurnEffectType.PursueMaybe]: [-8],
-	[BotTurnEffectType.EliminateKnownUsedValue]: [-9],
-	[BotTurnEffectType.EliminateStompsExact]: [-10],
-	[BotTurnEffectType.EliminateWild]: [-11],
-	[BotTurnEffectType.MaybeLose]: [-12],
-	[BotTurnEffectType.PursuePossible]: [-13],
-	[BotTurnEffectType.Lose]: [-1000],
-};
 
 const TEMP_MAX = 10;
 const TEMP_MIN = 1;
@@ -295,11 +265,11 @@ const neighborsViaSwap = (function (): NeighborsGenerator<SimRun> {
 					}
 				}
 			}
-			console.log(`Swapped neighbors: ${allRuns.length}`);
+			// console.log(`Swapped neighbors: ${allRuns.length}`);
 			shuffleInPlace(allRuns, prng);
 		}
 		if (allRuns.length === 0) {
-			console.log(`Falling back to variance`);
+			// console.log(`Falling back to variance`);
 			allRuns.push(...neighborsViaVariance(1000, simRun, temp, prng));
 		}
 		const runs: SimRun[] = [];
@@ -328,10 +298,13 @@ function improvement(afterState: SimRun, afterEnergy: number, beforeState: SimRu
 // 	weights: HANDMADE_FROM_TYPE,
 // };
 // console.log(`Initial: ${initialState.lossRate == null ? "?" : formatPercent(initialState.lossRate, 2)}: ${formatOrderedEffectWeightOpsFromType(initialState.weights)}`);
-const initialState: SimRun[] = findBestScores().map(sws => <SimRun> {
+const initialFromBest = findBestScores().map(sws => <SimRun> {
 	lossRate: sws.score,
 	weights: sws.weights,
 });
+const initialState: SimRun[] = initialFromBest.length > 0 ? initialFromBest : [{
+	weights: FLAT_SCORE_FROM_TYPE,
+}];
 
 initialState.forEach(state => {
 	console.log(`${formatPercent(state.lossRate || 1, 2)} ${formatOrderedEffectWeightOpsFromType(state.weights)}`);

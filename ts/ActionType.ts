@@ -1,16 +1,27 @@
 export enum ActionType {
+	Adler = "Adler",
+	Baskerville = "Baskerville",
 	Assist = "Assist",
 	Confirm = "Confirm",
 	Eliminate = "Eliminate",
+	Hope = "Hope",
+	Hudson = "Hudson",
 	Investigate = "Investigate",
+	Pike = "Pike",
 	Pursue = "Pursue",
+	Toby = "Toby",
 }
 
 export const ACTION_TYPES: ActionType[] = [
+	ActionType.Adler,
+	ActionType.Baskerville,
 	ActionType.Assist,
 	ActionType.Confirm,
 	ActionType.Eliminate,
+	ActionType.Hope,
+	ActionType.Hudson,
 	ActionType.Investigate,
+	ActionType.Pike,
 	ActionType.Pursue,
 ];
 

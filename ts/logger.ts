@@ -1,3 +1,5 @@
+import { objectMap } from "./objectMap";
+
 export interface Logger {
 	info(messageBuilder: () => string): void;
 	json(data: unknown): void;
@@ -7,6 +9,11 @@ export interface Logger {
 export const CONSOLE_LOGGER: Logger = {
 	info: (messageBuilder: () => string) => console.info(messageBuilder()),
 	json: (data: unknown) => console.log(JSON.stringify(data)),
+	trace: (messageBuilder: () => string) => console.log(messageBuilder()),
+};
+export const CONSOLE_LOGGER_NO_JSON: Logger = {
+	info: (messageBuilder: () => string) => console.info(messageBuilder()),
+	json: (data: unknown) => void(0),
 	trace: (messageBuilder: () => string) => console.log(messageBuilder()),
 };
 export const SILENT_LOGGER: Logger = {
@@ -40,4 +47,13 @@ export function cachingLoggerFactory(): CachingLogger {
 		messages,
 		trace: log(LogLevel.trace),
 	};
+}
+
+export function buildLogger(levels: Record<LogLevel, boolean>): Logger {
+	const effective: Record<LogLevel, boolean> = Object.assign({
+		[LogLevel.info]: true,
+		[LogLevel.json]: true,
+		[LogLevel.trace]: true,
+	}, levels);
+	return objectMap(effective, (loud, level) => loud ? CONSOLE_LOGGER[level] : SILENT_LOGGER[level]);
 }

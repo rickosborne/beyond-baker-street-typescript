@@ -1,8 +1,8 @@
-import { OtherPlayer, Player } from "./Player";
-import { VisibleBoard } from "./VisibleBoard";
 import { OtherHand } from "./OtherHand";
+import { OtherPlayer, Player } from "./Player";
+import { HasVisibleBoard, VisibleBoard } from "./VisibleBoard";
 
-export interface TurnStart {
+export interface TurnStart extends HasVisibleBoard {
 	askOtherPlayerAboutTheirHand(otherPlayer: OtherPlayer): OtherHand;
 	board: VisibleBoard;
 	nextPlayer: Player;

@@ -1,11 +1,11 @@
 import { Action, isActionOfType } from "./Action";
 import { ActionType } from "./ActionType";
-import { isLeadType, LeadType } from "./LeadType";
 import { EvidenceCard } from "./EvidenceCard";
 import { formatLeadCard, LeadCard } from "./LeadCard";
+import { isLeadType, LeadType } from "./LeadType";
 import { Outcome, OutcomeType } from "./Outcome";
-import { TurnStart } from "./TurnStart";
 import { Player } from "./Player";
+import { TurnStart } from "./TurnStart";
 import { VisibleBoard } from "./VisibleBoard";
 
 export interface PursueAction extends Action {
@@ -32,10 +32,10 @@ export function isPursueOutcome(maybe: unknown): maybe is PursueOutcome {
 	return (o != null) && (o.outcomeType === OutcomeType.Pursue);
 }
 
-export function formatPursue(action: PursueAction, turnStart: TurnStart): string {
-	return `${turnStart.player.name} pursues ${formatLeadCard(turnStart.board.leads[action.leadType].leadCard)}.  Impossible count is ${turnStart.board.impossibleCards.length}/${turnStart.board.caseFile.impossibleCount}.`;
+export function formatPursue(action: PursueAction, player: Player, board: VisibleBoard): string {
+	return `${player.name} pursues ${formatLeadCard(board.leads[action.leadType].leadCard)}.  Impossible count is ${board.impossibleCards.length}/${board.impossibleLimit}.`;
 }
 
 export function formatPursueOutcome(outcome: PursueOutcome, board: VisibleBoard): string {
-	return `${outcome.activePlayer.name} pursued ${outcome.action.leadType}.  ${outcome.returnedEvidence.length} evidence were returned.  ${outcome.impossibleCount}/${board.caseFile.impossibleCount} impossible have been found.  ${outcome.nextLead == null ? `No leads remain!` : `Next lead is ${formatLeadCard(outcome.nextLead)}.`}`;
+	return `${outcome.activePlayer.name} pursued ${outcome.action.leadType}.  ${outcome.returnedEvidence.length} evidence were returned.  ${outcome.impossibleCount}/${board.impossibleLimit} impossible have been found.  ${outcome.nextLead == null ? `No leads remain!` : `Next lead is ${formatLeadCard(outcome.nextLead)}.`}`;
 }

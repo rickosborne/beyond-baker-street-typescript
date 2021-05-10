@@ -3,7 +3,7 @@ import { ActionType } from "./ActionType";
 import { EvidenceType, isEvidenceType } from "./EvidenceType";
 import { EvidenceValue, isEvidenceValue } from "./EvidenceValue";
 import { formatPercent } from "./formatPercent";
-import { Outcome, OutcomeType } from "./Outcome";
+import { OutcomeType, TypedOutcome } from "./Outcome";
 import { isPlayer, Player } from "./Player";
 
 export enum AssistType {
@@ -29,6 +29,10 @@ export function isAssisted(maybe: unknown): maybe is Assisted {
 	return (maybe != null)
 		&& (typeof ae.possibleAfter === "number")
 		&& (typeof ae.possibleBefore === "number");
+}
+
+export function isAssistAction(maybe: unknown): maybe is AssistAction {
+	return (maybe != null) && ((maybe as AssistAction).actionType === ActionType.Assist);
 }
 
 export function isAssistActionOfType(maybe: unknown, assistType: AssistType): maybe is AssistAction {
@@ -61,7 +65,7 @@ export function isValueAssistAction(maybe: unknown): maybe is ValueAssistAction 
 		&& isEvidenceValue(va.evidenceValue);
 }
 
-export interface AssistOutcome extends Outcome {
+export interface AssistOutcome extends TypedOutcome<OutcomeType.Assist> {
 	action: AssistAction;
 	holmesLocation: number;
 	identifiedHandIndexes: number[];
@@ -73,11 +77,11 @@ export function isAssistOutcome(maybe: unknown): maybe is AssistOutcome {
 	return (o != null) && (o.outcomeType === OutcomeType.Assist);
 }
 
-function formatTypeAssist(assist: TypeAssistAction, player: Player, holmesLocation: number): string {
+export function formatTypeAssist(assist: TypeAssistAction, player: Player, holmesLocation: number): string {
 	return `${player.name} assisted ${assist.player.name} with type ${assist.evidenceType}, for a ${assist.possibleBefore}>${assist.possibleAfter} (${formatPercent(assistRatio(assist))}) reduction.  Holmes is at ${holmesLocation}.`;
 }
 
-function formatValueAssist(assist: ValueAssistAction, player: Player, holmesLocation: number): string {
+export function formatValueAssist(assist: ValueAssistAction, player: Player, holmesLocation: number): string {
 	return `${player.name} assisted ${assist.player.name} with value ${assist.evidenceValue}, for a ${assist.possibleBefore}>${assist.possibleAfter} (${formatPercent(assistRatio(assist))}) reduction.  Holmes is at ${holmesLocation}.`;
 }
 

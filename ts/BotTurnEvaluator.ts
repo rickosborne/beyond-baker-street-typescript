@@ -10,9 +10,11 @@ import { randomItem } from "./randomItem";
 import { PseudoRNG } from "./rng";
 import { ScoredOption } from "./ScoredOption";
 import { TurnStart } from "./TurnStart";
+import { HasVisibleBoard } from "./VisibleBoard";
 
 export interface BotTurnEvaluator {
-	selectOption(options: BotTurnOption[], bot: Bot, turnStart: TurnStart): BotTurnOption;
+	scoreEffects(effects: BotTurnEffect[], hasVisibleBoard: HasVisibleBoard): BotEffectScore;
+	selectOption(options: BotTurnOption[], bot: Bot, hasVisibleBoard: HasVisibleBoard): BotTurnOption;
 }
 
 interface BotEffectScore {
@@ -37,28 +39,29 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 		const toShow = positive.length > 0 ? positive : top5;
 		const hidden = scored.length - toShow.length;
 		const tail = hidden > 0 ? `\n  ... plus ${hidden} more options.` : "";
-		return `  ${toShow.map(s => `${columnarNumber(s.score, 7, 1)}: ${formatAction(s.option.action, bot, turnStart)} [${s.option.effects.map(e => e.effectType).join(", ")}] ${s.formula}`).join("\n  ")}${tail}`;
+		//  ${s.formula}
+		return `  ${toShow.map(s => `${columnarNumber(s.score, 7, 1)}: ${formatAction(s.option.action, bot, turnStart)} [${s.option.effects.map(e => e.effectType).join(", ")}]`).join("\n  ")}${tail}`;
 	}
 
-	private scoreEffect(effect: BotTurnEffect, turnStart: TurnStart): BotEffectScore {
+	private scoreEffect(effect: BotTurnEffect, hasVisibleBoard: HasVisibleBoard): BotEffectScore {
 		const operation = this.scoreFromType[effect.effectType];
 		return {
-			formula: operation.format(effect, turnStart),
-			score: operation.calculate(effect, turnStart),
+			formula: operation.format(effect, hasVisibleBoard),
+			score: operation.calculate(effect, hasVisibleBoard),
 		};
 	}
 
-	private scoreEffects(effects: BotTurnEffect[], turnStart: TurnStart): BotEffectScore {
-		return effects.map(e => this.scoreEffect(e, turnStart)).reduce((p, c) => ({
+	public scoreEffects(effects: BotTurnEffect[], hasVisibleBoard: HasVisibleBoard): BotEffectScore {
+		return effects.map(e => this.scoreEffect(e, hasVisibleBoard)).reduce((p, c) => ({
 			formula: p.formula === "" ? c.formula : `${p.formula} ++ ${c.formula}`,
 			score: p.score + c.score,
 		}), { formula: "", score: 0 });
 	}
 
-	public scoreOptions(options: BotTurnOption[], turnStart: TurnStart): ScoredOption[] {
+	public scoreOptions(options: BotTurnOption[], hasVisibleBoard: HasVisibleBoard): ScoredOption[] {
 		return options
 			.map(option => {
-				const score = this.scoreEffects(option.effects, turnStart);
+				const score = this.scoreEffects(option.effects, hasVisibleBoard);
 				return {
 					formula: score.formula,
 					option,
@@ -86,6 +89,13 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 // noinspection JSUnusedGlobalSymbols
 export class RandomBotTurnEvaluator implements BotTurnEvaluator {
 	constructor(private readonly prng: PseudoRNG) {
+	}
+
+	scoreEffects(): BotEffectScore {
+		return {
+			formula: "random()",
+			score: Math.random(),
+		};
 	}
 
 	public selectOption(options: BotTurnOption[]): BotTurnOption {

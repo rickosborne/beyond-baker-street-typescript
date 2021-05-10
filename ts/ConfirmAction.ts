@@ -29,8 +29,8 @@ export function isConfirmOutcome(maybe: unknown): maybe is ConfirmOutcome {
 	return (o != null) && (o.outcomeType === OutcomeType.Confirm);
 }
 
-export function formatConfirm(confirm: ConfirmAction, turnStart: TurnStart): string {
-	return `${turnStart.player.name} confirms ${confirm.leadType}.  Holmes is at ${turnStart.board.holmesLocation}.`;
+export function formatConfirm(confirm: ConfirmAction, player: Player, holmesLocation: number): string {
+	return `${player.name} confirms ${confirm.leadType}.  Holmes is at ${holmesLocation}.`;
 }
 
 export function formatConfirmOutcome(outcome: ConfirmOutcome): string {

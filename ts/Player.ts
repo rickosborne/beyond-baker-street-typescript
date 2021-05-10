@@ -1,11 +1,19 @@
 import { Action } from "./Action";
+import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
 import { EvidenceCard } from "./EvidenceCard";
-import { TurnStart } from "./TurnStart";
-import { Outcome } from "./Outcome";
+import { InspectorType } from "./InspectorType";
 import { OtherHand } from "./OtherHand";
+import { Outcome } from "./Outcome";
+import { BottomOrTop } from "./Toby";
+import { TurnStart } from "./TurnStart";
 
 export interface Player {
+	readonly inspector: InspectorType | undefined;
 	readonly name: string;
+}
+
+export interface PlayerInspector<I extends InspectorType> extends Player {
+	readonly inspector: I;
 }
 
 export interface OtherPlayer extends Player {
@@ -14,8 +22,11 @@ export interface OtherPlayer extends Player {
 
 export interface ActivePlayer extends Player {
 	addCard(index: number, evidenceCard: EvidenceCard | undefined, fromRemainingEvidence: boolean): void;
+	chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice;
 	readonly otherHand: OtherHand;
 	removeCardAt(index: number): void;
+	sawEvidenceDealt(player: Player): void;
+	sawEvidenceReturned(evidenceCards: EvidenceCard[], bottomOrTop: BottomOrTop, shuffle: boolean): void;
 	sawOutcome(outcome: Outcome): void;
 	setHandCount(handCount: number): void;
 	takeTurn(turnStart: TurnStart): Action;
@@ -30,4 +41,12 @@ export function isPlayer(maybe: unknown): maybe is Player {
 
 export function isSamePlayer(a: Player, b: Player): boolean {
 	return a === b || a.name === b.name;
+}
+
+export function isPlayerInspector<I extends InspectorType>(maybe: unknown, inspectorType: I): maybe is PlayerInspector<I> {
+	return isPlayer(maybe) && maybe.inspector === inspectorType;
+}
+
+export function formatPlayer(player: Player): string {
+	return player.name;
 }

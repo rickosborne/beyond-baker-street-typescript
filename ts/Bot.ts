@@ -1,4 +1,5 @@
 import { Action } from "./Action";
+import { AdlerInspectorStrategy, isAdlerOutcome } from "./Adler";
 import {
 	AssistOutcome,
 	isAssistOutcome,
@@ -7,15 +8,24 @@ import {
 	TypeAssistAction,
 	ValueAssistAction,
 } from "./AssistAction";
+import { isBaskervilleOutcome } from "./Baskerville";
+import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
 import { BOT_STRATEGIES } from "./BotStrategies";
-import { BotTurnStrategy } from "./BotTurn";
+import { BotTurnEffect, BotTurnOption, BotTurnStrategy } from "./BotTurn";
 import { BasicBotTurnEvaluator, BotTurnEvaluator } from "./BotTurnEvaluator";
-import { ConfirmOutcome, isConfirmOutcome } from "./ConfirmAction";
+import { isConfirmOutcome } from "./ConfirmAction";
+import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
+import { EliminateStrategy } from "./EliminateStrategy";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
+import { MonoFunction } from "./Function";
+import { Guard } from "./Guard";
+import { HopeOutcome, isHopeOutcome } from "./Hope";
+import { HudsonOutcome, isHudsonOutcome } from "./Hudson";
+import { InspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
 import {
 	BadInvestigateOutcome,
@@ -25,18 +35,23 @@ import {
 	isDeadLeadInvestigateOutcome,
 	isGoodInvestigateOutcome,
 } from "./InvestigateAction";
+import { InvestigateStrategy } from "./InvestigateStrategy";
 import { formatLeadCard } from "./LeadCard";
 import { LEAD_TYPES } from "./LeadType";
 import { Logger, SILENT_LOGGER } from "./logger";
-import { formatMysteryCard, HasMysteryHand, MysteryCard, MysteryPile } from "./MysteryCard";
+import { formatMysteryCard, HasMysteryHand, MysteryCard } from "./MysteryCard";
+import { MysteryPile } from "./MysteryPile";
 import { OtherHand } from "./OtherHand";
-import { Outcome } from "./Outcome";
-import { ActivePlayer, isSamePlayer } from "./Player";
+import { Outcome, OutcomeType, TypedOutcome } from "./Outcome";
+import { isPikeOutcome, PikeInspectorStrategy, PikeOutcome } from "./Pike";
+import { ActivePlayer, isSamePlayer, Player } from "./Player";
 import { isPursueOutcome, PursueOutcome } from "./PursueAction";
 import { range } from "./range";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
+import { strategyForInspector } from "./StrategyForInspector";
+import { BottomOrTop, isTobyOutcome, TobyInspectorStrategy } from "./Toby";
 import { TurnStart } from "./TurnStart";
-import { unconfirmedLeads } from "./unconfirmedLeads";
+import { unconfirmedLeads, unfinishedLeads } from "./unconfirmedLeads";
 
 export const BOT_NAMES: string[] = [
 	"Alice",
@@ -58,8 +73,36 @@ const nextName = (function nextName() {
 	};
 })();
 
+function buildOutcomeHandler<T extends OutcomeType, O extends TypedOutcome<T>>(guard: Guard<O>, consumer: Consumer<O>): MonoFunction<Outcome, boolean> {
+	return outcome => {
+		if (guard(outcome)) {
+			consumer(outcome);
+			return true;
+		}
+		return false;
+	};
+}
+
 export class Bot implements ActivePlayer, HasMysteryHand {
+	private readonly eliminateStrategy: EliminateStrategy;
 	public readonly hand: MysteryCard[] = [];
+	private readonly inspectorStrategy: InspectorStrategy | undefined;
+	private readonly investigateStrategy: InvestigateStrategy;
+		private readonly outcomeHandlers: Record<OutcomeType, MonoFunction<Outcome, boolean>> = {
+		[OutcomeType.Adler]: buildOutcomeHandler(isAdlerOutcome, () => this.sawAdler()),
+		[OutcomeType.Assist]: buildOutcomeHandler(isAssistOutcome, o => this.sawAssist(o)),
+		[OutcomeType.BadInvestigate]: buildOutcomeHandler(isBadInvestigateOutcome, o => this.sawBadInvestigate(o)),
+		[OutcomeType.Baskerville]: buildOutcomeHandler(isBaskervilleOutcome, () => void(0)),
+		[OutcomeType.Confirm]: buildOutcomeHandler(isConfirmOutcome, () => void(0)),
+		[OutcomeType.DeadLead]: buildOutcomeHandler(isDeadLeadInvestigateOutcome, o => this.sawDeadLead(o)),
+		[OutcomeType.Eliminate]: buildOutcomeHandler(isEliminateOutcome, o => this.sawEliminate(o)),
+		[OutcomeType.GoodInvestigate]: buildOutcomeHandler(isGoodInvestigateOutcome, o => this.sawGoodInvestigate(o)),
+		[OutcomeType.Hope]: buildOutcomeHandler(isHopeOutcome, o => this.sawHope(o)),
+		[OutcomeType.Hudson]: buildOutcomeHandler(isHudsonOutcome, o => this.sawHudson(o)),
+		[OutcomeType.Pike]: buildOutcomeHandler(isPikeOutcome, o => this.sawPike(o)),
+		[OutcomeType.Pursue]: buildOutcomeHandler(isPursueOutcome, o => this.sawPursue(o)),
+		[OutcomeType.Toby]: buildOutcomeHandler(isTobyOutcome, () => void(0)),
+	};
 	public readonly remainingEvidence = new MysteryPile();
 
 	constructor(
@@ -70,27 +113,63 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		public readonly name: string = inspector == null ? nextName(prng) : inspector,
 		private readonly strategies: BotTurnStrategy[] = BOT_STRATEGIES.slice(),
 		private readonly evaluator: BotTurnEvaluator = new BasicBotTurnEvaluator(scoreFromTypeOverrides, logger),
-	) {}
+	) {
+		this.inspectorStrategy = inspector == null ? undefined : strategyForInspector(inspector, logger);
+		this.investigateStrategy = strategies.find(s => s instanceof InvestigateStrategy) as InvestigateStrategy;
+		this.eliminateStrategy = strategies.find(s => s instanceof EliminateStrategy) as EliminateStrategy;
+	}
 
 	public addCard(index: number, evidenceCard: EvidenceCard | undefined, fromRemainingEvidence: boolean): void {
 		const mysteryCard = evidenceCard != null ? MysteryCard.fromEvidenceCard(evidenceCard) : fromRemainingEvidence ? this.remainingEvidence.toMysteryCard() : new MysteryCard();
 		this.hand.splice(index, 0, mysteryCard);
+		if (this.inspectorStrategy instanceof TobyInspectorStrategy) {
+			this.inspectorStrategy.addCard(index, evidenceCard, fromRemainingEvidence, mysteryCard);
+		}
 		this.logger.trace(() => `${this.name} took a card.  ${this.formatKnowledge(undefined)}`);
 	}
 
 	private assessGameState(turnStart: TurnStart): void {
 		for (const otherPlayer of turnStart.otherPlayers) {
-			this.sawEvidences(otherPlayer.hand);
+			this.sawEvidences(otherPlayer.hand, `assessGameState hand ${otherPlayer.name}`);
 		}
 		const board = turnStart.board;
 		const leads = board.leads;
 		for (const leadType of LEAD_TYPES) {
 			const lead = leads[leadType];
-			this.sawEvidences(lead.badCards);
-			this.sawEvidences(lead.evidenceCards);
+			this.sawEvidences(lead.badCards, `assessGameState lead ${leadType} bad`);
+			this.sawEvidences(lead.evidenceCards, `assessGameState lead ${leadType} good`);
 		}
 		const impossible = board.impossibleCards;
-		this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[]);
+		this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[], "assessGameState impossible");
+	}
+
+	public chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice {
+		const votes: [ number, number ] = [ 0, 0 ];
+		const leads = unfinishedLeads(blackwellTurn);
+		const otherCards = [
+			blackwellTurn.blackwell.hand,
+			blackwellTurn.otherPlayers.flatMap(op => op.hand),
+		].flatMap(ecs => ecs);
+		for (let i = 0; i < blackwellTurn.evidences.length; i++) {
+			const evidenceCard = blackwellTurn.evidences[i];
+			const mysteryCard = MysteryCard.fromEvidenceCard(evidenceCard);
+			const { evidenceType } = evidenceCard;
+			const effects: BotTurnEffect[] = [];
+			for (const lead of leads.filter(l => l.leadCard.evidenceType === evidenceType)) {
+				const investigateEffects = this.investigateStrategy.buildEffectsForLeadWithCard(lead, mysteryCard);
+				effects.push(...investigateEffects);
+			}
+			const eliminateEffects = this.eliminateStrategy.buildEffects(mysteryCard, leads, otherCards, blackwellTurn, undefined);
+			effects.push(...eliminateEffects);
+			const score = this.evaluator.scoreEffects(effects, blackwellTurn);
+			votes[i] = score.score;
+		}
+		const keepIndex = votes[0] > votes[1] ? 0 : 1;
+		const buryIndex = 1 - keepIndex;
+		return {
+			bury: blackwellTurn.evidences[buryIndex],
+			keep: blackwellTurn.evidences[keepIndex],
+		};
 	}
 
 	private formatHandIndexes(handIndexes: number[]): string {
@@ -128,9 +207,15 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		this.hand.splice(index, 1);
 	}
 
-	private returnEvidence(evidenceCard: EvidenceCard): void {
-		this.sawEvidence(evidenceCard);
-		this.remainingEvidence.addToBottom(evidenceCard);
+	private returnEvidence(evidenceCard: EvidenceCard, context: string): void {
+		this.sawEvidence(evidenceCard, context);
+		this.remainingEvidence.add(evidenceCard);
+	}
+
+	private sawAdler(): void {
+		if (this.inspectorStrategy instanceof AdlerInspectorStrategy) {
+			this.inspectorStrategy.sawAdlerOutcome();
+		}
 	}
 
 	private sawAssist(outcome: AssistOutcome): void {
@@ -140,68 +225,88 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	}
 
 	private sawBadInvestigate(outcome: BadInvestigateOutcome): void {
-		this.sawEvidence(outcome.evidenceCard);
-	}
-
-	private sawConfirm(outcome: ConfirmOutcome): void {
-		// nothing to do here?  The next lines just make the linter happy.
-		// noinspection BadExpressionStatementJS
-		outcome;
-		// noinspection BadExpressionStatementJS
-		this;
+		this.sawEvidence(outcome.evidenceCard, "sawBadInvestigate");
 	}
 
 	private sawDeadLead(outcome: DeadLeadInvestigateOutcome): void {
-		this.returnEvidence(outcome.evidenceCard);
+		this.returnEvidence(outcome.evidenceCard, "sawDeadLead evidenceCard");
 		for (const evidenceCard of outcome.returnedEvidence) {
-			this.returnEvidence(evidenceCard);
+			this.returnEvidence(evidenceCard, "sawDeadLead returnedEvidence");
 		}
 	}
 
 	private sawEliminate(outcome: EliminateOutcome): void {
-		this.sawEvidence(outcome.evidenceCard);
+		this.sawEvidence(outcome.evidenceCard, "sawEliminate");
 	}
 
-	private sawEvidence(evidenceCard: EvidenceCard): void {
-		this.remainingEvidence.eliminate(evidenceCard);
+	private sawEvidence(evidenceCard: EvidenceCard, context: string): void {
+		this.remainingEvidence.eliminate(evidenceCard, context);
 		for (const mysteryCard of this.hand) {
 			mysteryCard.eliminateCard(evidenceCard);
 		}
 	}
 
-	private sawEvidences(evidenceCards: EvidenceCard[]): void {
+	public sawEvidenceDealt(player: Player): void {
+		if (!isSamePlayer(player, this) && (this.inspectorStrategy instanceof TobyInspectorStrategy)) {
+			this.inspectorStrategy.sawEvidenceDealt();
+		}
+	}
+
+	public sawEvidenceReturned(evidenceCards: EvidenceCard[], bottomOrTop: BottomOrTop, shuffle: true): void {
+		evidenceCards.forEach(evidenceCard => this.remainingEvidence.add(evidenceCard));
+		if (this.inspectorStrategy instanceof TobyInspectorStrategy) {
+			this.inspectorStrategy.sawEvidenceReturned(evidenceCards, bottomOrTop, shuffle);
+		}
+	}
+
+	private sawEvidences(evidenceCards: EvidenceCard[], context: string): void {
 		for (const evidenceCard of evidenceCards) {
-			this.sawEvidence(evidenceCard);
+			this.sawEvidence(evidenceCard, context);
 		}
 	}
 
 	private sawGoodInvestigate(outcome: GoodInvestigateOutcome): void {
-		this.sawEvidence(outcome.evidenceCard);
+		this.sawEvidence(outcome.evidenceCard, "sawGoodInvestigate");
+	}
+
+	private sawHope(outcome: HopeOutcome): void {
+		for (const assistOutcome of outcome.assistOutcomes) {
+			this.sawAssist(assistOutcome);
+		}
+	}
+
+	private sawHudson(outcome: HudsonOutcome): void {
+		this.remainingEvidence.add(outcome.action.impossibleEvidence);
 	}
 
 	public sawOutcome(outcome: Outcome): void {
-		if (isAssistOutcome(outcome)) {
-			this.sawAssist(outcome);
-		} else if (isBadInvestigateOutcome(outcome)) {
-			this.sawBadInvestigate(outcome);
-		} else if (isConfirmOutcome(outcome)) {
-			this.sawConfirm(outcome);
-		} else if (isDeadLeadInvestigateOutcome(outcome)) {
-			this.sawDeadLead(outcome);
-		} else if (isEliminateOutcome(outcome)) {
-			this.sawEliminate(outcome);
-		} else if (isGoodInvestigateOutcome(outcome)) {
-			this.sawGoodInvestigate(outcome);
-		} else if (isPursueOutcome(outcome)) {
-			this.sawPursue(outcome);
-		} else {
+		const handlers = this.outcomeHandlers;
+		const wasHandled = (Object.keys(handlers) as OutcomeType[]).findIndex(h => handlers[h](outcome)) >= 0;
+		if (!wasHandled) {
 			throw new Error(`Unknown outcome: ${outcome}`);
+		}
+	}
+
+	private sawPike(outcome: PikeOutcome): void {
+		if (isSamePlayer(outcome.activePlayer, this)) {
+			if (this.inspectorStrategy instanceof PikeInspectorStrategy) {
+				this.inspectorStrategy.sawPikeOutcome();
+			} else {
+				throw new Error(`Pike active player does not have PikeInspectorStrategy, which should be impossible.`);
+			}
+			// assumption: this happens _after_ the cards have been swapped
+			const mysteryCard = this.hand[outcome.activeHandIndexAfter];
+			mysteryCard.setExact(outcome.action.otherEvidence);
+		} else if (isSamePlayer(outcome.action.otherPlayer, this)) {
+			// assumption: this happens _after_ the cards have been swapped
+			const mysteryCard = this.hand[outcome.otherHandIndexAfter];
+			mysteryCard.setExact(outcome.givenEvidence);
 		}
 	}
 
 	private sawPursue(outcome: PursueOutcome): void {
 		for (const evidenceCard of outcome.returnedEvidence) {
-			this.returnEvidence(evidenceCard);
+			this.returnEvidence(evidenceCard, "sawPursue");
 		}
 	}
 
@@ -212,6 +317,11 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	public takeTurn(turnStart: TurnStart): Action {
 		this.assessGameState(turnStart);
 		const options = this.strategies.flatMap(s => s.buildOptions(turnStart, this));
+		const removedOptions: BotTurnOption[] = [];
+		if (this.inspectorStrategy != null) {
+			options.push(...this.inspectorStrategy.buildOptions(turnStart, this));
+			this.inspectorStrategy.processOptions(options, removedOptions);
+		}
 		const option = this.evaluator.selectOption(options, this, turnStart);
 		if (option == null) {
 			throw new Error(`No option found from ${options.length} options`);
@@ -263,7 +373,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 			}
 			const evidenceCard = mysteryCard.asEvidence();
 			if (evidenceCard != null) {
-				this.sawEvidence(evidenceCard);
+				this.sawEvidence(evidenceCard, `wasTypeOrValueAssisted ${tv}`);
 			}
 		}
 	}

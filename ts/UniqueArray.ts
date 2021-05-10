@@ -1,3 +1,4 @@
+import { Predicate } from "./Predicate";
 import { removeIf } from "./removeIf";
 
 export type IsSame<T> = (a: T, b: T) => boolean;
@@ -15,6 +16,7 @@ export class UniqueArray<T> {
 
 	constructor(
 		isSame: IsSame<T> = STRICT_EQUALS,
+		initialItems: T[] = [],
 	) {
 		if (isSame === STRICT_EQUALS) {
 			this._includes = item => this.itemSet.has(item);
@@ -38,6 +40,7 @@ export class UniqueArray<T> {
 			this._removeOne = item => removeIf(this.itemArray, i => isSame(i, item));
 			this._removeAt = index => this.itemArray.splice(index, 1);
 		}
+		initialItems.forEach(item => this._addOne(item));
 	}
 
 	public add(...items: T[]): number {
@@ -49,6 +52,10 @@ export class UniqueArray<T> {
 			}
 		}
 		return addedCount;
+	}
+
+	public anyMatch(predicate: Predicate<T>): boolean {
+		return this.itemArray.findIndex(predicate) >= 0;
 	}
 
 	public asArray(): T[] {

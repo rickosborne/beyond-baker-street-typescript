@@ -2,11 +2,12 @@ import { Assisted, isAssisted } from "./AssistAction";
 import { BotTurnEffect, BotTurnEffectType } from "./BotTurn";
 import { EliminateKnownUnusedValueEffect, EliminateUnusedTypeEffect } from "./EliminateStrategy";
 import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
+import { formatDecimal } from "./formatDecimal";
 import { HOLMES_MAX } from "./Game";
 import { isNumber } from "./isNumber";
 import { LEAD_TYPES } from "./LeadType";
 import { PursueDuplicateEffect } from "./PursueStrategy";
-import { TurnStart } from "./TurnStart";
+import { HasVisibleBoard } from "./VisibleBoard";
 
 export enum EffectWeightOperator {
 	Add = "Add",
@@ -59,7 +60,7 @@ export const EFFECT_WEIGHT_OPERANDS: EffectWeightOperand[] = [
 ];
 
 export type EffectWeightOp = EffectWeightOperator | EffectWeightOperand | number;
-export type EffectTurnStackConverter<S, R extends S | void> = S extends (string | number) ? (effect: BotTurnEffect, turnStart: TurnStart, stack: S[]) => R : (effect: BotTurnEffect, turnStart: TurnStart) => R;
+export type EffectTurnStackConverter<S, R extends S | void> = S extends (string | number) ? (effect: BotTurnEffect, turnStart: HasVisibleBoard, stack: S[]) => R : (effect: BotTurnEffect, turnStart: HasVisibleBoard) => R;
 export type EffectOperandResolver = EffectTurnStackConverter<unknown, number>;
 export type EffectWeightFormatter = EffectTurnStackConverter<string, string>;
 export type EffectWeightOperation = EffectTurnStackConverter<number, void>;
@@ -101,7 +102,7 @@ const EFFECT_WEIGHT_OPERAND_RESOLVER: Record<EffectWeightOperand, EffectOperandR
 	[EffectWeightOperand.HolmesLocation]: (e, t) => t.board.holmesLocation,
 	[EffectWeightOperand.HolmesProgress]: (e, t) => (HOLMES_MAX - t.board.holmesLocation) / HOLMES_MAX,
 	[EffectWeightOperand.ImpossibleCount]: (e, t) => t.board.impossibleCards.length,
-	[EffectWeightOperand.ImpossiblePastLimit]: (e, t) => Math.max(0, t.board.impossibleCards.length - t.board.caseFile.impossibleCount),
+	[EffectWeightOperand.ImpossiblePastLimit]: (e, t) => Math.max(0, t.board.impossibleCards.length - t.board.impossibleLimit),
 	[EffectWeightOperand.Probability4Plus]: ifEffectType<EliminateUnusedTypeEffect>(BotTurnEffectType.EliminateUnusedType, e => e.probability4plus),
 	[EffectWeightOperand.RemainingCount]: (e, t) => t.board.remainingEvidenceCount,
 	[EffectWeightOperand.UnconfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => !t.board.leads[lt].confirmed).length,
@@ -165,7 +166,7 @@ function format2(popped: (a: string, b: string) => string): EffectWeightFormatte
 function formatPush(op: EffectWeightOperand): EffectWeightFormatter {
 	const resolver: EffectOperandResolver = operandResolver(op);
 	return (e, t, s: string[]): string => {
-		const value = String(resolver(e, t));
+		const value = formatDecimal(resolver(e, t), 2);
 		s.push(value);
 		return value;
 	};
@@ -244,7 +245,7 @@ export function compileEffectWeight(
 				p(e, t, s);
 			}
 			if (isNumber(c)) {
-				const constant = String(c);
+				const constant = formatDecimal(c, 2);
 				s.push(constant);
 				return constant;
 			}
@@ -252,7 +253,7 @@ export function compileEffectWeight(
 			return opFormatter(e, t, s);
 		};
 	}, undefined as unknown as EffectWeightFormatter) : (e, t, s) => { s.push(""); return ""; };
-	function doIt<T>(effect: BotTurnEffect, turnStart: TurnStart, fn: (effect: BotTurnEffect, turnStart: TurnStart, stack: T[]) => void): T {
+	function doIt<T>(effect: BotTurnEffect, turnStart: HasVisibleBoard, fn: (effect: BotTurnEffect, turnStart: HasVisibleBoard, stack: T[]) => void): T {
 		const s: T[] = [];
 		fn(effect, turnStart, s);
 		const value = s.pop();
@@ -266,7 +267,7 @@ export function compileEffectWeight(
 		return value;
 	}
 	return {
-		calculate: (e: BotTurnEffect, t: TurnStart): number => doIt(e, t, math),
-		format: (e: BotTurnEffect, t: TurnStart): string => wantFormatter ? doIt(e, t, formats) : "",
+		calculate: (e: BotTurnEffect, t: HasVisibleBoard): number => doIt(e, t, math),
+		format: (e: BotTurnEffect, t: HasVisibleBoard): string => wantFormatter ? doIt(e, t, formats) : "",
 	};
 }

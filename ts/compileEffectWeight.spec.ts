@@ -7,6 +7,7 @@ import { CaseFileCard } from "./CaseFileCard";
 import { compileEffectWeight, EffectWeightOp, EffectWeightOperand, EffectWeightOperator } from "./EffectWeight";
 import { EliminateKnownUnusedValueEffect, EliminateUnusedTypeEffect } from "./EliminateStrategy";
 import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
+import { EvidenceType } from "./EvidenceType";
 import { HOLMES_MAX } from "./Game";
 import { LeadType } from "./LeadType";
 import { PursueDuplicateEffect } from "./PursueStrategy";
@@ -22,6 +23,9 @@ function assistKnownCardEffect(): AssistKnownCardEffect {
 	return {
 		assistRatio: assistRatioFromPossible(possibleBefore, 1),
 		effectType: BotTurnEffectType.AssistKnown,
+		evidenceType: EvidenceType.Clue,
+		evidenceValue: randomInt(1, 20),
+		playerName: "Bot",
 		possibleAfter: 1,
 		possibleBefore,
 	};
@@ -170,6 +174,7 @@ describe("compileEffectWeight", function () {
 					impossibleCount: impossibleTarget,
 				},
 				impossibleCards: new Array(impossibleCount),
+				impossibleLimit: impossibleTarget,
 			},
 		});
 	});

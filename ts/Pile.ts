@@ -1,3 +1,5 @@
+import { Predicate } from "./Predicate";
+import { removeIf } from "./removeIf";
 import { PseudoRNG } from "./rng";
 import { shuffleInPlace } from "./shuffle";
 
@@ -19,6 +21,10 @@ export class Pile<C> {
 		this.cards.unshift(card);
 	}
 
+	public anyMatch(predicate: Predicate<C>): boolean {
+		return this.cards.findIndex(predicate) >= 0;
+	}
+
 	public get bottomCard(): C | undefined {
 		return this.cards.length > 0 ? this.cards[this.cards.length - 1] : undefined;
 	}
@@ -35,6 +41,10 @@ export class Pile<C> {
 		return this.cards.length === 0;
 	}
 
+	public removeIf(predicate: Predicate<C>): number {
+		return removeIf(this.cards, predicate);
+	}
+
 	public shuffle(prng: PseudoRNG): void {
 		shuffleInPlace(this.cards, prng);
 	}
@@ -45,6 +55,15 @@ export class Pile<C> {
 			result += valueExtractor(card);
 		}
 		return result;
+	}
+
+	public swap(replacement: C, predicate: Predicate<C>): boolean {
+		const index = this.cards.findIndex(predicate);
+		if (index >= 0) {
+			this.cards.splice(index, 1, replacement);
+			return true;
+		}
+		return false;
 	}
 
 	public takeFromBottom(): C | undefined {

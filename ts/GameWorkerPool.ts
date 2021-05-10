@@ -1,12 +1,12 @@
+import { cpus } from "os";
 import * as path from "path";
 import { Worker } from "worker_threads";
-import { cpus } from "os";
+import { Consumer } from "./Consumer";
+import { EffectWeightOpsFromType } from "./defaultScores";
 import { playSingleGame } from "./playSingleGame";
 import { range } from "./range";
 import { isPlayGameResult, PlayGameRequest, PlayGameResult } from "./WorkerTypes";
-import { EffectWeightOpsFromType } from "./defaultScores";
 
-type Consumer<T> = (item: T) => void;
 type WorkerConsumer = Consumer<Worker>;
 type PlayGameResultConsumer = Consumer<PlayGameResult>;
 

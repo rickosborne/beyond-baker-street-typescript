@@ -2,6 +2,7 @@ import { ActionType } from "./ActionType";
 import { addEffect } from "./addEffect";
 import { Bot } from "./Bot";
 import { BotTurnEffect, BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
+import { CardType } from "./CardType";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
@@ -56,7 +57,8 @@ export class PursueStrategy implements BotTurnStrategy {
 
 	public buildOptions(turn: TurnStart, bot: Bot): BotTurnOption[] {
 		const visibleLeads = unfinishedLeads(turn);
-		return visibleLeads
+		return LEAD_TYPES
+			.map(leadType => turn.board.leads[leadType])
 			.map(lead => this.buildPursueForLead(lead, visibleLeads, turn, bot))
 			.filter(option => option != null) as PursueOption[]
 			;
@@ -67,7 +69,7 @@ export class PursueStrategy implements BotTurnStrategy {
 		const totalValue = lead.badValue + evidenceTarget;
 		const gap = totalValue - lead.evidenceValue;
 		const effects: BotTurnEffect[] = [];
-		addImpossibleAddedEffectsFromTurn(effects, turn);
+		addImpossibleAddedEffectsFromTurn(effects, turn, CardType.Lead, this.strategyType, bot.inspector);
 		if (lead.leadCount === 1) {
 			addLoseEffect(effects);
 		}

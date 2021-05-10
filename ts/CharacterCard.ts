@@ -38,7 +38,7 @@ export const CHARACTER_CARDS: CharacterCard[] = [
 	},
 	{
 		cardType: CardType.Character,
-		characterType: InspectorType.Broadstreet,
+		characterType: InspectorType.Bradstreet,
 		order: 4,
 		pipeCount: 1,
 	},
