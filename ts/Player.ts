@@ -8,7 +8,7 @@ import { BottomOrTop } from "./Toby";
 import { TurnStart } from "./TurnStart";
 
 export interface Player {
-	readonly inspector: InspectorType | undefined;
+	readonly inspector?: InspectorType | undefined;
 	readonly name: string;
 }
 

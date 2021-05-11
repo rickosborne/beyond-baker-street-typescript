@@ -1,6 +1,6 @@
 export interface ErrorLike {
-	name: string;
 	message: string;
+	name: string;
 	stack?: string | undefined;
 }
 

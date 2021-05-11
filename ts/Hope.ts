@@ -2,7 +2,7 @@ import { Action } from "./Action";
 import { ActionType } from "./ActionType";
 import { addEffectsEvenIfDuplicate, addEffectsIfNotPresent } from "./addEffect";
 import { AssistAction, AssistOutcome, formatAssist, formatAssistOutcome } from "./AssistAction";
-import { isAssistOption } from "./AssistStrategy";
+import { AssistTurnOption, isAssistOption } from "./AssistStrategy";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
 import { pairedPermutations } from "./pairedPermutations";
 import { InspectorStrategy } from "./InspectorStrategy";
@@ -43,6 +43,37 @@ export function formatHopeOutcome(outcome: HopeOutcome): string {
 	return `${outcome.activePlayer.name} assisted twice: ${outcome.assistOutcomes.map(o => formatAssistOutcome(o)).join(", ")}.`;
 }
 
+export function unifyEffectsForAssists(
+	assists: [ AssistTurnOption, AssistTurnOption ],
+): BotTurnEffectType[] {
+	return assists.reduce((effects, assist) => {
+		for (const effect of assist.effects) {
+			if (effect === BotTurnEffectType.HolmesProgress) {
+				// Hope only advances Holmes once
+				addEffectsIfNotPresent(effects, effect);
+			} else {
+				// Everything else should be double-counted if necessary
+				addEffectsEvenIfDuplicate(effects, effect);
+			}
+		}
+		return effects;
+	}, [] as BotTurnEffectType[]);
+}
+
+export function buildHopeOptionForActions(
+	assists: [ AssistAction, AssistAction ],
+	effects: BotTurnEffectType[],
+): HopeOption {
+	return {
+		action: {
+			actionType: ActionType.Hope,
+			assists,
+		},
+		effects,
+		strategyType: BotTurnStrategyType.Inspector,
+	};
+}
+
 /**
  * Hope assists twice but only moves Holmes once.
  */
@@ -54,26 +85,12 @@ export class HopeInspectorStrategy extends InspectorStrategy {
 		if (assists.length < 2) {
 			return;
 		}
-		const pairs = pairedPermutations(assists);
-		options.push(...pairs.map(assists => <HopeOption>{
-			action: {
-				actionType: ActionType.Hope,
-				assists: assists.map(assist => assist.action),
-			},
-			effects: assists.reduce((effects, assist) => {
-				assist.effects.forEach(effect => {
-					if (effect === BotTurnEffectType.HolmesProgress) {
-						addEffectsIfNotPresent(effects, effect);
-					} else {
-						addEffectsEvenIfDuplicate(effects, effect);
-					}
-				});
-				if (effects.filter(effect => effect === BotTurnEffectType.HolmesProgress).length > 1) {
-					throw new Error(`Multiple HolmesProgress effects for Hope`);
-				}
-				return effects;
-			}, [] as BotTurnEffectType[]),
-			strategyType: BotTurnStrategyType.Inspector,
-		}));
+		const hopeOptions = pairedPermutations(assists)
+			.map(pair => {
+				const actions = pair.map(a => a.action) as [ AssistAction, AssistAction ];
+				const effects = unifyEffectsForAssists(pair);
+				return buildHopeOptionForActions(actions, effects);
+			});
+		options.push(...hopeOptions);
 	}
 }
