@@ -1,4 +1,4 @@
-import { zeroFill } from "./columnarNumber";
+import { zeroFill } from "./zeroFill";
 
 export function formatTimestamp(timestamp: number): string {
 	const date = new Date(timestamp);

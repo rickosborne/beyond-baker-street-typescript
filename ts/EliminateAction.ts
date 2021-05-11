@@ -5,8 +5,7 @@ import { ImpossibleCard } from "./Impossible";
 import { formatMysteryCard, MysteryCard } from "./MysteryCard";
 import { Outcome, OutcomeType } from "./Outcome";
 import { Player } from "./Player";
-import { TurnStart } from "./TurnStart";
-import { HasVisibleBoard, VisibleBoard } from "./VisibleBoard";
+import { VisibleBoard } from "./VisibleBoard";
 
 export interface EliminateAction extends Action {
 	actionType: ActionType.Eliminate;

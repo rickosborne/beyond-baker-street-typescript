@@ -3,7 +3,6 @@ import { ActionType } from "./ActionType";
 import { isLeadType, LeadType } from "./LeadType";
 import { Outcome, OutcomeType } from "./Outcome";
 import { Player } from "./Player";
-import { TurnStart } from "./TurnStart";
 
 export interface ConfirmAction extends Action {
 	actionType: ActionType.Confirm;
