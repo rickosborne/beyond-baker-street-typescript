@@ -133,7 +133,7 @@ describe("compileEffectWeight", function () {
 		testBoth([EffectWeightOperand.ImpossiblePastLimit], impossibleOver, String(impossibleOver), NO_EFFECT, <TurnStart>{
 			board: <VisibleBoard>{
 				caseFile: <CaseFileCard>{
-					impossibleCount: impossibleTarget,
+					impossibleLimit: impossibleTarget,
 				},
 				impossibleCards: new Array(impossibleCount),
 				impossibleLimit: impossibleTarget,

@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { describe, it } from "mocha";
 import { ActionType } from "./ActionType";
 import { OtherCardKnowledge, OtherPlayerKnowledge } from "./askOtherPlayersAboutTheirHands";
-import { AssistAction, Assisted, AssistType, TypeAssistAction, ValueAssistAction } from "./AssistAction";
+import { AssistAction, AssistType, TypeAssistAction, ValueAssistAction } from "./AssistAction";
 import {
 	addUsualAssistEffects,
 	AssistStrategy,
@@ -15,7 +15,6 @@ import {
 	getPossibleAfterValues,
 	isAssistTypeOption,
 	isAssistValueOption,
-	reduceAssistOptions,
 	TypeAssistTurnOption,
 	ValueAssistTurnOption,
 } from "./AssistStrategy";
@@ -27,13 +26,14 @@ import { EvidenceValue } from "./EvidenceValue";
 import { LeadType } from "./LeadType";
 import { OtherHand } from "./OtherHand";
 import { OtherPlayer, Player } from "./Player";
+import { reduceOptions } from "./reduceOptions";
 import { TurnStart } from "./TurnStart";
 import { VisibleLead } from "./VisibleBoard";
 
 const strategy = new AssistStrategy();
 
-function assisted(possibleBefore: number, possibleAfter: number): Assisted {
-	return {
+function assisted(possibleBefore: number, possibleAfter: number): AssistAction {
+	return <AssistAction> {
 		possibleAfter,
 		possibleBefore,
 	};
@@ -216,7 +216,7 @@ describe("AssistStrategy", function () {
 		});
 	});
 
-	describe("reduceAssistOptions", function () {
+	describe("reduceOptions+compareAssistedImpacts", function () {
 		it("leaves only the best options with matching effects", function () {
 			const optionsBefore: AssistTurnOption[] = [
 				valueAssist(1, 8, 7, BotTurnEffectType.AssistImpossibleType),
@@ -226,7 +226,7 @@ describe("AssistStrategy", function () {
 				valueAssist(5, 5, 2, BotTurnEffectType.AssistNarrow, BotTurnEffectType.AssistNextPlayer),
 				valueAssist(6, 8, 3, BotTurnEffectType.AssistImpossibleType),
 			];
-			const optionsAfter = reduceAssistOptions(optionsBefore);
+			const optionsAfter = reduceOptions(optionsBefore, compareAssistedImpacts);
 			expect(optionsAfter).lengthOf(3);
 			const known = optionsAfter.filter(o => o.effects.includes(BotTurnEffectType.AssistKnown));
 			expect(known).lengthOf(1);

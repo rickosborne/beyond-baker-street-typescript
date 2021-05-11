@@ -20,6 +20,7 @@ import { EvidenceValue } from "./EvidenceValue";
 import { HOLMES_MOVE_PROGRESS, INVESTIGATION_MARKER_GOAL } from "./Game";
 import { addHolmesProgressEffects } from "./HolmesProgressEffect";
 import { isSamePlayer, OtherPlayer, Player } from "./Player";
+import { CompareResult, reduceOptions } from "./reduceOptions";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
 import { VisibleLead } from "./VisibleBoard";
@@ -61,32 +62,20 @@ export function isAssistValueOption(maybe: unknown): maybe is ValueAssistTurnOpt
 	return isAssistOption(maybe) && ((maybe as ValueAssistTurnOption).assistType === AssistType.Value);
 }
 
-export function compareAssistedImpacts(a: Assisted, b: Assisted): number {
+export function compareAssistedImpacts(first: AssistAction, b: AssistAction): CompareResult {
 	// known is best
-	const aAfter = a.possibleAfter;
+	const aAfter = first.possibleAfter;
 	const bAfter = b.possibleAfter;
 	if (aAfter === 1 && bAfter > 1) {
-		return -1;
+		return CompareResult.First;
 	} else if (bAfter === 1 && aAfter > 1) {
-		return 1;
+		return CompareResult.Second;
 	} if (aAfter !== bAfter) {
 		// positive means a is wider than b, so b is better
-		return aAfter - bAfter;
+		return aAfter > bAfter ? CompareResult.Second : CompareResult.First;
 	}
 	// but here, positive means b eliminates more, so b is better
-	return b.possibleBefore - a.possibleBefore;
-}
-
-export function reduceAssistOptions(options: AssistTurnOption[]): AssistTurnOption[] {
-	const best = options.reduce((state, option) => {
-		const key = option.effects.sort().join(",");
-		const existing = state[key];
-		if (existing == null || compareAssistedImpacts(existing.action, option.action) > 0) {
-			state[key] = option;
-		}
-		return state;
-	}, {} as Record<string, AssistTurnOption>);
-	return Object.values(best);
+	return b.possibleBefore > first.possibleBefore ? CompareResult.Second : CompareResult.First;
 }
 
 export function getPossibleAfterValues(otherPlayerKnowledge: OtherPlayerKnowledge, evidenceValue: EvidenceValue): number {
@@ -256,6 +245,6 @@ export class AssistStrategy implements BotTurnStrategy {
 		const leads = unfinishedLeads(turn);
 		const options = askOtherPlayersAboutTheirHands(turn)
 			.flatMap(otherPlayerKnowledge => buildAssistsForPlayer(otherPlayerKnowledge, leads, turn));
-		return reduceAssistOptions(options);
+		return reduceOptions(options, compareAssistedImpacts);
 	}
 }

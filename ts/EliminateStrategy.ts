@@ -11,10 +11,10 @@ import { INVESTIGATION_MARKER_GOAL } from "./Game";
 import { addImpossibleAddedEffectsFromTurn } from "./ImpossibleAdded";
 import { InspectorType } from "./InspectorType";
 import { MysteryCard } from "./MysteryCard";
+import { Comparator, CompareResult, reduceOptions } from "./reduceOptions";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
-import { uniqueReducer } from "./unique";
-import { HasVisibleBoard, VisibleLead } from "./VisibleBoard";
+import { HasVisibleBoard } from "./VisibleBoard";
 
 export interface EliminateOption extends BotTurnOption {
 	action: EliminateAction;
@@ -27,12 +27,13 @@ export function isEliminateOption(maybe: unknown): maybe is EliminateOption {
 		&& (eliminate.strategyType === BotTurnStrategyType.Eliminate);
 }
 
-export function buildEffects(
+export function buildEliminateEffects(
 	mysteryCard: MysteryCard,
-	unconfirmed: VisibleLead[],
+	unconfirmedEvidenceTypes: EvidenceType[],
 	otherPlayerEvidence: EvidenceCard[],
 	turn: HasVisibleBoard,
 	inspector: InspectorType | undefined,
+	stompsExact: boolean,
 ): BotTurnEffectType[] {
 	const effects: BotTurnEffectType[] = [];
 	const investigationMarker = turn.board.investigationMarker;
@@ -40,12 +41,8 @@ export function buildEffects(
 	const { possibleTypes, possibleValues } = mysteryCard;
 	const evidenceValue: EvidenceValue | undefined = possibleValues.length === 1 ? possibleValues[0] : undefined;
 	const evidenceType: EvidenceType | undefined = possibleTypes.length === 1 ? possibleTypes[0] : undefined;
-	const evidenceTypes = unconfirmed.map(lead => lead.leadCard.evidenceType);
 	const markerMultiplier = inspector === InspectorType.Gregson ? 2 : 1;
-	const maybeUsedEvidenceTypes = evidenceTypes
-		.filter(evidenceType => mysteryCard.couldBeType(evidenceType))
-		.reduce(uniqueReducer, [] as EvidenceType[])
-	;
+	const maybeUsed = unconfirmedEvidenceTypes.findIndex(et => mysteryCard.couldBeType(et)) >= 0;
 	if (evidenceType == null && evidenceValue == null) {
 		addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateWild);
 	} else if (evidenceValue != null) {
@@ -55,27 +52,30 @@ export function buildEffects(
 		} else {
 			if (markerDelta === investigationGap) {
 				addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigationComplete);
-			}
-			if (otherPlayerEvidence.find(e => !evidenceTypes.includes(e.evidenceType) && (e.evidenceValue + evidenceValue === investigationGap)) != null) {
+			} else if (otherPlayerEvidence.find(e => !unconfirmedEvidenceTypes.includes(e.evidenceType) && (e.evidenceValue + evidenceValue === investigationGap)) != null) {
 				addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateSetsUpExact);
 			}
-			if (maybeUsedEvidenceTypes.length === 0) {
-				addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateKnownUnusedValue);
+			if (maybeUsed) {
+				addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateKnownValueUsedType);
 			} else {
-				addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateKnownUsedValue);
+				addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateKnownValueUnusedType);
 			}
 		}
 	} else {  // known type, unknown value
-		if (maybeUsedEvidenceTypes.length === 0) {
-			addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateUnusedType);
+		if (maybeUsed) {
+			addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateUnknownValueUsedType);
 		} else {
-			addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateUsedType);
+			addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateUnknownValueUnusedType);
 		}
-		addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateUnknownValue);
 	}
 	const couldCauseLoss = possibleValues.filter(v => (v * markerMultiplier) > investigationGap).length;
-	if (couldCauseLoss > 0) {
+	if (couldCauseLoss === possibleValues.length) {
+		addEffectsIfNotPresent(effects, BotTurnEffectType.Lose);
+	} else if (couldCauseLoss > 0) {
 		addEffectsIfNotPresent(effects, BotTurnEffectType.MaybeLose);
+	}
+	if (stompsExact) {
+		addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateStompsExact);
 	}
 	addImpossibleAddedEffectsFromTurn(effects, turn, CardType.Evidence, BotTurnStrategyType.Eliminate, inspector);
 	return effects;
@@ -84,11 +84,7 @@ export function buildEffects(
 export function buildEliminateOption(
 	effects: BotTurnEffectType[],
 	handIndex: number,
-	stompsExact: boolean,
 ): EliminateOption {
-	if (stompsExact) {
-		addEffectsIfNotPresent(effects, BotTurnEffectType.EliminateStompsExact);
-	}
 	return {
 		action: {
 			actionType: ActionType.Eliminate,
@@ -99,16 +95,31 @@ export function buildEliminateOption(
 	};
 }
 
+function compareWithHand(hand: MysteryCard[]): Comparator<EliminateAction> {
+	return (firstAction, secondAction): CompareResult => {
+		const firstCard = hand[firstAction.handIndex].possibleValues;
+		const secondCard = hand[secondAction.handIndex].possibleValues;
+		// in general, we want to eliminate higher-valued cards
+		const firstAvg = firstCard.reduce((p, c) => p + c, 0) / firstCard.length;
+		const secondAvg = secondCard.reduce((p, c) => p + c, 0) / secondCard.length;
+		return secondAvg > firstAvg ? CompareResult.Second : CompareResult.First;
+	};
+}
+
 export class EliminateStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Eliminate;
 
-	public buildOptions(turn: TurnStart, bot: Bot): BotTurnOption[] {
+	public buildOptions(turn: TurnStart, bot: Bot): EliminateOption[] {
 		const unconfirmed = unfinishedLeads(turn);
+		const unconfirmedEvidenceTypes = unconfirmed.map(lead => lead.leadCard.evidenceType);
 		const otherPlayerEvidence = turn.otherPlayers.flatMap(op => op.hand);
 		const investigationGap = INVESTIGATION_MARKER_GOAL - turn.board.investigationMarker;
-		const stompsExact = otherPlayerEvidence.find(e => e.evidenceValue === investigationGap) != null;
-		return bot.hand
-			.map(mysteryCard => buildEffects(mysteryCard, unconfirmed, otherPlayerEvidence, turn, bot.inspector))
-			.map((effects, handIndex) => buildEliminateOption(effects, handIndex, stompsExact));
+		const stompsExact = turn.otherPlayers
+			.flatMap(op => op.hand.map(card => (op.inspector === InspectorType.Gregson ? 2 : 1) * card.evidenceValue))
+			.find(v => v === investigationGap) != null;
+		const options = bot.hand
+			.map(mysteryCard => buildEliminateEffects(mysteryCard, unconfirmedEvidenceTypes, otherPlayerEvidence, turn, bot.inspector, stompsExact))
+			.map((effects, handIndex) => buildEliminateOption(effects, handIndex));
+		return reduceOptions(options, compareWithHand(bot.hand));
 	}
 }

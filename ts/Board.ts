@@ -111,7 +111,7 @@ export class Board implements VisibleBoard {
 		this.investigationValue = 0;
 		this.leads = toRecord(LEAD_TYPES, lt => lt, leadType => new BoardLead(leadType, prng));
 		this.init();
-		this._impossibleLimit = caseFile.impossibleCount;
+		this._impossibleLimit = caseFile.impossibleLimit;
 	}
 
 	public addBad(leadType: LeadType, evidence: EvidenceCard): void {

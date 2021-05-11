@@ -105,7 +105,7 @@ export class PikeInspectorStrategy extends OncePerGameInspectorStrategy {
 					if ((otherEvidence.evidenceValue > investigationGap) && unusedEvidenceTypes.includes(otherEvidence.evidenceType)) {
 						// do nothing
 					} else {
-						this.addOption(options, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, lestrade, BotTurnEffectType.EliminateUnusedType);
+						this.addOption(options, activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, lestrade, BotTurnEffectType.EliminateUnknownValueUnusedType);
 					}
 				}
 			}
