@@ -12,7 +12,6 @@ export enum AssistType {
 }
 
 export interface Assisted {
-	assistRatio: number;
 	possibleAfter: number;
 	possibleBefore: number;
 }

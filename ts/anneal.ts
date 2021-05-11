@@ -18,6 +18,7 @@ export interface AnnealParams<State> {
 	threadCount: number;
 }
 
+// istanbul ignore next
 const ANNEAL_DEFAULTS: Partial<AnnealParams<unknown>> = {
 	prng: DEFAULT_PRNG,
 	temperature: temp => temp - 1,
@@ -31,9 +32,11 @@ export async function anneal<State>(
 ): Promise<State[]> {
 	const effectiveParams: AnnealParams<State> = Object.assign({}, ANNEAL_DEFAULTS as AnnealParams<State>, params);
 	const { calculateEnergy, formatState, improvement, initialState, neighbors, prng, temperature, temperatureMax, temperatureMin, threadCount } = effectiveParams;
+	/* istanbul ignore if */
 	if (calculateEnergy == null || formatState == null || improvement == null || initialState == null || neighbors == null || prng == null || temperature == null || temperatureMax == null || temperatureMin == null || threadCount == null) {
 		throw new Error(`Missing some params:\n${JSON.stringify(params, null, 2)}`);
 	}
+	/* istanbul ignore if */
 	if (initialState.length < 1) {
 		throw new Error(`Need at least one initial state`);
 	}
@@ -42,6 +45,7 @@ export async function anneal<State>(
 	const lastStates: State[] = initialState.slice();
 	let currentState: State = randomItem(initialState);
 	let currentEnergy: number | undefined = await calculateEnergy(currentState);
+	/* istanbul ignore if */
 	if (currentEnergy == null) {
 		throw new Error(`Initial energy cannot be null.`);
 	}
@@ -56,6 +60,7 @@ export async function anneal<State>(
 		for (let i = 0; i < states.length; i++) {
 			currentState = states[i];
 			currentEnergy = energies[i];
+			/* istanbul ignore if */
 			if (strictDeepEqual(lastState, currentState)) {
 				throw new Error(`Equal states: ${formatState(lastState, lastEnergy)}`);
 			}
@@ -83,10 +88,10 @@ export async function anneal<State>(
 				bestEnergy = currentEnergy;
 				bestStates.splice(0, bestStates.length);
 				bestStates.push(...lastStates);
-				console.log(`Best has ${bestStates.length}`);
+				// console.log(`Best has ${bestStates.length}`);
 			} else if (lastEnergy === bestEnergy && !bestStates.includes(lastState)) {
 				bestStates.push(lastState);
-				console.log(`Best has ${bestStates.length}: ${formatState(lastState, lastEnergy)}`);
+				// console.log(`Best has ${bestStates.length}: ${formatState(lastState, lastEnergy)}`);
 			}
 		}
 		temp = temperature(temp);

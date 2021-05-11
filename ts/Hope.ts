@@ -4,7 +4,7 @@ import { addEffectsEvenIfDuplicate, addEffectsIfNotPresent } from "./addEffect";
 import { AssistAction, AssistOutcome, formatAssist, formatAssistOutcome } from "./AssistAction";
 import { isAssistOption } from "./AssistStrategy";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategyType } from "./BotTurn";
-import { pairedPermutations } from "./crossProduct";
+import { pairedPermutations } from "./pairedPermutations";
 import { InspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
 import { Outcome, OutcomeType } from "./Outcome";

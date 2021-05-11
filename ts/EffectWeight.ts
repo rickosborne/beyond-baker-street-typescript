@@ -1,4 +1,3 @@
-import { Assisted, isAssisted } from "./AssistAction";
 import { BotTurnEffectType } from "./BotTurn";
 import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
 import { formatDecimal } from "./formatDecimal";
@@ -28,7 +27,6 @@ export const EFFECT_WEIGHT_OPERATORS: EffectWeightOperator[] = [
 ];
 
 export enum EffectWeightOperand {
-	AssistRatio = "AssistRatio",
 	ConfirmedLeads = "ConfirmedLeads",
 	EvidenceValueMax = "EvidenceValueMax",
 	HolmesLocation = "HolmesLocation",
@@ -40,7 +38,6 @@ export enum EffectWeightOperand {
 }
 
 export const EFFECT_WEIGHT_OPERANDS: EffectWeightOperand[] = [
-	EffectWeightOperand.AssistRatio,
 	EffectWeightOperand.ConfirmedLeads,
 	EffectWeightOperand.EvidenceValueMax,
 	EffectWeightOperand.HolmesLocation,
@@ -61,32 +58,7 @@ export interface EffectCalculator {
 	format: EffectTurnStackConverter<unknown, string>;
 }
 
-export function ifEffectType<E extends BotTurnEffectType>(type: BotTurnEffectType, mapper: (effect: E) => number): EffectOperandResolver {
-	return e => {
-		/* istanbul ignore if */
-		if (e !== type) {
-			throw new Error(`Effect ${e} found, but expected: ${type}`);
-		}
-		return mapper(e as E);
-	};
-}
-
-export function ifEffectMatch<E>(
-	guard: (effect: unknown) => effect is E,
-	mapper: (effect: E) => number
-): EffectOperandResolver {
-	return e => {
-		if (guard(e)) {
-			return mapper(e);
-		}
-		/* istanbul ignore next */
-		throw new Error(`Effect ${e} found but unexpected.`);
-	};
-}
-
-
 const EFFECT_WEIGHT_OPERAND_RESOLVER: Record<EffectWeightOperand, EffectOperandResolver> = {
-	[EffectWeightOperand.AssistRatio]: ifEffectMatch<Assisted>(isAssisted, a => a.assistRatio),
 	[EffectWeightOperand.ConfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => t.board.leads[lt].confirmed).length,
 	[EffectWeightOperand.EvidenceValueMax]: () => EVIDENCE_CARD_VALUE_MAX,
 	[EffectWeightOperand.HolmesLocation]: (e, t) => t.board.holmesLocation,
@@ -169,7 +141,6 @@ const EFFECT_WEIGHT_OPERATION_FORMAT: Record<EffectWeightOp, EffectWeightFormatt
 	[EffectWeightOperator.Negate]: format1(a => `0-(${a})`),
 	[EffectWeightOperator.Reverse]: format1(a => `1-(${a})`),
 	[EffectWeightOperator.Subtract]: format2((a, b) => `(${b})-(${a})`),
-	[EffectWeightOperand.AssistRatio]: formatPush(EffectWeightOperand.AssistRatio),
 	[EffectWeightOperand.ConfirmedLeads]: formatPush(EffectWeightOperand.ConfirmedLeads),
 	[EffectWeightOperand.EvidenceValueMax]: formatPush(EffectWeightOperand.EvidenceValueMax),
 	[EffectWeightOperand.HolmesLocation]: formatPush(EffectWeightOperand.HolmesLocation),
