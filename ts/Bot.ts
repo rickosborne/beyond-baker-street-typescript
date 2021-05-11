@@ -8,7 +8,7 @@ import {
 	TypeAssistAction,
 	ValueAssistAction,
 } from "./AssistAction";
-import { isBaskervilleOutcome } from "./Baskerville";
+import { BaskervilleInspectorStrategy, isBaskervilleOutcome } from "./Baskerville";
 import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
 import { BOT_STRATEGIES } from "./BotStrategies";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategy } from "./BotTurn";
@@ -92,7 +92,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		[OutcomeType.Adler]: buildOutcomeHandler(isAdlerOutcome, () => this.sawAdler()),
 		[OutcomeType.Assist]: buildOutcomeHandler(isAssistOutcome, o => this.sawAssist(o)),
 		[OutcomeType.BadInvestigate]: buildOutcomeHandler(isBadInvestigateOutcome, o => this.sawBadInvestigate(o)),
-		[OutcomeType.Baskerville]: buildOutcomeHandler(isBaskervilleOutcome, () => void(0)),
+		[OutcomeType.Baskerville]: buildOutcomeHandler(isBaskervilleOutcome, () => this.sawBaskerville()),
 		[OutcomeType.Confirm]: buildOutcomeHandler(isConfirmOutcome, () => void(0)),
 		[OutcomeType.DeadLead]: buildOutcomeHandler(isDeadLeadInvestigateOutcome, o => this.sawDeadLead(o)),
 		[OutcomeType.Eliminate]: buildOutcomeHandler(isEliminateOutcome, o => this.sawEliminate(o)),
@@ -226,6 +226,12 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 
 	private sawBadInvestigate(outcome: BadInvestigateOutcome): void {
 		this.sawEvidence(outcome.evidenceCard, "sawBadInvestigate");
+	}
+
+	private sawBaskerville(): void {
+		if (this.inspectorStrategy instanceof BaskervilleInspectorStrategy) {
+			this.inspectorStrategy.sawBaskervilleOutcome();
+		}
 	}
 
 	private sawDeadLead(outcome: DeadLeadInvestigateOutcome): void {

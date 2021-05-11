@@ -12,6 +12,7 @@ import { Player, PlayerInspector } from "./Player";
 import { summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
+import { VisibleLead } from "./VisibleBoard";
 
 export interface BaskervilleAction extends Action {
 	actionType: ActionType.Baskerville;
@@ -49,28 +50,59 @@ export function formatBaskervilleOutcome(outcome: BaskervilleOutcome): string {
 	return `${outcome.activePlayer.name} moved the investigation by ${outcome.investigationDelta} by swapped impossible ${formatEvidence(outcome.action.impossibleEvidence)} with lead ${formatEvidence(outcome.action.leadEvidence)}.  Investigation marker is at ${outcome.investigationMarker}.`;
 }
 
+export function buildBaskervilleOption(
+	impossibleEvidence: EvidenceCard,
+	leadType: LeadType,
+	leadEvidence: EvidenceCard,
+	...effects: BotTurnEffectType[]
+): BaskervilleOption {
+	return {
+		action: {
+			actionType: ActionType.Baskerville,
+			impossibleEvidence,
+			leadEvidence,
+			leadType,
+		},
+		effects,
+		strategyType: BotTurnStrategyType.Inspector,
+	};
+}
+
+export function buildBaskervilleOptionForImpossibleAndLead(
+	impossibleEvidence: EvidenceCard,
+	leadType: LeadType,
+	leadEvidence: EvidenceCard,
+	turn: TurnStart,
+	leadGap: number,
+	evidenceValues: () => number[]
+): BaskervilleOption | undefined {
+	const leadAdds = impossibleEvidence.evidenceValue - leadEvidence.evidenceValue;
+	const investigationAdds = -leadAdds;
+	const effects: BotTurnEffectType[] = [];
+	const updatedInvestigationMarker = turn.board.investigationMarker + investigationAdds;
+	if (updatedInvestigationMarker > INVESTIGATION_MARKER_GOAL || leadAdds > leadGap) {
+		// swapping would lose the game, or invalidate the lead
+		return undefined;
+	} else if (updatedInvestigationMarker === INVESTIGATION_MARKER_GOAL) {
+		addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigationComplete);
+	}
+	if (leadAdds === leadGap) {
+		addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmReady);
+	} else {
+		const remaining = leadGap - leadAdds;
+		const values = evidenceValues();
+		if (summingPathsTo(remaining, values) > 0) {
+			addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
+		}
+	}
+	if (effects.length > 0) {
+		return buildBaskervilleOption(impossibleEvidence, leadType, leadEvidence, ...effects);
+	}
+	return undefined;
+}
+
 export class BaskervilleInspectorStrategy extends OncePerGameInspectorStrategy {
 	public readonly inspectorType = InspectorType.Baskerville;
-
-	// noinspection JSMethodCanBeStatic
-	private addOption(
-		options: BotTurnOption[],
-		impossibleEvidence: EvidenceCard,
-		leadType: LeadType,
-		leadEvidence: EvidenceCard,
-		...effects: BotTurnEffectType[]
-	): void {
-		options.push(<BaskervilleOption>{
-			action: {
-				actionType: ActionType.Baskerville,
-				impossibleEvidence,
-				leadEvidence,
-				leadType,
-			},
-			effects,
-			strategyType: BotTurnStrategyType.Inspector,
-		});
-	}
 
 	public buildOptions(turn: TurnStart): BotTurnOption[] {
 		const options: BotTurnOption[] = [];
@@ -86,32 +118,18 @@ export class BaskervilleInspectorStrategy extends OncePerGameInspectorStrategy {
 				const evidenceValues = this.memoizedTypedCardValues(otherPlayerCards, evidenceType);
 				for (const leadEvidence of lead.evidenceCards) {
 					for (const impossibleEvidence of impossibleEvidences) {
-						const leadAdds = impossibleEvidence.evidenceValue - leadEvidence.evidenceValue;
-						const investigationAdds = -leadAdds;
-						const effects: BotTurnEffectType[] = [];
-						const updatedInvestigationMarker = turn.board.investigationMarker + investigationAdds;
-						if (updatedInvestigationMarker > INVESTIGATION_MARKER_GOAL || leadAdds > leadGap) {
-							// swapping would lose the game, or invalidate the lead
-							continue;
-						} else if (updatedInvestigationMarker === INVESTIGATION_MARKER_GOAL) {
-							addEffectsIfNotPresent(effects, BotTurnEffectType.InvestigationComplete);
-						}
-						if (leadAdds === leadGap) {
-							addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmReady);
-						} else {
-							const remaining = leadGap - leadAdds;
-							const values = evidenceValues();
-							if (summingPathsTo(remaining, values) > 0) {
-								addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
-							}
-						}
-						if (effects.length > 0) {
-							this.addOption(options, impossibleEvidence, lead.leadCard.leadType, leadEvidence, ...effects);
+						const option = buildBaskervilleOptionForImpossibleAndLead(impossibleEvidence, lead.leadCard.leadType, leadEvidence, turn, leadGap, evidenceValues);
+						if (option != null) {
+							options.push(option);
 						}
 					}
 				}
 			}
 		});
 		return options;
+	}
+
+	sawBaskervilleOutcome(): void {
+		this.setUsed();
 	}
 }
