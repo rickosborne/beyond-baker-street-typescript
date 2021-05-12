@@ -1,9 +1,9 @@
 export function range(min: number, max: number): number[] {
-	if (min == max) {
-		return [min];
-	}
-	const result: number[] = new Array(max - min);
-	for (let i: number = min, j = 0; i <= max; i++, j++) {
+	const delta = max - min;
+	const count = Math.abs(delta) + 1;
+	const direction = delta > 0 ? 1 : -1;
+	const result: number[] = new Array(count);
+	for (let i: number = min, j = 0; j < count; i += direction, j++) {
 		result[j] = i;
 	}
 	return result;
