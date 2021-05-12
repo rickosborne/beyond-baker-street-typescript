@@ -21,12 +21,21 @@ export enum BotTurnEffectType {
 	HolmesImpeded = "HolmesImpeded",
 	HolmesProgress = "HolmesProgress",
 	ImpossibleAdded = "ImpossibleAdded",
-	InvestigateBad = "InvestigateBad",
+	InvestigateBadOnWedged = "InvestigateBadOnWedged",
+	InvestigateBadOnUnwedged = "InvestigateBadOnUnwedged",
 	InvestigateCorrectType = "InvestigateCorrectType",
 	InvestigateCorrectValue = "InvestigateCorrectValue",
 	InvestigateMaybeBad = "InvestigateMaybeBad",
 	InvestigatePerfect = "InvestigatePerfect",
+	/**
+	 * An investigation is currently wedged, but adding this bad card would unwedge it.
+	 */
+	InvestigateUnwedgeWithBad = "InvestigateUnwedgeWithBad",
 	InvestigateWild = "InvestigateWild",
+	/**
+	 * When you put down evidence which prevents the lead from being solved due to available cards.
+	 */
+	InvestigateWouldWedge = "InvestigateWouldWedge",
 	InvestigationComplete = "InvestigationComplete",
 	Lose = "Lose",
 	MaybeLose = "MaybeLose",
@@ -57,7 +66,7 @@ export const BOT_TURN_EFFECT_TYPES: BotTurnEffectType[] = [
 	BotTurnEffectType.HolmesImpeded,
 	BotTurnEffectType.HolmesProgress,
 	BotTurnEffectType.ImpossibleAdded,
-	BotTurnEffectType.InvestigateBad,
+	BotTurnEffectType.InvestigateBadOnWedged,
 	BotTurnEffectType.InvestigateCorrectType,
 	BotTurnEffectType.InvestigateCorrectValue,
 	BotTurnEffectType.InvestigateMaybeBad,

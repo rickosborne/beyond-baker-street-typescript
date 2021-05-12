@@ -49,7 +49,7 @@ const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.HolmesProgress]: [0],
 	[BotTurnEffectType.InvestigateMaybeBad]: [0],
 	[BotTurnEffectType.InvestigateWild]: [0],
-	[BotTurnEffectType.InvestigateBad]: [0],
+	[BotTurnEffectType.InvestigateBadOnWedged]: [0],
 	[BotTurnEffectType.EliminateUnknownValueUsedType]: [0],
 	[BotTurnEffectType.PursueMaybe]: [0],
 	[BotTurnEffectType.EliminateKnownValueUsedType]: [0],

@@ -21,7 +21,7 @@ export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.HolmesImpeded]: [0],
 	[BotTurnEffectType.HolmesProgress]: [-17],
 	[BotTurnEffectType.ImpossibleAdded]: [0],
-	[BotTurnEffectType.InvestigateBad]: [-12],
+	[BotTurnEffectType.InvestigateBadOnWedged]: [-12],
 	[BotTurnEffectType.InvestigateCorrectType]: [8],
 	[BotTurnEffectType.InvestigateCorrectValue]: [-3],
 	[BotTurnEffectType.InvestigateMaybeBad]: [-21],

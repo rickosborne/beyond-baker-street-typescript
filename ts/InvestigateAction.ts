@@ -1,12 +1,11 @@
 import { Action, isActionOfType } from "./Action";
 import { ActionType } from "./ActionType";
-import { isLeadType, LeadType } from "./LeadType";
 import { EvidenceCard, formatEvidence } from "./EvidenceCard";
 import { formatLeadCard, LeadCard } from "./LeadCard";
+import { isLeadType, LeadType } from "./LeadType";
 import { formatMysteryCard, MysteryCard } from "./MysteryCard";
 import { Outcome, OutcomeType } from "./Outcome";
 import { Player } from "./Player";
-import { TurnStart } from "./TurnStart";
 import { VisibleBoard } from "./VisibleBoard";
 
 export interface InvestigateAction extends Action {
