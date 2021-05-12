@@ -4,9 +4,8 @@ import { ActionType } from "./ActionType";
 import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnStrategyType } from "./BotTurn";
 import { CardType } from "./CardType";
-import { EvidenceCard } from "./EvidenceCard";
+import { evidence, EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
-import { EvidenceValue } from "./EvidenceValue";
 import { ImpossibleCard } from "./Impossible";
 import { buildEffectsForLeadWithCard, buildOptionForLeadWithCard, InvestigateStrategy } from "./InvestigateStrategy";
 import { LeadType } from "./LeadType";
@@ -16,26 +15,18 @@ import { VisibleLead } from "./VisibleBoard";
 
 const strategy = new InvestigateStrategy();
 
-function evidence(evidenceType: EvidenceType, evidenceValue: EvidenceValue): EvidenceCard {
-	return {
-		cardType: CardType.Evidence,
-		evidenceType,
-		evidenceValue,
-	};
-}
-
 function turn(): TurnStart {
 	return <TurnStart> {
 		board: {
-			impossibleCards: [evidence(EvidenceType.Track, 1)] as ImpossibleCard[],
+			impossibleCards: [evidence(1, EvidenceType.Track)] as ImpossibleCard[],
 			leads: {
 				[LeadType.Motive]: {
 					badCards: [] as EvidenceCard[],
 					badValue: 0,
 					confirmed: false,
 					evidenceCards: [
-						evidence(EvidenceType.Document, 4),
-						evidence(EvidenceType.Document, 2),
+						evidence(4, EvidenceType.Document),
+						evidence(2, EvidenceType.Document),
 					] as EvidenceCard[],
 					evidenceValue: 6,
 					leadCard: {

@@ -8,21 +8,11 @@ import {
 	buildBaskervilleOptionForImpossibleAndLead,
 } from "./Baskerville";
 import { BotTurnEffectType, BotTurnStrategyType } from "./BotTurn";
-import { CardType } from "./CardType";
-import { EvidenceCard } from "./EvidenceCard";
+import { evidence, EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
-import { EvidenceValue } from "./EvidenceValue";
 import { LeadType } from "./LeadType";
 import { OtherPlayer } from "./Player";
 import { TurnStart } from "./TurnStart";
-
-function evidence(evidenceType: EvidenceType, evidenceValue: EvidenceValue): EvidenceCard {
-	return {
-		cardType: CardType.Evidence,
-		evidenceType,
-		evidenceValue,
-	};
-}
 
 function buildBaskerville(used: boolean): BaskervilleInspectorStrategy {
 	const strategy = new BaskervilleInspectorStrategy();
@@ -33,8 +23,8 @@ function buildBaskerville(used: boolean): BaskervilleInspectorStrategy {
 }
 
 describe("BaskervilleInspectorStrategy", function () {
-	const impossible = evidence(EvidenceType.Witness, 1);
-	const lead = evidence(EvidenceType.Witness, 6);
+	const impossible = evidence(1, EvidenceType.Witness);
+	const lead = evidence(6, EvidenceType.Witness);
 	const action: BaskervilleAction = {
 		actionType: ActionType.Baskerville,
 		impossibleEvidence: impossible,

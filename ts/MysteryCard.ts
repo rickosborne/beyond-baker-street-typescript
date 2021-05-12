@@ -90,6 +90,14 @@ export class MysteryCard implements UnknownCard {
 		return this._evidence;
 	}
 
+	public asUnknown(): UnknownCard {
+		return {
+			possibleCount: this.possibleCount,
+			possibleTypes: this.possibleTypes,
+			possibleValues: this.possibleValues,
+		};
+	}
+
 	private clear(): void {
 		this._evidence = undefined;
 		EVIDENCE_TYPES.forEach(et => {
@@ -272,17 +280,21 @@ export class MysteryCard implements UnknownCard {
 	}
 }
 
-export function formatMysteryCard(mysteryCard: MysteryCard): string {
-	function formatPart<T>(possible: T[], all: T[]): string {
-		if (possible.length === all.length) {
-			return "*";
-		} else if (possible.length === all.length - 1) {
-			return "!" + all.filter(t => !possible.includes(t)).join();
-		} else {			return possible.join("|");
-		}
+function formatPart<T>(possible: T[], all: T[]): string {
+	if (possible.length === all.length) {
+		return "*";
+	} else if (possible.length === all.length - 1) {
+		return "!" + all.filter(t => !possible.includes(t)).join();
+	} else {			return possible.join("|");
 	}
+}
 
-	return `${formatPart(mysteryCard.possibleTypes, EVIDENCE_TYPES)}-${formatPart(mysteryCard.possibleValues, EVIDENCE_CARD_VALUES)}`;
+export function formatMysteryCard(mysteryCard: MysteryCard): string {
+	return formatUnknownCard(mysteryCard);
+}
+
+export function formatUnknownCard(card: UnknownCard): string {
+	return `${formatPart(card.possibleTypes, EVIDENCE_TYPES)}-${formatPart(card.possibleValues, EVIDENCE_CARD_VALUES)}`;
 }
 
 export interface HasMysteryHand {

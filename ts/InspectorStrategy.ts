@@ -94,5 +94,12 @@ export abstract class OncePerGameInspectorStrategy extends InspectorStrategy {
 	protected setUsed(): void {
 		this.available = false;
 	}
+
+	protected whenAvailable<T>(block: () => T, defaultValue: T): T {
+		if (this.available) {
+			return block();
+		}
+		return defaultValue;
+	}
 }
 

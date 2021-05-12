@@ -3,26 +3,14 @@ import { describe, it } from "mocha";
 import { ActionType } from "./ActionType";
 import { BotTurnEffectType, BotTurnStrategyType } from "./BotTurn";
 import { CardType } from "./CardType";
-import { EvidenceCard } from "./EvidenceCard";
+import { evidence, EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
-import { EvidenceValue } from "./EvidenceValue";
 import { buildHudsonOptionForLeadAndImpossible, HudsonInspectorStrategy } from "./Hudson";
 import { ImpossibleCard } from "./Impossible";
 import { LeadReverseCard } from "./LeadCard";
 import { LeadType } from "./LeadType";
 import { OtherPlayer } from "./Player";
 import { TurnStart } from "./TurnStart";
-
-function evidence(
-	evidenceValue: EvidenceValue,
-	evidenceType: EvidenceType = EvidenceType.Track,
-): EvidenceCard {
-	return {
-		cardType: CardType.Evidence,
-		evidenceType,
-		evidenceValue,
-	};
-}
 
 function leadReverse(): LeadReverseCard {
 	return {
@@ -81,7 +69,7 @@ const strategy = new HudsonInspectorStrategy();
 describe("HudsonInspectorStrategy", function () {
 	describe("buildOptions", function () {
 		it("handles ConfirmEventually for gap match", function () {
-			expect(buildHudsonOptionForLeadAndImpossible(evidence(6), 6, () => []))
+			expect(buildHudsonOptionForLeadAndImpossible(evidence(6, EvidenceType.Track), 6, () => []))
 				.deep.includes({
 				action: {
 					actionType: ActionType.Hudson,
@@ -97,7 +85,7 @@ describe("HudsonInspectorStrategy", function () {
 		});
 
 		it("handles ConfirmEventually for within gap", function () {
-			expect(buildHudsonOptionForLeadAndImpossible(evidence(6), 7, () => [1]))
+			expect(buildHudsonOptionForLeadAndImpossible(evidence(6, EvidenceType.Track), 7, () => [1]))
 				.deep.includes({
 				action: {
 					actionType: ActionType.Hudson,
@@ -113,7 +101,7 @@ describe("HudsonInspectorStrategy", function () {
 		});
 
 		it("handles ConfirmEventually for within gap", function () {
-			expect(buildHudsonOptionForLeadAndImpossible(evidence(6), 7, () => [2])).is.undefined;
+			expect(buildHudsonOptionForLeadAndImpossible(evidence(6, EvidenceType.Track), 7, () => [2])).is.undefined;
 		});
 	});
 

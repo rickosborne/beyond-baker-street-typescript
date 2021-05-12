@@ -10,6 +10,14 @@ export interface EvidenceCard extends Card<CardType.Evidence> {
 	evidenceValue: number;
 }
 
+export function evidence(evidenceValue: number, evidenceType: EvidenceType): EvidenceCard {
+	return {
+		cardType: CardType.Evidence,
+		evidenceType,
+		evidenceValue,
+	};
+}
+
 export const EVIDENCE_CARD_VALUE_MIN = 1;
 export const EVIDENCE_CARD_VALUE_MAX = 6;
 export const EVIDENCE_CARD_VALUES = range(EVIDENCE_CARD_VALUE_MIN, EVIDENCE_CARD_VALUE_MAX);

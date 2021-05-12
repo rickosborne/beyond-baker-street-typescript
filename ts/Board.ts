@@ -144,7 +144,7 @@ export class Board implements VisibleBoard {
 		const impossibleEvidence = action.impossibleEvidence;
 		const leadEvidence = action.leadEvidence;
 		const lead = this.leads[action.leadType];
-		this.impossible.swap(leadEvidence, c => isEvidenceCard(c) && isSameEvidenceCard(c, impossibleEvidence));
+		this.impossible.swapOne(leadEvidence, c => isEvidenceCard(c) && isSameEvidenceCard(c, impossibleEvidence));
 		lead.baskervilleSwap(leadEvidence, impossibleEvidence);
 		const investigationDelta = leadEvidence.evidenceValue - impossibleEvidence.evidenceValue;
 		this.moveInvestigationMarker(investigationDelta);
