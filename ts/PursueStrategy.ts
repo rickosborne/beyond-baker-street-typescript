@@ -14,8 +14,8 @@ import { availableValuesOfType } from "./playedEvidence";
 import { PursueAction } from "./PursueAction";
 import { MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
-import { unfinishedLeads } from "./unconfirmedLeads";
 import { VisibleLead } from "./VisibleBoard";
+import { unfinishedLeads } from "./unfinishedLeads";
 
 export interface PursueOption extends BotTurnOption {
 	action: PursueAction;

@@ -22,8 +22,8 @@ import { addHolmesProgressEffects } from "./HolmesProgressEffect";
 import { isSamePlayer, OtherPlayer, Player } from "./Player";
 import { CompareResult, reduceOptions } from "./reduceOptions";
 import { TurnStart } from "./TurnStart";
-import { unfinishedLeads } from "./unconfirmedLeads";
 import { VisibleLead } from "./VisibleBoard";
+import { unfinishedLeads } from "./unfinishedLeads";
 
 export interface AssistTurnOption extends BotTurnOption {
 	action: AssistAction;

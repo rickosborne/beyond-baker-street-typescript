@@ -13,8 +13,8 @@ import { InspectorType } from "./InspectorType";
 import { MysteryCard } from "./MysteryCard";
 import { Comparator, CompareResult, reduceOptions } from "./reduceOptions";
 import { TurnStart } from "./TurnStart";
-import { unfinishedLeads } from "./unconfirmedLeads";
 import { HasVisibleBoard } from "./VisibleBoard";
+import { unfinishedLeads } from "./unfinishedLeads";
 
 export interface EliminateOption extends BotTurnOption {
 	action: EliminateAction;

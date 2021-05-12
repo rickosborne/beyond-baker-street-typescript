@@ -52,7 +52,8 @@ import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { strategyForInspector } from "./StrategyForInspector";
 import { BottomOrTop, isTobyOutcome, TobyInspectorStrategy } from "./Toby";
 import { TurnStart } from "./TurnStart";
-import { unconfirmedLeads, unfinishedLeads } from "./unconfirmedLeads";
+import { unconfirmedLeads } from "./unconfirmedLeads";
+import { unfinishedLeads } from "./unfinishedLeads";
 
 export const BOT_NAMES: string[] = [
 	"Alice",

@@ -15,8 +15,8 @@ import { objectMap } from "./objectMap";
 import { availableValuesByType, playedEvidence } from "./playedEvidence";
 import { summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
-import { unfinishedLeads } from "./unconfirmedLeads";
 import { VisibleLead } from "./VisibleBoard";
+import { unfinishedLeads } from "./unfinishedLeads";
 
 export interface InvestigateOption extends BotTurnOption {
 	action: InvestigateAction,

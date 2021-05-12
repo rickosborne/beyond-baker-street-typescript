@@ -13,7 +13,7 @@ import { formatMysteryCard, formatUnknownCard, MysteryCard, UnknownCard } from "
 import { Outcome, OutcomeType } from "./Outcome";
 import { OtherPlayer, Player, PlayerInspector } from "./Player";
 import { TurnStart } from "./TurnStart";
-import { unfinishedLeads } from "./unconfirmedLeads";
+import { unfinishedLeads } from "./unfinishedLeads";
 
 export interface PikeAction extends Action {
 	actionType: ActionType.Pike;
