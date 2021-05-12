@@ -1,12 +1,12 @@
+import { LEAD_PILE_START_COUNT } from "./Board";
 import { Card, isCardOfType } from "./Card";
 import { CardType } from "./CardType";
-import { isLeadType, LeadType } from "./LeadType";
-import { range } from "./range";
 import { EVIDENCE_TYPES, EvidenceType, isEvidenceType } from "./EvidenceType";
-import { isEvidenceValue } from "./EvidenceValue";
+import { EvidenceValue, isEvidenceValue } from "./EvidenceValue";
 import { groupBy } from "./groupBy";
+import { isLeadType, LeadType } from "./LeadType";
 import { randomItems } from "./randomItems";
-import { LEAD_PILE_START_COUNT } from "./Board";
+import { range } from "./range";
 import { PseudoRNG } from "./rng";
 
 export interface LeadCard extends Card<CardType.Lead> {
@@ -34,6 +34,15 @@ export function isLeadCard(maybe: unknown): maybe is LeadCard {
 		&& isLeadType(lc.leadType)
 		&& isEvidenceType(lc.evidenceType)
 		&& isEvidenceValue(lc.evidenceTarget);
+}
+
+export function leadCard(leadType: LeadType, evidenceType: EvidenceType, evidenceTarget: number): LeadCard {
+	return {
+		cardType: CardType.Lead,
+		evidenceTarget,
+		evidenceType,
+		leadType,
+	};
 }
 
 export const LEAD_CARDS: LeadCard[] = range(LEAD_CARD_TARGET_MIN, LEAD_CARD_TARGET_MAX)

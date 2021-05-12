@@ -17,7 +17,7 @@ import { isConfirmOutcome } from "./ConfirmAction";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
-import { EliminateStrategy } from "./EliminateStrategy";
+import { buildEliminateEffects, EliminateStrategy } from "./EliminateStrategy";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
@@ -35,7 +35,7 @@ import {
 	isDeadLeadInvestigateOutcome,
 	isGoodInvestigateOutcome,
 } from "./InvestigateAction";
-import { InvestigateStrategy } from "./InvestigateStrategy";
+import { buildEffectsForLeadWithCard, InvestigateStrategy } from "./InvestigateStrategy";
 import { formatLeadCard } from "./LeadCard";
 import { LEAD_TYPES } from "./LeadType";
 import { Logger, SILENT_LOGGER } from "./logger";
@@ -44,6 +44,7 @@ import { MysteryPile } from "./MysteryPile";
 import { OtherHand } from "./OtherHand";
 import { Outcome, OutcomeType, TypedOutcome } from "./Outcome";
 import { isPikeOutcome, PikeInspectorStrategy, PikeOutcome } from "./Pike";
+import { availableValuesByType } from "./playedEvidence";
 import { ActivePlayer, isSamePlayer, Player } from "./Player";
 import { isPursueOutcome, PursueOutcome } from "./PursueAction";
 import { range } from "./range";
@@ -150,16 +151,17 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 			blackwellTurn.blackwell.hand,
 			blackwellTurn.otherPlayers.flatMap(op => op.hand),
 		].flatMap(ecs => ecs);
+		const availableByType = availableValuesByType(blackwellTurn);
 		for (let i = 0; i < blackwellTurn.evidences.length; i++) {
 			const evidenceCard = blackwellTurn.evidences[i];
 			const mysteryCard = MysteryCard.fromEvidenceCard(evidenceCard);
 			const { evidenceType } = evidenceCard;
 			const effects: BotTurnEffectType[] = [];
 			for (const lead of leads.filter(l => l.leadCard.evidenceType === evidenceType)) {
-				const investigateEffects = this.investigateStrategy.buildEffectsForLeadWithCard(lead, mysteryCard);
+				const investigateEffects = buildEffectsForLeadWithCard(lead, mysteryCard, availableByType[evidenceType]);
 				effects.push(...investigateEffects);
 			}
-			const eliminateEffects = this.eliminateStrategy.buildEffects(mysteryCard, leads, otherCards, blackwellTurn, undefined);
+			const eliminateEffects = buildEliminateEffects(mysteryCard, leads.map(l => l.leadCard.evidenceType), otherCards, blackwellTurn, undefined, false);
 			effects.push(...eliminateEffects);
 			const score = this.evaluator.scoreEffects(effects, blackwellTurn);
 			votes[i] = score.score;

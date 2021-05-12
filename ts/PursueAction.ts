@@ -5,20 +5,19 @@ import { formatLeadCard, LeadCard } from "./LeadCard";
 import { isLeadType, LeadType } from "./LeadType";
 import { Outcome, OutcomeType } from "./Outcome";
 import { Player } from "./Player";
-import { TurnStart } from "./TurnStart";
 import { VisibleBoard } from "./VisibleBoard";
 
 export interface PursueAction extends Action {
-	actionType: ActionType.Pursue;
-	leadType: LeadType;
+	readonly actionType: ActionType.Pursue;
+	readonly leadType: LeadType;
 }
 
 export interface PursueOutcome extends Outcome {
-	action: PursueAction;
-	impossibleCount: number;
-	nextLead: LeadCard | undefined;
-	outcomeType: OutcomeType.Pursue;
-	returnedEvidence: EvidenceCard[];
+	readonly action: PursueAction;
+	readonly impossibleCount: number;
+	readonly nextLead: LeadCard | undefined;
+	readonly outcomeType: OutcomeType.Pursue;
+	readonly returnedEvidence: EvidenceCard[];
 }
 
 export function isPursueAction(maybe: unknown): maybe is PursueAction {

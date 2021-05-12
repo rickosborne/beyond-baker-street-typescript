@@ -12,7 +12,7 @@ import { LeadType } from "./LeadType";
 import { minus } from "./minus";
 import { MysteryCard } from "./MysteryCard";
 import { objectMap } from "./objectMap";
-import { playedEvidence } from "./playedEvidence";
+import { availableValuesByType, playedEvidence } from "./playedEvidence";
 import { summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unconfirmedLeads";
@@ -86,14 +86,12 @@ export class InvestigateStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Investigate;
 
 	public buildOptions(turn: TurnStart, bot: Bot): InvestigateOption[] {
-		const played = playedEvidence(turn);
-		const unavailableCardsByType: Record<EvidenceType, EvidenceCard[]> = groupBy(played, c => c.evidenceType);
-		const availableByType: Record<EvidenceType, EvidenceValue[]> = objectMap(unavailableCardsByType, cards => invertValues(...cards.map(c => c.evidenceValue)));
+		const availableByType = availableValuesByType(turn);
 		const options: InvestigateOption[] = [];
 		const hand = bot.hand;
 		for (const lead of unfinishedLeads(turn)) {
 			const evidenceType = lead.leadCard.evidenceType;
-			const availableEvidenceValues: EvidenceValue[] = availableByType[evidenceType] || EVIDENCE_CARD_VALUES;
+			const availableEvidenceValues: EvidenceValue[] = availableByType[evidenceType];
 			for (let handIndex = 0; handIndex < hand.length; handIndex++) {
 				const mysteryCard = hand[handIndex];
 				const effects = buildEffectsForLeadWithCard(lead, mysteryCard, availableEvidenceValues);
