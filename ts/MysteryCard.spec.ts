@@ -124,4 +124,40 @@ describe("MysteryCard", function () {
 		});
 		expectSingleCard(card, evidenceType, evidenceValue);
 	});
+
+	it("setExact works", function () {
+		const mysteryCard = new MysteryCard();
+		expect(mysteryCard.possibleCount).equals(24);
+		expect(mysteryCard.possibleValues).includes.members(EVIDENCE_CARD_VALUES);
+		expect(mysteryCard.possibleTypes).includes.members(EVIDENCE_TYPES);
+		mysteryCard.setExact(<EvidenceCard> { evidenceType: EvidenceType.Clue, evidenceValue: 6 });
+		expect(mysteryCard.possibleCount).equals(1);
+		expect(mysteryCard.possibleValues).has.members([6]);
+		expect(mysteryCard.possibleTypes).has.members([EvidenceType.Clue]);
+	});
+
+	it("setExact throws for impossible", function () {
+		const mysteryCard = new MysteryCard([EvidenceType.Clue], [6]);
+		expect(() => mysteryCard.setExact(<EvidenceCard> { evidenceType: EvidenceType.Clue, evidenceValue: 5 })).throws("cannot set exact");
+	});
+
+	it("setType throws for impossible", function () {
+		const mysteryCard = new MysteryCard([EvidenceType.Clue], [6]);
+		expect(() => mysteryCard.setType(EvidenceType.Track)).throws("cannot set type");
+	});
+
+	it("setType throws for impossible", function () {
+		const mysteryCard = new MysteryCard([EvidenceType.Clue], [6]);
+		expect(() => mysteryCard.setValue(1)).throws("cannot set value");
+	});
+
+	it("fromEvidenceCards does what it says", function () {
+		const mysteryCard = MysteryCard.fromEvidenceCards([
+			<EvidenceCard> { evidenceType: EvidenceType.Clue, evidenceValue: 5 },
+			<EvidenceCard> { evidenceType: EvidenceType.Document, evidenceValue: 4 },
+		]);
+		expect(mysteryCard.possibleCount).equals(2);
+		expect(mysteryCard.possibleValues).includes.members([ 4, 5 ]);
+		expect(mysteryCard.possibleTypes).includes.members([ EvidenceType.Clue, EvidenceType.Document ]);
+	});
 });
