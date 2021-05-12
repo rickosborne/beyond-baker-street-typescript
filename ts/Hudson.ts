@@ -44,6 +44,35 @@ export function formatHudsonOutcome(outcome: HudsonOutcome): string {
 	return formatHudsonAction(outcome.action, outcome.activePlayer, outcome.investigationMarker);
 }
 
+export function buildHudsonOptionForLeadAndImpossible(
+	impossibleEvidence: EvidenceCard,
+	leadGap: number,
+	evidenceValues: () => number[],
+): HudsonOption | undefined {
+	const evidenceValue = impossibleEvidence.evidenceValue;
+	const effects: BotTurnEffectType[] = [];
+	if (leadGap === evidenceValue) {
+		addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
+	} else if (leadGap > evidenceValue) {
+		const remain = leadGap - evidenceValue;
+		const values = evidenceValues();
+		if (summingPathsTo(remain, values) > 0) {
+			addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
+		}
+	}
+	if (effects.length > 0) {
+		return {
+			action: {
+				actionType: ActionType.Hudson,
+				impossibleEvidence,
+			},
+			effects,
+			strategyType: BotTurnStrategyType.Inspector,
+		};
+	}
+	return undefined;
+}
+
 export class HudsonInspectorStrategy extends InspectorStrategy {
 	public readonly inspectorType = InspectorType.Hudson;
 
@@ -59,26 +88,9 @@ export class HudsonInspectorStrategy extends InspectorStrategy {
 				if (impossibleEvidence.evidenceType !== evidenceType) {
 					continue;
 				}
-				const evidenceValue = impossibleEvidence.evidenceValue;
-				const effects: BotTurnEffectType[] = [];
-				if (leadGap === evidenceValue) {
-					addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
-				} else if (leadGap > evidenceValue) {
-					const remain = leadGap - evidenceValue;
-					const values = evidenceValues();
-					if (summingPathsTo(remain, values) > 0) {
-						addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmEventually);
-					}
-				}
-				if (effects.length > 0) {
-					options.push({
-						action: {
-							actionType: ActionType.Hudson,
-							impossibleEvidence,
-						},
-						effects,
-						strategyType: BotTurnStrategyType.Inspector,
-					});
+				const option = buildHudsonOptionForLeadAndImpossible(impossibleEvidence, leadGap, evidenceValues);
+				if (option != null) {
+					options.push(option);
 				}
 			}
 		}
