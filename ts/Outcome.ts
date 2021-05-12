@@ -18,9 +18,9 @@ export enum OutcomeType {
 }
 
 export interface Outcome {
-	action: Action;
-	activePlayer: Player;
-	outcomeType: OutcomeType;
+	readonly action: Action;
+	readonly activePlayer: Player;
+	readonly outcomeType: OutcomeType;
 }
 
 export interface TypedOutcome<T extends OutcomeType> extends Outcome {
