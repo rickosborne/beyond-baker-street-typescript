@@ -1,16 +1,9 @@
 import { AdlerInspectorStrategy } from "./Adler";
-import { isAssistValueOption } from "./AssistStrategy";
 import { BaskervilleInspectorStrategy } from "./Baskerville";
-import { EvidenceType } from "./EvidenceType";
 import { MonoFunction } from "./Function";
 import { HopeInspectorStrategy } from "./Hope";
 import { HudsonInspectorStrategy } from "./Hudson";
-import {
-	CannotIdentifyTypeInspectorStrategy,
-	InspectorStrategy,
-	OnOptionProcessingResult,
-	OptionProcessingInspectorStrategy,
-} from "./InspectorStrategy";
+import { InspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
 import { Logger } from "./logger";
 import { PikeInspectorStrategy } from "./Pike";
@@ -24,15 +17,15 @@ const INSPECTOR_STRATEGY_FUNCTION: Record<InspectorType, InspectorStrategyFactor
 	Baskerville: () => new BaskervilleInspectorStrategy(),
 	Baynes: () => undefined,
 	Blackwell: () => undefined,
-	Bradstreet: () => new CannotIdentifyTypeInspectorStrategy(InspectorType.Bradstreet, EvidenceType.Document),
-	Forrester: () => new CannotIdentifyTypeInspectorStrategy(InspectorType.Forrester, EvidenceType.Clue),
+	Bradstreet: () => undefined,
+	Forrester: () => undefined,
 	Gregson: () => undefined,
 	Hope: () => new HopeInspectorStrategy(),
-	Hopkins: () => new CannotIdentifyTypeInspectorStrategy(InspectorType.Hopkins, EvidenceType.Witness),
+	Hopkins: () => undefined,
 	Hudson: () => new HudsonInspectorStrategy(),
-	Jones: () => new CannotIdentifyTypeInspectorStrategy(InspectorType.Jones, EvidenceType.Track),
+	Jones: () => undefined,
 	Lestrade: () => undefined,
-	Martin: () => new OptionProcessingInspectorStrategy(InspectorType.Martin, isAssistValueOption, () => OnOptionProcessingResult.Remove),
+	Martin: () => undefined,
 	Morstan: () => undefined,
 	Pike: () => new PikeInspectorStrategy(),
 	Stoner: () => undefined,

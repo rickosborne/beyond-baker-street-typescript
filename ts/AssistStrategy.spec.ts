@@ -10,6 +10,7 @@ import {
 	buildAssistsForCard,
 	buildTypeAssistOption,
 	buildValueAssistOption,
+	canAssistWithType,
 	compareAssistedImpacts,
 	getPossibleAfterTypes,
 	getPossibleAfterValues,
@@ -18,12 +19,15 @@ import {
 	TypeAssistTurnOption,
 	ValueAssistTurnOption,
 } from "./AssistStrategy";
+import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnStrategyType } from "./BotTurn";
-import { CardType } from "./CardType";
-import { EvidenceCard } from "./EvidenceCard";
-import { EvidenceType } from "./EvidenceType";
+import { evidence, EVIDENCE_CARD_VALUES } from "./EvidenceCard";
+import { EVIDENCE_TYPES, EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
+import { InspectorType } from "./InspectorType";
+import { leadCard } from "./LeadCard";
 import { LeadType } from "./LeadType";
+import { UnknownCard } from "./MysteryCard";
 import { OtherHand } from "./OtherHand";
 import { OtherPlayer, Player } from "./Player";
 import { reduceOptions } from "./reduceOptions";
@@ -65,32 +69,48 @@ function playerNamed(name: string): OtherPlayer {
 	};
 }
 
+function unknownCard(
+	possibleTypes: EvidenceType[],
+	possibleValues: EvidenceValue[],
+	possibleCount = possibleTypes.length * possibleValues.length,
+): UnknownCard {
+	return {
+		possibleCount,
+		possibleTypes,
+		possibleValues,
+	};
+}
+
+type CanAssistExpectation = [InspectorType | undefined, EvidenceType, boolean];
+
+const CAN_ASSIST_EXPECTATIONS: CanAssistExpectation[] = [
+	[ undefined, EvidenceType.Clue, true ],
+	[ undefined, EvidenceType.Document, true ],
+	[ undefined, EvidenceType.Track, true ],
+	[ undefined, EvidenceType.Witness, true ],
+	[ InspectorType.Toby, EvidenceType.Witness, true ],
+	[ InspectorType.Bradstreet, EvidenceType.Witness, true ],
+	[ InspectorType.Bradstreet, EvidenceType.Document, false ],
+	[ InspectorType.Forrester, EvidenceType.Witness, true ],
+	[ InspectorType.Forrester, EvidenceType.Clue, false ],
+	[ InspectorType.Hopkins, EvidenceType.Witness, false ],
+	[ InspectorType.Hopkins, EvidenceType.Clue, true ],
+	[ InspectorType.Jones, EvidenceType.Track, false ],
+	[ InspectorType.Jones, EvidenceType.Clue, true ],
+];
 
 describe("AssistStrategy", function () {
 	it("assists type and value when both are unknown", function () {
-		const evidenceCard1: EvidenceCard = {
-			cardType: CardType.Evidence,
-			evidenceType: EvidenceType.Track,
-			evidenceValue: 1,
-		};
-		const evidenceCard2: EvidenceCard = {
-			cardType: CardType.Evidence,
-			evidenceType: EvidenceType.Witness,
-			evidenceValue: 3,
-		};
+		const evidenceCard1 = evidence(1, EvidenceType.Track);
+		const evidenceCard2 = evidence(3, EvidenceType.Witness);
 		const options = strategy.buildOptions(<TurnStart>{
 			askOtherPlayerAboutTheirHand: (otherPlayer: OtherPlayer): OtherHand => {
 				expect(otherPlayer.name).equals("other");
 				return {
-					hand: [ {
-						possibleCount: 3,
-						possibleTypes: [ EvidenceType.Track, EvidenceType.Witness ],
-						possibleValues: [ 1, 2 ],
-					}, {
-						possibleCount: 3,
-						possibleTypes: [EvidenceType.Witness],
-						possibleValues: [ 3, 4 ],
-					} ],
+					hand: [
+						unknownCard([ EvidenceType.Track, EvidenceType.Witness ], [ 1, 2 ], 3),
+						unknownCard([EvidenceType.Witness], [ 3, 4 ]),
+					],
 				};
 			},
 			board: {
@@ -100,32 +120,20 @@ describe("AssistStrategy", function () {
 						badValue: 0,
 						confirmed: false,
 						evidenceValue: 0,
-						leadCard: {
-							evidenceTarget: 8,
-							evidenceType: EvidenceType.Document,
-						},
+						leadCard: leadCard(LeadType.Motive, EvidenceType.Document, 8),
 					},
 					[LeadType.Opportunity]: {
 						badValue: 0,
 						confirmed: false,
-						evidenceCards: [{
-							evidenceType: EvidenceType.Track,
-							evidenceValue: 6,
-						}],
+						evidenceCards: [evidence(6, EvidenceType.Track)],
 						evidenceValue: 6,
-						leadCard: {
-							evidenceTarget: 7,
-							evidenceType: EvidenceType.Track,
-						},
+						leadCard: leadCard(LeadType.Opportunity, EvidenceType.Track, 7),
 					},
 					[LeadType.Suspect]: {
 						badValue: 0,
 						confirmed: false,
 						evidenceValue: 0,
-						leadCard: {
-							evidenceTarget: 10,
-							evidenceType: EvidenceType.Clue,
-						},
+						leadCard: leadCard(LeadType.Suspect, EvidenceType.Clue, 10),
 					},
 				},
 			},
@@ -139,6 +147,7 @@ describe("AssistStrategy", function () {
 			player: {
 				name: "active",
 			},
+		}, <Bot> {
 		});
 		expect(options).has.length(2);
 		const typeOption = options.filter(isAssistTypeOption)[0];
@@ -349,6 +358,14 @@ describe("AssistStrategy", function () {
 		});
 	});
 
+	describe("canAssistWithType", function () {
+		CAN_ASSIST_EXPECTATIONS.forEach(([ inspector, evidenceType, shouldBeAllowed ]) => {
+			it(`${inspector || "Unknown"} is${shouldBeAllowed ? "" : " not"} allowed ${evidenceType}`, function () {
+				expect(canAssistWithType(evidenceType, inspector), `${inspector || "Unknown"} ${evidenceType}`).equals(shouldBeAllowed);
+			});
+		});
+	});
+
 	describe("buildAssistsForCard", function () {
 		const turn = <TurnStart> {
 			board: {
@@ -360,39 +377,25 @@ describe("AssistStrategy", function () {
 
 		it("does not try to assist if the other player already knows the card", function () {
 			const cardKnowledge = <OtherCardKnowledge> {
-				evidenceCard: {
-					evidenceType: EvidenceType.Track,
-					evidenceValue: 1,
-				},
+				evidenceCard: evidence(1, EvidenceType.Track),
 				handIndex: 0,
-				unknownCard: {
-					possibleCount: 1,
-					possibleTypes: [EvidenceType.Track],
-					possibleValues: [6],
-				},
+				unknownCard: unknownCard([EvidenceType.Track], [6]),
 			};
-			const options = buildAssistsForCard(cardKnowledge, undefined as unknown as OtherPlayerKnowledge, <VisibleLead[]> [], turn);
+			const options = buildAssistsForCard(cardKnowledge, undefined as unknown as OtherPlayerKnowledge, <VisibleLead[]> [], turn, undefined);
 			expect(options).lengthOf(0);
 		});
 
 		it("builds type assist options when appropriate", function () {
 			const cardKnowledge = <OtherCardKnowledge> {
-				evidenceCard: {
-					evidenceType: EvidenceType.Track,
-					evidenceValue: 1,
-				},
+				evidenceCard: evidence(1, EvidenceType.Track),
 				handIndex: 0,
-				unknownCard: {
-					possibleCount: 2,
-					possibleTypes: [ EvidenceType.Track, EvidenceType.Witness ],
-					possibleValues: [1],
-				},
+				unknownCard: unknownCard([ EvidenceType.Track, EvidenceType.Witness ], [1]),
 			};
 			const playerKnowledge = <OtherPlayerKnowledge> {
 				knowledge: [cardKnowledge],
 				otherPlayer: playerNamed("other"),
 			};
-			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn);
+			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, undefined);
 			expect(options).lengthOf(1);
 			const type = options[0];
 			expect(type.action).includes({ evidenceType: EvidenceType.Track });
@@ -401,26 +404,61 @@ describe("AssistStrategy", function () {
 
 		it("builds value assist options when appropriate", function () {
 			const cardKnowledge = <OtherCardKnowledge> {
-				evidenceCard: {
-					evidenceType: EvidenceType.Track,
-					evidenceValue: 1,
-				},
+				evidenceCard: evidence(1, EvidenceType.Track),
 				handIndex: 0,
-				unknownCard: {
-					possibleCount: 2,
-					possibleTypes: [EvidenceType.Track],
-					possibleValues: [ 1, 6 ],
-				},
+				unknownCard: unknownCard([EvidenceType.Track], [ 1, 6 ]),
 			};
 			const playerKnowledge = <OtherPlayerKnowledge> {
 				knowledge: [cardKnowledge],
 				otherPlayer: playerNamed("other"),
 			};
-			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn);
+			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, undefined);
 			expect(options).lengthOf(1);
 			const value = options[0];
 			expect(value.action).includes({ evidenceValue: 1 });
 			expect(value.effects).has.members([ BotTurnEffectType.HolmesProgress, BotTurnEffectType.AssistKnown, BotTurnEffectType.AssistExactEliminate ]);
+		});
+
+		function testBoth(inspector: InspectorType | undefined, shouldSeeType: boolean, shouldSeeValue: boolean, evidenceType: EvidenceType = EvidenceType.Track): void {
+			const cardKnowledge = <OtherCardKnowledge> {
+				evidenceCard: evidence(1, evidenceType),
+				handIndex: 0,
+				unknownCard: unknownCard(EVIDENCE_TYPES, EVIDENCE_CARD_VALUES),
+			};
+			const playerKnowledge = <OtherPlayerKnowledge> {
+				knowledge: [cardKnowledge],
+				otherPlayer: playerNamed("other"),
+			};
+			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, inspector);
+			expect(options).lengthOf((shouldSeeValue ? 1 : 0) + (shouldSeeType ? 1 : 0));
+			const value = options.find(isAssistValueOption) as ValueAssistTurnOption;
+			if (shouldSeeValue) {
+				expect(value.action, "value.action").includes({ evidenceValue: 1 });
+				expect(value.effects, "value.effects").has.members([ BotTurnEffectType.HolmesProgress, BotTurnEffectType.AssistNarrow, BotTurnEffectType.AssistExactEliminate ]);
+			} else {
+				expect(value, "value").is.undefined;
+			}
+			const type = options.find(isAssistTypeOption) as TypeAssistTurnOption;
+			if (shouldSeeType) {
+				expect(type.action, "type.action").includes({ evidenceType });
+				expect(type.effects, "type.effects").has.members([ BotTurnEffectType.HolmesProgress, BotTurnEffectType.AssistNarrow, BotTurnEffectType.AssistExactEliminate, BotTurnEffectType.AssistImpossibleType ]);
+			} else {
+				expect(type, "type").is.undefined;
+			}
+		}
+
+		it("builds both when appropriate", function () {
+			testBoth(undefined, true, true);
+		});
+
+		it("does not build value assists for Martin", function () {
+			testBoth(InspectorType.Martin, true, false);
+		});
+
+		CAN_ASSIST_EXPECTATIONS.forEach(([ inspector, evidenceType, shouldBeAllowed ]) => {
+			it(`${shouldBeAllowed ? "builds" : "does not build"} ${evidenceType} assists for ${inspector || "Unknown"}`, function () {
+				testBoth(inspector, shouldBeAllowed, true, evidenceType);
+			});
 		});
 	});
 });

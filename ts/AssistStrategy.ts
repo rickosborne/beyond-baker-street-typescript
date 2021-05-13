@@ -7,23 +7,24 @@ import {
 } from "./askOtherPlayersAboutTheirHands";
 import {
 	AssistAction,
-	Assisted,
 	AssistType,
 	isTypeAssistAction,
 	isValueAssistAction,
 	TypeAssistAction,
 	ValueAssistAction,
 } from "./AssistAction";
+import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
 import { HOLMES_MOVE_PROGRESS, INVESTIGATION_MARKER_GOAL } from "./Game";
 import { addHolmesProgressEffects } from "./HolmesProgressEffect";
+import { InspectorType } from "./InspectorType";
 import { isSamePlayer, OtherPlayer, Player } from "./Player";
 import { CompareResult, reduceOptions } from "./reduceOptions";
 import { TurnStart } from "./TurnStart";
-import { VisibleLead } from "./VisibleBoard";
 import { unfinishedLeads } from "./unfinishedLeads";
+import { VisibleLead } from "./VisibleBoard";
 
 export interface AssistTurnOption extends BotTurnOption {
 	action: AssistAction;
@@ -70,7 +71,8 @@ export function compareAssistedImpacts(first: AssistAction, b: AssistAction): Co
 		return CompareResult.First;
 	} else if (bAfter === 1 && aAfter > 1) {
 		return CompareResult.Second;
-	} if (aAfter !== bAfter) {
+	}
+	if (aAfter !== bAfter) {
 		// positive means a is wider than b, so b is better
 		return aAfter > bAfter ? CompareResult.Second : CompareResult.First;
 	}
@@ -187,11 +189,19 @@ export function buildTypeAssistOption(
 	return assistType;
 }
 
+export function canAssistWithType(evidenceType: EvidenceType, inspector: InspectorType | undefined): boolean {
+	return !((inspector === InspectorType.Bradstreet && evidenceType === EvidenceType.Document)
+		|| (inspector === InspectorType.Forrester && evidenceType === EvidenceType.Clue)
+		|| (inspector === InspectorType.Hopkins && evidenceType === EvidenceType.Witness)
+		|| (inspector === InspectorType.Jones && evidenceType === EvidenceType.Track));
+}
+
 export function buildAssistsForCard(
 	otherCardKnowledge: OtherCardKnowledge,
 	otherPlayerKnowledge: OtherPlayerKnowledge,
 	leads: VisibleLead[],
 	turn: TurnStart,
+	inspector: InspectorType | undefined,
 ): AssistTurnOption[] {
 	const options: AssistTurnOption[] = [];
 	const { evidenceCard, unknownCard } = otherCardKnowledge;
@@ -210,10 +220,10 @@ export function buildAssistsForCard(
 	const { holmesLocation, investigationMarker } = turn.board;
 	const investigationGap = INVESTIGATION_MARKER_GOAL - investigationMarker;
 	const matchingLeads = leads.filter(lead => lead.leadCard.evidenceType === evidenceType);
-	if (!knowsType) {
+	if (!knowsType && canAssistWithType(evidenceType, inspector)) {
 		buildTypeAssistOption(otherPlayerKnowledge, evidenceType, possibleBefore, matchingLeads.length, knowsValue, otherPlayer, options);
 	}
-	if (!knowsValue) {
+	if (!knowsValue && inspector !== InspectorType.Martin) {
 		buildValueAssistOption(otherPlayerKnowledge, evidenceValue, possibleBefore, knowsType, otherPlayer, options);
 	}
 	addUsualAssistEffects(options, holmesLocation, otherPlayer, turn.nextPlayer, matchingLeads.length, investigationGap, evidenceValue);
@@ -224,9 +234,10 @@ export function buildAssistsForPlayer(
 	otherPlayerKnowledge: OtherPlayerKnowledge,
 	leads: VisibleLead[],
 	turn: TurnStart,
+	inspector: InspectorType | undefined,
 ): AssistTurnOption[] {
 	return otherPlayerKnowledge.knowledge
-		.flatMap(otherCardKnowledge => buildAssistsForCard(otherCardKnowledge, otherPlayerKnowledge, leads, turn))
+		.flatMap(otherCardKnowledge => buildAssistsForCard(otherCardKnowledge, otherPlayerKnowledge, leads, turn, inspector))
 		.reduce((options, option) => {
 			const existing = options.find(o => isSameAssistAction(o.action, option.action));
 			if (existing != null) {
@@ -241,10 +252,10 @@ export function buildAssistsForPlayer(
 export class AssistStrategy implements BotTurnStrategy {
 	public readonly strategyType = BotTurnStrategyType.Assist;
 
-	public buildOptions(turn: TurnStart): BotTurnOption[] {
+	public buildOptions(turn: TurnStart, bot: Bot): BotTurnOption[] {
 		const leads = unfinishedLeads(turn);
 		const options = askOtherPlayersAboutTheirHands(turn)
-			.flatMap(otherPlayerKnowledge => buildAssistsForPlayer(otherPlayerKnowledge, leads, turn));
+			.flatMap(otherPlayerKnowledge => buildAssistsForPlayer(otherPlayerKnowledge, leads, turn, bot.inspector));
 		return reduceOptions(options, compareAssistedImpacts);
 	}
 }

@@ -11,7 +11,7 @@ import {
 } from "./AssistAction";
 import { BaskervilleAction, BaskervilleOutcome, formatBaskervilleOutcome, isBaskervilleAction } from "./Baskerville";
 import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
-import { Board } from "./Board";
+import { BadOrGood, Board } from "./Board";
 import { CardType } from "./CardType";
 import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
 import { ConfirmAction, ConfirmOutcome, formatConfirm, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
@@ -202,7 +202,7 @@ export class Game {
 		private readonly prng: PseudoRNG = DEFAULT_PRNG,
 		private readonly logger: Logger = SILENT_LOGGER,
 	) {
-		this.board = new Board(caseFile, prng);
+		this.board = new Board(caseFile, prng, undefined);
 		this.players = players.map(p => new GamePlayer(p));
 		this.cardsPerPlayer = CARDS_PER_PLAYER[players.length];
 		if (isNaN(this.cardsPerPlayer)) {
@@ -374,9 +374,8 @@ export class Game {
 			throw new Error(`Unknown card index for ${activePlayer}: ${action.handIndex}`);
 		}
 		this.board.addImpossible(evidenceCard, activePlayer.inspector !== InspectorType.Lestrade);
-		const investigationMarker = this.board.moveInvestigationMarker(evidenceCard.evidenceValue);
 		this.checkGameCompletion();
-		const impossibleCards = this.board.impossibleCards;
+		const { impossibleCards, investigationMarker } = this.board;
 		const impossibleFaceDownCount = impossibleCards.filter(c => isLeadReverseCard(c)).length;
 		const outcome: EliminateOutcome = {
 			action,
@@ -410,10 +409,7 @@ export class Game {
 		if (!isPlayerInspector(activePlayer, InspectorType.Hudson)) {
 			throw new Error(`You're not Hudson: ${formatPlayer(activePlayer)}`);
 		}
-		const removedCount = this.board.removeFromImpossible(action.impossibleEvidence);
-		if (removedCount !== 1) {
-			throw new Error(`Expected to remove 1, but removed ${removedCount}`);
-		}
+		this.board.removeFromImpossible(action.impossibleEvidence);
 		this.returnEvidence([action.impossibleEvidence], true, BottomOrTop.Bottom, ReturnEvidenceVisibility.All);
 		const investigationMarker = this.board.investigationMarker;
 		const outcome: HudsonOutcome = {
@@ -428,12 +424,11 @@ export class Game {
 
 	private applyInvestigate(action: InvestigateAction, activePlayer: GamePlayer): InvestigateOutcome {
 		const evidenceCard = activePlayer.removeCardAt(action.handIndex);
-		const evidenceType = this.board.evidenceTypeFor(action.leadType);
 		if (evidenceCard == null) {
 			throw new Error(`Player ${activePlayer} does not have card for action ${action}`);
 		}
-		if (evidenceType !== evidenceCard.evidenceType) {
-			this.board.addBad(action.leadType, evidenceCard);
+		const badOrGood = this.board.addEvidence(action.leadType, evidenceCard);
+		if (badOrGood === BadOrGood.Bad) {
 			const badValue = this.board.calculateBadFor(action.leadType);
 			const targetValue = this.board.targetForLead(action.leadType);
 			const accumulatedValue = this.board.calculateEvidenceValueFor(action.leadType);
@@ -451,7 +446,6 @@ export class Game {
 			this.logger.info(() => formatBadInvestigateOutcome(outcome));
 			return outcome;
 		}
-		this.board.addEvidence(action.leadType, evidenceCard);
 		const gap = this.board.calculateGapFor(action.leadType);
 		if (gap < 0) {
 			const returnedEvidence = this.applyDeadLead(action.leadType, activePlayer.inspector);

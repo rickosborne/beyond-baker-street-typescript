@@ -14,12 +14,20 @@ export class Pile<C> {
 		this.cards.unshift(card);
 	}
 
+	public get bottomCard(): C | undefined {
+		return this.cards.length === 0 ? undefined : this.cards[this.cards.length - 1];
+	}
+
 	public get count(): number {
 		return this.cards.length;
 	}
 
 	public empty(): void {
 		this.cards.splice(0, this.cards.length);
+	}
+
+	public find(predicate: Predicate<C>): C | undefined {
+		return this.cards.find(predicate);
 	}
 
 	public removeIf(predicate: Predicate<C>): number {
@@ -49,6 +57,10 @@ export class Pile<C> {
 
 	public takeFromTop(): C | undefined {
 		return this.cards.shift();
+	}
+
+	public get topCard(): C | undefined {
+		return this.cards[0];
 	}
 
 	public toArray(): C[] {

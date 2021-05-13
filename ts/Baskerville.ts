@@ -11,7 +11,6 @@ import { Outcome, OutcomeType } from "./Outcome";
 import { Player, PlayerInspector } from "./Player";
 import { summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
-import { VisibleLead } from "./VisibleBoard";
 import { unfinishedLeads } from "./unfinishedLeads";
 
 export interface BaskervilleAction extends Action {
