@@ -319,10 +319,6 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		}
 	}
 
-	public setHandCount(handCount: number): void {
-		this.hand.splice(0, this.hand.length, ...range(1, handCount).map(() => new MysteryCard()));
-	}
-
 	public takeTurn(turnStart: TurnStart): Action {
 		this.assessGameState(turnStart);
 		const options = this.strategies.flatMap(s => s.buildOptions(turnStart, this));

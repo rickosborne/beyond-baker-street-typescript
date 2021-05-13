@@ -28,7 +28,6 @@ export interface ActivePlayer extends Player {
 	sawEvidenceDealt(player: Player): void;
 	sawEvidenceReturned(evidenceCards: EvidenceCard[], bottomOrTop: BottomOrTop, shuffle: boolean): void;
 	sawOutcome(outcome: Outcome): void;
-	setHandCount(handCount: number): void;
 	takeTurn(turnStart: TurnStart): Action;
 }
 

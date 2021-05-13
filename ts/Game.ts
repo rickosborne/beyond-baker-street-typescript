@@ -60,7 +60,7 @@ export enum GameState {
 	Won = "Won",
 }
 
-class GamePlayer implements OtherPlayer, ActivePlayer {
+export class GamePlayer implements OtherPlayer, ActivePlayer {
 	constructor(
 		public readonly player: ActivePlayer,
 		private readonly _hand: EvidenceCard[] = [],
@@ -116,10 +116,6 @@ class GamePlayer implements OtherPlayer, ActivePlayer {
 
 	public sawOutcome(outcome: Outcome): void {
 		this.player.sawOutcome(outcome);
-	}
-
-	public setHandCount(handCount: number): void {
-		this.player.setHandCount(handCount);
 	}
 
 	public takeTurn(turnStart: TurnStart): Action {
@@ -562,13 +558,13 @@ export class Game {
 			.filter(e => e != null) as EvidenceCard[];
 		let evidence: EvidenceCard | undefined;
 		if (evidences.length === 2 && isPlayerInspector(activePlayer, InspectorType.Blackwell)) {
-			const nextPlayer = this.playerAfter(activePlayer);
-			const blackwellChoice = nextPlayer.chooseForBlackwell({
+			const previousPlayer = this.playerToTheRight(activePlayer);
+			const blackwellChoice = previousPlayer.chooseForBlackwell({
 				askBlackwellAboutTheirHand: (): OtherHand => activePlayer.otherHand,
 				askOtherPlayerAboutTheirHand: (otherPlayer: OtherPlayer): OtherHand => {
 					const other = this.findPlayer(otherPlayer);
-					if (isSamePlayer(other, nextPlayer)) {
-						throw new Error(`Cannot ask about your own hand: ${nextPlayer}`);
+					if (isSamePlayer(other, previousPlayer)) {
+						throw new Error(`Cannot ask about your own hand: ${previousPlayer}`);
 					} else if (isSamePlayer(other, activePlayer)) {
 						throw new Error(`Blackwell player should be asked directly`);
 					}
@@ -577,7 +573,7 @@ export class Game {
 				blackwell: activePlayer,
 				board: this.board,
 				evidences,
-				otherPlayers: this.players.filter(p => p !== activePlayer && p !== nextPlayer),
+				otherPlayers: this.players.filter(p => p !== activePlayer && p !== previousPlayer),
 			});
 			this.returnEvidence([blackwellChoice.bury], false, BottomOrTop.Bottom, ReturnEvidenceVisibility.None);
 			evidence = blackwellChoice.keep;
@@ -605,8 +601,8 @@ export class Game {
 		return holmesLocation;
 	}
 
-	private playerAfter(activePlayer: GamePlayer): GamePlayer {
-		return this.players[(this.players.indexOf(activePlayer) + 1) % this.players.length];
+	private playerToTheRight(activePlayer: GamePlayer): GamePlayer {
+		return this.players[(this.players.indexOf(activePlayer) + this.players.length - 1) % this.players.length];
 	}
 
 	private returnEvidence(
