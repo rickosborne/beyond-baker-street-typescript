@@ -8,14 +8,14 @@ import {
 	formatEffectWeightOpsFromTypeDiff,
 	formatOrderedEffectWeightOpsFromType,
 } from "./defaultScores";
-import { EffectWeightOp } from "./EffectWeight";
+import { EFFECT_WEIGHT_MODIFIERS, EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
 import { formatDecimal } from "./formatDecimal";
 import { formatPercent } from "./formatPercent";
 import { GameWorkerPool } from "./GameWorkerPool";
 import { objectMap } from "./objectMap";
 import { randomItem } from "./randomItem";
 import { range } from "./range";
-import { DEFAULT_PRNG, PseudoRNG } from "./rng";
+import { DEFAULT_PRNG, PseudoRNG, randomInt } from "./rng";
 import { shuffleInPlace } from "./shuffle";
 import { stableJson } from "./stableJson";
 import { strictDeepEqual } from "./strictDeepEqual";
@@ -50,6 +50,7 @@ const db = new sqlite3(historyFileNameSqlite);
 db.pragma("journal_mode = WAL");
 const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
 const gameWorkerPool = new GameWorkerPool(isDebug ? 0 : 6);
+
 function quit(doExit = true): void {
 	console.log(`Closing ${historyFileNameSqlite}`);
 	gameWorkerPool.shutdown();
@@ -58,13 +59,16 @@ function quit(doExit = true): void {
 		process.exit();
 	}
 }
+
 process.on("beforeExit", () => quit(false));
 process.on("exit", () => quit(false));
 db.exec("CREATE TABLE IF NOT EXISTS weights_score (weights TEXT NOT NULL PRIMARY KEY, score DECIMAL(8,7))");
+
 interface SelectWeightsScore {
 	score: number;
 	weights: string;
 }
+
 const scoreForAttempt = (db => {
 	const selectScore = db.prepare<string>("SELECT score FROM weights_score WHERE (weights = ?)");
 	return function scoreForAttempt(attempt: string): number | undefined {
@@ -72,11 +76,13 @@ const scoreForAttempt = (db => {
 		return row?.score;
 	};
 })(db);
+
 function scoreForWeights(weights: Partial<EffectWeightOpsFromType>): number | undefined {
 	return scoreForAttempt(stableJson(weights));
 }
+
 const addAttemptScore = (db => {
-	const insertAttemptScore = db.prepare<[ string, number ]>("INSERT OR IGNORE INTO weights_score (weights, score) VALUES (?, ?)");
+	const insertAttemptScore = db.prepare<[string, number]>("INSERT OR IGNORE INTO weights_score (weights, score) VALUES (?, ?)");
 	return function addAttemptScore(attempt: string, score: number): number {
 		return insertAttemptScore.run(attempt, score).changes;
 	};
@@ -87,13 +93,18 @@ const findBestScores: () => SelectWeightsScore[] = (db => {
 	return function findBestScores(): SelectWeightsScore[] {
 		const score: number = selectLowestScore.get().s;
 		const allWeights: Partial<EffectWeightOpsFromType>[] = selectWeightsByScore.all(score).map(row => JSON.parse(row.weights));
-		return allWeights.map(weights => <SelectWeightsScore> {
+		return allWeights.map(weights => <SelectWeightsScore>{
 			score,
 			weights,
 		});
 	};
 })(db);
-interface SelectAttemptSummary { attempts: number; best: number; }
+
+interface SelectAttemptSummary {
+	attempts: number;
+	best: number;
+}
+
 const findAttemptSummary = (db => {
 	const selectAttemptSummary = db.prepare("SELECT COUNT(*) as attempts, MIN(score) as best FROM weights_score");
 	return function findAttemptSummary(): SelectAttemptSummary | undefined {
@@ -102,8 +113,7 @@ const findAttemptSummary = (db => {
 })(db);
 const iterations = 250;
 const IGNORE_TYPES = [ BotTurnEffectType.Win, BotTurnEffectType.Lose ];
-const MUTABLE_TYPES = (Object.keys(FLAT_SCORE_FROM_TYPE) as BotTurnEffectType[])
-	.filter((key: BotTurnEffectType) => !IGNORE_TYPES.includes(key));
+const MUTABLE_TYPES = BOT_TURN_EFFECT_TYPES.filter((key: BotTurnEffectType) => !IGNORE_TYPES.includes(key));
 
 function getAttemptSummary(): SelectAttemptSummary {
 	return findAttemptSummary() || {
@@ -141,7 +151,7 @@ function neighborsViaVariance(count: number, simRun: SimRun, temp: number, prng:
 			const override: Partial<EffectWeightOpsFromType> = {};
 			for (const effectType of MUTABLE_TYPES) {
 				const mod = randomItem(mods, prng);
-				const existing: EffectWeightOp[] = priorWeights[effectType] || FLAT_SCORE_FROM_TYPE[effectType];
+				const existing: EffectWeightFormula = priorWeights[effectType] || FLAT_SCORE_FROM_TYPE[effectType];
 				const updated = (existing[0] as number) + mod;
 				override[effectType] = [updated];
 			}
@@ -169,13 +179,14 @@ const neighborsViaSwap = (function (): NeighborsGenerator<SimRun> {
 	const allRuns: SimRun[] = [];
 	const maxDistance = 6;
 	return function neighborsViaSwap(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
-		function addRunIfNovel(weights: EffectWeightOpsFromType, ): void {
+		function addRunIfNovel(weights: EffectWeightOpsFromType,): void {
 			if (!strictDeepEqual(weights, simRun.weights) && scoreForWeights(weights) === undefined) {
 				allRuns.push({
 					weights,
 				});
 			}
 		}
+
 		if (!strictDeepEqual(previousRun, simRun)) {
 			previousRun = simRun;
 			allRuns.splice(0, allRuns.length);
@@ -246,6 +257,39 @@ const neighborsViaSwap = (function (): NeighborsGenerator<SimRun> {
 	};
 })();
 
+const modifiersPlusUndefined: (EffectWeightModifier | undefined)[] = EFFECT_WEIGHT_MODIFIERS.slice();
+modifiersPlusUndefined.push(undefined);
+
+function neighborsViaFormulae(count: number, state: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
+	const result: SimRun[] = [];
+	for (let effectsToModify = 1; effectsToModify <= 5; effectsToModify++) {
+		const effectTypes = shuffleInPlace(MUTABLE_TYPES.slice(), prng);
+		for (let effectStart = 0; effectStart < effectTypes.length - effectsToModify; effectStart++) {
+			const weights: Partial<EffectWeightOpsFromType> = {};
+			for (let effectNum = 0; effectNum < effectsToModify; effectNum++) {
+				const effectType = effectTypes[effectStart + effectNum];
+				let weight = state.weights[effectType];
+				if (weight == null) {
+					weight = DEFAULT_SCORE_FROM_TYPE[effectType];
+				}
+				const updatedModifier = randomItem(modifiersPlusUndefined);
+				if (updatedModifier == null) {
+					weights[effectType] = [weight[0] + randomInt(-10, 10)];
+				} else {
+					weights[effectType] = [ weight[0], updatedModifier ];
+				}
+			}
+			if (!strictDeepEqual(weights, state.weights) && scoreForWeights(weights) === undefined) {
+				result.push(<SimRun> { weights });
+			}
+		}
+		if (result.length >= count) {
+			return result;
+		}
+	}
+	return result;
+}
+
 function improvement(afterState: SimRun, afterEnergy: number, beforeState: SimRun, beforeEnergy: number, temp: number): void {
 	console.log(`${formatPercent(afterEnergy, 2)} < ${formatPercent(beforeEnergy, 2)} :: ${temp} :: ${formatEffectWeightOpsFromTypeDiff(afterState.weights, beforeState.weights)}`);
 }
@@ -266,7 +310,7 @@ function improvement(afterState: SimRun, afterEnergy: number, beforeState: SimRu
 // 	weights: HANDMADE_FROM_TYPE,
 // };
 // console.log(`Initial: ${initialState.lossRate == null ? "?" : formatPercent(initialState.lossRate, 2)}: ${formatOrderedEffectWeightOpsFromType(initialState.weights)}`);
-const initialFromBest = findBestScores().map(sws => <SimRun> {
+const initialFromBest = findBestScores().map(sws => <SimRun>{
 	lossRate: sws.score,
 	weights: sws.weights,
 });
@@ -287,12 +331,12 @@ async function optimize(
 	console.log(`Starting with ${summary.attempts} attempts, ${state.length} best${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}.`);
 	do {
 		const start = Date.now();
-		state = await anneal(<AnnealParams<SimRun>> {
+		state = await anneal(<AnnealParams<SimRun>>{
 			calculateEnergy,
 			formatState: (simRun, lossRate) => `${formatPercent(lossRate, 2)} ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`,
 			improvement,
 			initialState: state,
-			neighbors: neighborsViaSwap,
+			neighbors: neighborsViaFormulae,
 			prng: DEFAULT_PRNG,
 			temperature: temp => temp - 0.5,
 			temperatureMax: TEMP_MAX,

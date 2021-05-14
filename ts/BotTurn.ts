@@ -1,5 +1,6 @@
 import { Action } from "./Action";
 import { Bot } from "./Bot";
+import { enumKeys } from "./enumKeys";
 import { TurnStart } from "./TurnStart";
 
 export enum BotTurnEffectType {
@@ -51,7 +52,7 @@ export enum BotTurnEffectType {
 }
 
 // noinspection SuspiciousTypeOfGuard
-export const BOT_TURN_EFFECT_TYPES: BotTurnEffectType[] = Object.values(BotTurnEffectType).filter(v => typeof v === "string");
+export const BOT_TURN_EFFECT_TYPES: BotTurnEffectType[] = enumKeys<BotTurnEffectType>(BotTurnEffectType);
 
 export function isBotTurnEffectType(maybe: unknown): maybe is BotTurnEffectType {
 	return (maybe != null)
