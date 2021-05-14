@@ -45,7 +45,7 @@
 		"prereinstall": "npm run clean",
 		"recompileAndRun": "npm run compile ; npm run start",
 		"reinstall": "npm install",
-		"optimize": "ts-node ts/optimizeWeights.ts optimizeWithInspectors2",
+		"optimize": "ts-node ts/optimizeWeights.ts optimizeWithInspectors4",
 		"profile": "node js/index.js",
 		"start": "ts-node index.ts",
 		"test": "mocha --config .mocharc.json ts/*.spec.ts"

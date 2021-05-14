@@ -14,7 +14,11 @@ if (isMainThread || parentPort == null) {
 	pp.on("message", function onWorkerMessage(request) {
 		if (isPlayGameRequest(request)) {
 			// console.log(`PlayGameRequest @${workerNum} #${request.id}`);
-			const logger = cachingLoggerFactory();
+			const logger = cachingLoggerFactory({
+				info: true,
+				json: false,
+				trace: false,
+			});
 			let lossRate: number | undefined = undefined;
 			let errors: string | undefined = undefined;
 			try {

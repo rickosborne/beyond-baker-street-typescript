@@ -47,7 +47,6 @@ import { isPikeOutcome, PikeInspectorStrategy, PikeOutcome } from "./Pike";
 import { availableValuesByType } from "./playedEvidence";
 import { ActivePlayer, isSamePlayer, Player } from "./Player";
 import { isPursueOutcome, PursueOutcome } from "./PursueAction";
-import { range } from "./range";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { strategyForInspector } from "./StrategyForInspector";
 import { BottomOrTop, isTobyOutcome, TobyInspectorStrategy } from "./Toby";
@@ -132,17 +131,17 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 
 	private assessGameState(turnStart: TurnStart): void {
 		for (const otherPlayer of turnStart.otherPlayers) {
-			this.sawEvidences(otherPlayer.hand, `assessGameState hand ${otherPlayer.name}`);
+			this.sawEvidences(otherPlayer.hand);
 		}
 		const board = turnStart.board;
 		const leads = board.leads;
 		for (const leadType of LEAD_TYPES) {
 			const lead = leads[leadType];
-			this.sawEvidences(lead.badCards, `assessGameState lead ${leadType} bad`);
-			this.sawEvidences(lead.evidenceCards, `assessGameState lead ${leadType} good`);
+			this.sawEvidences(lead.badCards);
+			this.sawEvidences(lead.evidenceCards);
 		}
 		const impossible = board.impossibleCards;
-		this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[], "assessGameState impossible");
+		this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[]);
 	}
 
 	public chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice {
@@ -210,8 +209,8 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		this.hand.splice(index, 1);
 	}
 
-	private returnEvidence(evidenceCard: EvidenceCard, context: string): void {
-		this.sawEvidence(evidenceCard, context);
+	private returnEvidence(evidenceCard: EvidenceCard): void {
+		this.sawEvidence(evidenceCard);
 		this.remainingEvidence.add(evidenceCard);
 	}
 
@@ -228,7 +227,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	}
 
 	private sawBadInvestigate(outcome: BadInvestigateOutcome): void {
-		this.sawEvidence(outcome.evidenceCard, "sawBadInvestigate");
+		this.sawEvidence(outcome.evidenceCard);
 	}
 
 	private sawBaskerville(): void {
@@ -238,18 +237,18 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	}
 
 	private sawDeadLead(outcome: DeadLeadInvestigateOutcome): void {
-		this.returnEvidence(outcome.evidenceCard, "sawDeadLead evidenceCard");
+		this.returnEvidence(outcome.evidenceCard);
 		for (const evidenceCard of outcome.returnedEvidence) {
-			this.returnEvidence(evidenceCard, "sawDeadLead returnedEvidence");
+			this.returnEvidence(evidenceCard);
 		}
 	}
 
 	private sawEliminate(outcome: EliminateOutcome): void {
-		this.sawEvidence(outcome.evidenceCard, "sawEliminate");
+		this.sawEvidence(outcome.evidenceCard);
 	}
 
-	private sawEvidence(evidenceCard: EvidenceCard, context: string): void {
-		this.remainingEvidence.eliminate(evidenceCard, context);
+	private sawEvidence(evidenceCard: EvidenceCard): void {
+		this.remainingEvidence.eliminate(evidenceCard);
 		for (const mysteryCard of this.hand) {
 			mysteryCard.eliminateCard(evidenceCard);
 		}
@@ -268,14 +267,14 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		}
 	}
 
-	private sawEvidences(evidenceCards: EvidenceCard[], context: string): void {
+	private sawEvidences(evidenceCards: EvidenceCard[]): void {
 		for (const evidenceCard of evidenceCards) {
-			this.sawEvidence(evidenceCard, context);
+			this.sawEvidence(evidenceCard);
 		}
 	}
 
 	private sawGoodInvestigate(outcome: GoodInvestigateOutcome): void {
-		this.sawEvidence(outcome.evidenceCard, "sawGoodInvestigate");
+		this.sawEvidence(outcome.evidenceCard);
 	}
 
 	private sawHope(outcome: HopeOutcome): void {
@@ -315,7 +314,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 
 	private sawPursue(outcome: PursueOutcome): void {
 		for (const evidenceCard of outcome.returnedEvidence) {
-			this.returnEvidence(evidenceCard, "sawPursue");
+			this.returnEvidence(evidenceCard);
 		}
 	}
 
@@ -378,7 +377,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 			}
 			const evidenceCard = mysteryCard.asEvidence();
 			if (evidenceCard != null) {
-				this.sawEvidence(evidenceCard, `wasTypeOrValueAssisted ${tv}`);
+				this.sawEvidence(evidenceCard);
 			}
 		}
 	}

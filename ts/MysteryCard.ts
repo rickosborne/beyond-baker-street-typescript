@@ -10,12 +10,11 @@ export interface UnknownCard {
 	possibleValues: EvidenceValue[];
 }
 
-type ValueFlags = [ boolean, boolean, boolean, boolean, boolean, boolean, boolean ];
+type ValueFlags = [boolean, boolean, boolean, boolean, boolean, boolean, boolean];
 const ALL_FALSE_VALUE_FLAGS: ValueFlags = [ false, false, false, false, false, false, false ];
 
 export class MysteryCard implements UnknownCard {
 	private _evidence: EvidenceCard | undefined;
-	private readonly _log: string[] = [];
 	private readonly possible: Record<EvidenceType, ValueFlags> = {
 		[EvidenceType.Witness]: ALL_FALSE_VALUE_FLAGS.slice() as ValueFlags,
 		[EvidenceType.Clue]: ALL_FALSE_VALUE_FLAGS.slice() as ValueFlags,
@@ -47,18 +46,16 @@ export class MysteryCard implements UnknownCard {
 		const cardType = CardType.Evidence;
 		for (const evidenceValue of possibleValues) {
 			for (const evidenceType of possibleTypes) {
-				this.addPossible(<EvidenceCard> {
+				this.addPossible(<EvidenceCard>{
 					cardType,
 					evidenceType,
 					evidenceValue,
 				});
 			}
 		}
-		this.log(`${formatMysteryCard(this)} << ${possibleTypes === EVIDENCE_TYPES ? "*" : possibleTypes.join("|")}:${possibleValues === EVIDENCE_CARD_VALUES ? "*" : possibleValues.join("|")}`);
 	}
 
 	private addPossible(...evidenceCards: EvidenceCard[]): void {
-		this.log(`addPossible ${evidenceCards.map(c => formatEvidence(c)).join(", ")}`);
 		for (const evidenceCard of evidenceCards) {
 			const evidenceType = evidenceCard.evidenceType;
 			const evidenceValue = evidenceCard.evidenceValue;
@@ -108,7 +105,6 @@ export class MysteryCard implements UnknownCard {
 		this.uniqueTypes.clear();
 		this.uniqueValues.clear();
 		EVIDENCE_CARD_VALUES.forEach(v => this.valueCounts[v] = 0);
-		this.log(`clear ${formatMysteryCard(this)}`);
 	}
 
 	public couldBe(evidenceCard: EvidenceCard): boolean {
@@ -125,24 +121,15 @@ export class MysteryCard implements UnknownCard {
 
 	public eliminateCard(evidenceCard: EvidenceCard): void {
 		if (this.possibleCount > 1) {
-			const formatBefore = formatMysteryCard(this);
 			const evidenceType = evidenceCard.evidenceType;
 			const evidenceValue = evidenceCard.evidenceValue;
-			if (this.eliminateTypeAndValue(evidenceType, evidenceValue)) {
-				this.log(`eliminateCard ${formatEvidence(evidenceCard)}: ${formatBefore} => ${formatMysteryCard(this)}`);
-			}
+			this.eliminateTypeAndValue(evidenceType, evidenceValue);
 		}
 	}
 
 	public eliminateType(evidenceType: EvidenceType): void {
-		let anyEliminated = false;
-		const formatBefore = formatMysteryCard(this);
 		for (const evidenceValue of EVIDENCE_CARD_VALUES) {
-			const eliminated = this.eliminateTypeAndValue(evidenceType, evidenceValue);
-			anyEliminated ||= eliminated;
-		}
-		if (anyEliminated) {
-			this.log(`eliminateType ${evidenceType}: ${formatBefore} => ${formatMysteryCard(this)}`);
+			this.eliminateTypeAndValue(evidenceType, evidenceValue);
 		}
 	}
 
@@ -174,19 +161,9 @@ export class MysteryCard implements UnknownCard {
 	}
 
 	public eliminateValue(evidenceValue: EvidenceValue): void {
-		let anyEliminated = false;
-		const formatBefore = formatMysteryCard(this);
 		for (const evidenceType of EVIDENCE_TYPES) {
-			const eliminated = this.eliminateTypeAndValue(evidenceType, evidenceValue);
-			anyEliminated ||= eliminated;
+			this.eliminateTypeAndValue(evidenceType, evidenceValue);
 		}
-		if (anyEliminated) {
-			this.log(`eliminateValue ${evidenceValue}: ${formatBefore} => ${formatMysteryCard(this)}`);
-		}
-	}
-
-	private log(message: string): void {
-		this._log.push(message);
 	}
 
 	public get isKnown(): boolean {
@@ -219,32 +196,23 @@ export class MysteryCard implements UnknownCard {
 		this.uniqueTypes.add(evidenceType);
 		this.uniqueValues.add(evidenceValue);
 		this.valueCounts[evidenceValue] = 1;
-		this.log(`setExact ${formatEvidence(evidenceCard)}: ${formatBefore} => ${formatMysteryCard(this)}`);
 	}
 
 	public setType(evidenceType: EvidenceType): void {
-		const formatBefore = formatMysteryCard(this);
-		let anyEliminated = false;
 		if (!this.couldBeType(evidenceType)) {
-			throw new Error(`Mystery card ${formatBefore} cannot set type ${evidenceType}`);
+			throw new Error(`Mystery card ${formatMysteryCard(this)} cannot set type ${evidenceType}`);
 		}
 		for (const et of EVIDENCE_TYPES) {
 			if (et === evidenceType) {
 				continue;
 			}
 			for (const evidenceValue of EVIDENCE_CARD_VALUES) {
-				const eliminated = this.eliminateTypeAndValue(et, evidenceValue);
-				anyEliminated ||= eliminated;
+				this.eliminateTypeAndValue(et, evidenceValue);
 			}
-		}
-		if (anyEliminated) {
-			this.log(`setType ${evidenceType}: ${formatBefore} => ${formatMysteryCard(this)}`);
 		}
 	}
 
 	public setValue(value: EvidenceValue): void {
-		const formatBefore = formatMysteryCard(this);
-		let anyEliminated = false;
 		if (!this.couldBeValue(value)) {
 			throw new Error(`Mystery card ${formatMysteryCard(this)} cannot set value ${value}`);
 		}
@@ -253,12 +221,8 @@ export class MysteryCard implements UnknownCard {
 				continue;
 			}
 			for (const evidenceType of EVIDENCE_TYPES) {
-				const eliminated = this.eliminateTypeAndValue(evidenceType, evidenceValue);
-				anyEliminated ||= eliminated;
+				this.eliminateTypeAndValue(evidenceType, evidenceValue);
 			}
-		}
-		if (anyEliminated) {
-			this.log(`setValue ${value}: ${formatBefore} => ${formatMysteryCard(this)}`);
 		}
 	}
 
@@ -285,7 +249,8 @@ function formatPart<T>(possible: T[], all: T[]): string {
 		return "*";
 	} else if (possible.length === all.length - 1) {
 		return "!" + all.filter(t => !possible.includes(t)).join();
-	} else {			return possible.join("|");
+	} else {
+		return possible.join("|");
 	}
 }
 

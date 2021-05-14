@@ -3,6 +3,7 @@ import { Bot } from "./Bot";
 import { TurnStart } from "./TurnStart";
 
 export enum BotTurnEffectType {
+	AssistNotHope = "AssistNotHope",
 	AssistExactEliminate = "AssistExactEliminate",
 	AssistImpossibleType = "AssistImpossibleType",
 	AssistKnown = "AssistKnown",
@@ -10,6 +11,7 @@ export enum BotTurnEffectType {
 	AssistNextPlayer = "AssistNextPlayer",
 	Confirm = "Confirm",
 	ConfirmEventually = "ConfirmEventually",
+	ConfirmNotBaynes = "ConfirmNotBaynes",
 	ConfirmReady = "ConfirmReady",
 	EliminateKnownValueUnusedType = "EliminateKnownValueUnusedType",
 	EliminateKnownValueUsedType = "EliminateKnownValueUsedType",
@@ -48,42 +50,8 @@ export enum BotTurnEffectType {
 	Win = "Win",
 }
 
-export const BOT_TURN_EFFECT_TYPES: BotTurnEffectType[] = [
-	BotTurnEffectType.AssistExactEliminate,
-	BotTurnEffectType.AssistImpossibleType,
-	BotTurnEffectType.AssistKnown,
-	BotTurnEffectType.AssistNarrow,
-	BotTurnEffectType.AssistNextPlayer,
-	BotTurnEffectType.Confirm,
-	BotTurnEffectType.ConfirmEventually,
-	BotTurnEffectType.ConfirmReady,
-	BotTurnEffectType.EliminateKnownValueUnusedType,
-	BotTurnEffectType.EliminateKnownValueUsedType,
-	BotTurnEffectType.EliminateSetsUpExact,
-	BotTurnEffectType.EliminateStompsExact,
-	BotTurnEffectType.EliminateUnknownValueUnusedType,
-	BotTurnEffectType.EliminateUnknownValueUsedType,
-	BotTurnEffectType.EliminateWild,
-	BotTurnEffectType.HolmesImpeded,
-	BotTurnEffectType.HolmesProgress,
-	BotTurnEffectType.ImpossibleAdded,
-	BotTurnEffectType.InvestigateBadOnWedged,
-	BotTurnEffectType.InvestigateCorrectType,
-	BotTurnEffectType.InvestigateCorrectValue,
-	BotTurnEffectType.InvestigateMaybeBad,
-	BotTurnEffectType.InvestigatePerfect,
-	BotTurnEffectType.InvestigateWild,
-	BotTurnEffectType.InvestigationComplete,
-	BotTurnEffectType.Lose,
-	BotTurnEffectType.MaybeLose,
-	BotTurnEffectType.PursueConfirmable,
-	BotTurnEffectType.PursueDuplicate,
-	BotTurnEffectType.PursueImpossible,
-	BotTurnEffectType.PursueMaybe,
-	BotTurnEffectType.PursuePossible,
-	BotTurnEffectType.Toby,
-	BotTurnEffectType.Win,
-];
+// noinspection SuspiciousTypeOfGuard
+export const BOT_TURN_EFFECT_TYPES: BotTurnEffectType[] = Object.values(BotTurnEffectType).filter(v => typeof v === "string");
 
 export function isBotTurnEffectType(maybe: unknown): maybe is BotTurnEffectType {
 	return (maybe != null)

@@ -54,7 +54,9 @@ export class BoardLead implements VisibleLead {
 	}
 
 	public confirm(): void {
-		if ((this.badValue + this.leadCard.evidenceTarget) !== this.evidenceValue) {
+		const total = this.badValue + this.leadCard.evidenceTarget;
+		const allowable = [ total, total - 1 ];
+		if (!allowable.includes(this.evidenceValue)) {
 			throw new Error(`Tried to confirm a lead where the evidence doesn't add up`);
 		}
 		this._confirmed = true;

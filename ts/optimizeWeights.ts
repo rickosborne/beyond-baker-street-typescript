@@ -1,7 +1,7 @@
 import * as sqlite3 from "better-sqlite3";
 import * as process from "process";
 import { anneal, AnnealParams, NeighborsGenerator } from "./anneal";
-import { BotTurnEffectType } from "./BotTurn";
+import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType } from "./BotTurn";
 import {
 	DEFAULT_SCORE_FROM_TYPE,
 	EffectWeightOpsFromType,
@@ -19,50 +19,14 @@ import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { shuffleInPlace } from "./shuffle";
 import { stableJson } from "./stableJson";
 import { strictDeepEqual } from "./strictDeepEqual";
+import { toRecord } from "./toRecord";
 
 interface SimRun {
 	lossRate?: number;
 	weights: Partial<EffectWeightOpsFromType>;
 }
 
-const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
-	[BotTurnEffectType.Win]: [1000],
-	[BotTurnEffectType.ConfirmReady]: [0],
-	[BotTurnEffectType.ConfirmEventually]: [0],
-	[BotTurnEffectType.InvestigationComplete]: [0],
-	[BotTurnEffectType.InvestigatePerfect]: [0],
-	[BotTurnEffectType.PursueImpossible]: [0],
-	[BotTurnEffectType.AssistExactEliminate]: [0],
-	[BotTurnEffectType.PursueDuplicate]: [0],
-	[BotTurnEffectType.EliminateKnownValueUnusedType]: [0],
-	[BotTurnEffectType.EliminateUnknownValueUnusedType]: [0],
-	[BotTurnEffectType.AssistKnown]: [0],
-	[BotTurnEffectType.InvestigateCorrectType]: [0],
-	[BotTurnEffectType.EliminateSetsUpExact]: [0],
-	[BotTurnEffectType.Confirm]: [0],
-	[BotTurnEffectType.HolmesImpeded]: [0],
-	[BotTurnEffectType.AssistImpossibleType]: [0],
-	[BotTurnEffectType.AssistNarrow]: [0],
-	[BotTurnEffectType.AssistNextPlayer]: [0],
-	[BotTurnEffectType.InvestigateCorrectValue]: [0],
-	[BotTurnEffectType.ImpossibleAdded]: [0],
-	[BotTurnEffectType.HolmesProgress]: [0],
-	[BotTurnEffectType.InvestigateMaybeBad]: [0],
-	[BotTurnEffectType.InvestigateWild]: [0],
-	[BotTurnEffectType.InvestigateBadOnWedged]: [0],
-	[BotTurnEffectType.InvestigateBadOnUnwedged]: [0],
-	[BotTurnEffectType.InvestigateUnwedgeWithBad]: [0],
-	[BotTurnEffectType.InvestigateWouldWedge]: [0],
-	[BotTurnEffectType.EliminateUnknownValueUsedType]: [0],
-	[BotTurnEffectType.PursueMaybe]: [0],
-	[BotTurnEffectType.EliminateKnownValueUsedType]: [0],
-	[BotTurnEffectType.EliminateStompsExact]: [0],
-	[BotTurnEffectType.EliminateWild]: [0],
-	[BotTurnEffectType.MaybeLose]: [0],
-	[BotTurnEffectType.PursuePossible]: [0],
-	[BotTurnEffectType.Toby]: [0],
-	[BotTurnEffectType.Lose]: [-1000],
-};
+const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = toRecord(BOT_TURN_EFFECT_TYPES, k => k, t => [t === BotTurnEffectType.Win ? 1000 : t === BotTurnEffectType.Lose ? -1000 : 0]);
 // 90.8% InvestigatePerfect:145 > InvestigateWild:77 > Confirm:75 > PursueImpossible:48 > AssistKnown:46
 // > EliminateSetsUpExact:42 > AssistNextPlayer:31 > AssistExactEliminate:25 > EliminateUnusedType:23
 // > EliminateUnknownValue:19 > AssistImpossibleType:18 > PursueDuplicate:16 > EliminateStompsExact:15
@@ -307,7 +271,7 @@ const initialFromBest = findBestScores().map(sws => <SimRun> {
 	weights: sws.weights,
 });
 const initialState: SimRun[] = initialFromBest.length > 0 ? initialFromBest : [{
-	weights: FLAT_SCORE_FROM_TYPE,
+	weights: DEFAULT_SCORE_FROM_TYPE,
 }];
 
 initialState.forEach(state => {

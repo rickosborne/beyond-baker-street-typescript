@@ -36,6 +36,7 @@ export function buildConfirmOption(
 export function buildConfirmOptionForLead(
 	lead: VisibleLead,
 	inspectorType: InspectorType | undefined,
+	otherPlayerIsBaynes: boolean,
 	unfinishedCount: number,
 	investigationMarker: number,
 ): ConfirmOption | undefined {
@@ -51,6 +52,8 @@ export function buildConfirmOptionForLead(
 		if (inspectorType === InspectorType.Baynes) {
 			// add it a second time, for twice the impact!
 			addEffectsEvenIfDuplicate(effects, BotTurnEffectType.HolmesImpeded);
+		} else if (otherPlayerIsBaynes) {
+			addEffectsIfNotPresent(effects, BotTurnEffectType.ConfirmNotBaynes);
 		}
 		if (unfinishedCount === 1) {
 			if (investigationMarker === INVESTIGATION_MARKER_GOAL) {
@@ -70,8 +73,9 @@ export class ConfirmStrategy implements BotTurnStrategy {
 	public buildOptions(turn: TurnStart, bot: Bot): BotTurnOption[] {
 		const options: BotTurnOption[] = [];
 		const unfinished = unconfirmedLeads(turn);
+		const otherPlayerIsBaynes = turn.otherPlayers.find(op => op.inspector === InspectorType.Baynes) != null;
 		for (const lead of unfinished) {
-			const option = buildConfirmOptionForLead(lead, bot.inspector, unfinished.length, turn.board.investigationMarker);
+			const option = buildConfirmOptionForLead(lead, bot.inspector, otherPlayerIsBaynes, unfinished.length, turn.board.investigationMarker);
 			if (option != null) {
 				options.push(option);
 			}

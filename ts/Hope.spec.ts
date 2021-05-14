@@ -71,7 +71,7 @@ describe("HopeInspectorStrategy", function () {
 			const options: BotTurnOption[] = [ t1, v1, t2, v2 ];
 			strategy.processOptions(options);
 			const assistOptions = options.filter(o => o.strategyType === BotTurnStrategyType.Assist);
-			expect(assistOptions).has.members([ t1, v1, t2, v2 ]);
+			expect(assistOptions).empty;
 			const hopes = options.filter(o => o.strategyType === BotTurnStrategyType.Inspector && o.action.actionType === ActionType.Hope) as HopeOption[];
 			expect(hopes).lengthOf(6);
 			expect(hopes.filter(o => o.action.assists[0] === t1.action && o.action.assists[1] === v1.action)[0].effects).has.members([ BotTurnEffectType.AssistNextPlayer, BotTurnEffectType.AssistImpossibleType, BotTurnEffectType.HolmesProgress, BotTurnEffectType.AssistExactEliminate ]);

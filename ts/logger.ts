@@ -39,19 +39,20 @@ export type CachingLogger = Logger & {
 };
 
 // noinspection JSUnusedGlobalSymbols
-export function cachingLoggerFactory(): CachingLogger {
+export function cachingLoggerFactory(levels: Record<LogLevel, boolean>): CachingLogger {
 	const messages: LogWithLevel[] = [];
 	const log = (level: LogLevel) => (messageBuilder: () => string) => messages.push({
 		level,
 		message: typeof messageBuilder === "function" ? messageBuilder() : JSON.stringify(messageBuilder),
 		time: Date.now(),
 	});
-	return {
-		info: log(LogLevel.info),
-		json: log(LogLevel.json),
-		messages,
-		trace: log(LogLevel.trace),
-	};
+	const drop = () => void(0);
+	const effective: Record<LogLevel, boolean> = Object.assign({
+		[LogLevel.info]: true,
+		[LogLevel.json]: true,
+		[LogLevel.trace]: true,
+	}, levels);
+	return Object.assign({ messages }, objectMap(effective, (loud, level) => loud ? log(level) : drop));
 }
 
 export function buildLogger(levels: Record<LogLevel, boolean>): Logger {

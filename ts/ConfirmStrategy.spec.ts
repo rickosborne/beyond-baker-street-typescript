@@ -6,6 +6,7 @@ import { BotTurnEffectType, BotTurnStrategyType } from "./BotTurn";
 import { ConfirmOption, ConfirmStrategy } from "./ConfirmStrategy";
 import { InspectorType } from "./InspectorType";
 import { LeadType } from "./LeadType";
+import { OtherPlayer } from "./Player";
 import { TurnStart } from "./TurnStart";
 import { VisibleLead } from "./VisibleBoard";
 
@@ -63,6 +64,7 @@ function turn(
 				[LeadType.Suspect]: suspect,
 			},
 		},
+		otherPlayers: [] as OtherPlayer[],
 	};
 }
 

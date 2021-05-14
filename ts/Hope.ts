@@ -9,6 +9,7 @@ import { InspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
 import { Outcome, OutcomeType } from "./Outcome";
 import { Player, PlayerInspector } from "./Player";
+import { removeIf } from "./removeIf";
 
 export interface HopeAction extends Action {
 	actionType: ActionType.Hope;
@@ -91,6 +92,7 @@ export class HopeInspectorStrategy extends InspectorStrategy {
 				const effects = unifyEffectsForAssists(pair);
 				return buildHopeOptionForActions(actions, effects);
 			});
+		removeIf(options, isAssistOption);  // Only dual-assist
 		options.push(...hopeOptions);
 	}
 }

@@ -139,6 +139,7 @@ export function addUsualAssistEffects(
 	matchingLeadCount: number,
 	investigationGap: number,
 	evidenceValue: number,
+	otherPlayerIsHope: boolean,
 ): void {
 	for (const option of options) {
 		addHolmesProgressEffects(option.effects, HOLMES_MOVE_PROGRESS, holmesLocation);
@@ -147,6 +148,9 @@ export function addUsualAssistEffects(
 		}
 		if (matchingLeadCount === 0 && (investigationGap === evidenceValue)) {
 			addEffectsIfNotPresent(option.effects, BotTurnEffectType.AssistExactEliminate);
+		}
+		if (otherPlayerIsHope) {
+			addEffectsIfNotPresent(option.effects, BotTurnEffectType.AssistNotHope);
 		}
 	}
 }
@@ -202,6 +206,7 @@ export function buildAssistsForCard(
 	leads: VisibleLead[],
 	turn: TurnStart,
 	inspector: InspectorType | undefined,
+	otherPlayerIsHope: boolean,
 ): AssistTurnOption[] {
 	const options: AssistTurnOption[] = [];
 	const { evidenceCard, unknownCard } = otherCardKnowledge;
@@ -226,7 +231,7 @@ export function buildAssistsForCard(
 	if (!knowsValue && inspector !== InspectorType.Martin) {
 		buildValueAssistOption(otherPlayerKnowledge, evidenceValue, possibleBefore, knowsType, otherPlayer, options);
 	}
-	addUsualAssistEffects(options, holmesLocation, otherPlayer, turn.nextPlayer, matchingLeads.length, investigationGap, evidenceValue);
+	addUsualAssistEffects(options, holmesLocation, otherPlayer, turn.nextPlayer, matchingLeads.length, investigationGap, evidenceValue, otherPlayerIsHope);
 	return options;
 }
 
@@ -235,9 +240,10 @@ export function buildAssistsForPlayer(
 	leads: VisibleLead[],
 	turn: TurnStart,
 	inspector: InspectorType | undefined,
+	otherPlayerIsHope: boolean,
 ): AssistTurnOption[] {
 	return otherPlayerKnowledge.knowledge
-		.flatMap(otherCardKnowledge => buildAssistsForCard(otherCardKnowledge, otherPlayerKnowledge, leads, turn, inspector))
+		.flatMap(otherCardKnowledge => buildAssistsForCard(otherCardKnowledge, otherPlayerKnowledge, leads, turn, inspector, otherPlayerIsHope))
 		.reduce((options, option) => {
 			const existing = options.find(o => isSameAssistAction(o.action, option.action));
 			if (existing != null) {
@@ -254,8 +260,9 @@ export class AssistStrategy implements BotTurnStrategy {
 
 	public buildOptions(turn: TurnStart, bot: Bot): BotTurnOption[] {
 		const leads = unfinishedLeads(turn);
+		const otherPlayerIsHope = turn.otherPlayers.find(op => op.inspector === InspectorType.Hope) != null;
 		const options = askOtherPlayersAboutTheirHands(turn)
-			.flatMap(otherPlayerKnowledge => buildAssistsForPlayer(otherPlayerKnowledge, leads, turn, bot.inspector));
+			.flatMap(otherPlayerKnowledge => buildAssistsForPlayer(otherPlayerKnowledge, leads, turn, bot.inspector, otherPlayerIsHope));
 		return reduceOptions(options, compareAssistedImpacts);
 	}
 }

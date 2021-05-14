@@ -168,7 +168,7 @@ describe("AssistStrategy", function () {
 		it("adds AssistNextPlayer if necessary", function () {
 			const option: Partial<AssistTurnOption> = mockOption();
 			const options: AssistTurnOption[] = [option as AssistTurnOption];
-			addUsualAssistEffects(options, 2, playerNamed("second"), playerNamed("second"), 0, 20, 1);
+			addUsualAssistEffects(options, 2, playerNamed("second"), playerNamed("second"), 0, 20, 1, false);
 			expect(options).has.length(1);
 			expect(option.effects)
 				.has.length(2).and
@@ -178,7 +178,7 @@ describe("AssistStrategy", function () {
 		it("adds Lose if Holmes would win", function () {
 			const option: Partial<AssistTurnOption> = mockOption();
 			const options: AssistTurnOption[] = [option as AssistTurnOption];
-			addUsualAssistEffects(options, 1, playerNamed("second"), playerNamed("third"), 0, 20, 1);
+			addUsualAssistEffects(options, 1, playerNamed("second"), playerNamed("third"), 0, 20, 1, false);
 			expect(options).has.length(1);
 			expect(option.effects)
 				.has.length(2).and
@@ -193,14 +193,14 @@ describe("AssistStrategy", function () {
 				effects: [] as BotTurnEffectType[],
 			};
 			const options: AssistTurnOption[] = [option as AssistTurnOption];
-			addUsualAssistEffects(options, 2, playerNamed("second"), playerNamed("third"), 0, 20, 1);
+			addUsualAssistEffects(options, 2, playerNamed("second"), playerNamed("third"), 0, 20, 1, false);
 			expect(option.effects).deep.equals([BotTurnEffectType.HolmesProgress]);
 		});
 
 		it("adds AssistExactEliminate if necessary", function () {
 			const option: Partial<AssistTurnOption> = mockOption();
 			const options: AssistTurnOption[] = [option as AssistTurnOption];
-			addUsualAssistEffects(options, 2, playerNamed("second"), playerNamed("third"), 0, 1, 1);
+			addUsualAssistEffects(options, 2, playerNamed("second"), playerNamed("third"), 0, 1, 1, false);
 			expect(options).has.length(1);
 			expect(option.effects)
 				.has.length(2).and
@@ -381,7 +381,7 @@ describe("AssistStrategy", function () {
 				handIndex: 0,
 				unknownCard: unknownCard([EvidenceType.Track], [6]),
 			};
-			const options = buildAssistsForCard(cardKnowledge, undefined as unknown as OtherPlayerKnowledge, <VisibleLead[]> [], turn, undefined);
+			const options = buildAssistsForCard(cardKnowledge, undefined as unknown as OtherPlayerKnowledge, <VisibleLead[]> [], turn, undefined, false);
 			expect(options).lengthOf(0);
 		});
 
@@ -395,7 +395,7 @@ describe("AssistStrategy", function () {
 				knowledge: [cardKnowledge],
 				otherPlayer: playerNamed("other"),
 			};
-			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, undefined);
+			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, undefined, false);
 			expect(options).lengthOf(1);
 			const type = options[0];
 			expect(type.action).includes({ evidenceType: EvidenceType.Track });
@@ -412,7 +412,7 @@ describe("AssistStrategy", function () {
 				knowledge: [cardKnowledge],
 				otherPlayer: playerNamed("other"),
 			};
-			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, undefined);
+			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, undefined, false);
 			expect(options).lengthOf(1);
 			const value = options[0];
 			expect(value.action).includes({ evidenceValue: 1 });
@@ -429,7 +429,7 @@ describe("AssistStrategy", function () {
 				knowledge: [cardKnowledge],
 				otherPlayer: playerNamed("other"),
 			};
-			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, inspector);
+			const options = buildAssistsForCard(cardKnowledge, playerKnowledge, <VisibleLead[]> [], turn, inspector, false);
 			expect(options).lengthOf((shouldSeeValue ? 1 : 0) + (shouldSeeType ? 1 : 0));
 			const value = options.find(isAssistValueOption) as ValueAssistTurnOption;
 			if (shouldSeeValue) {
