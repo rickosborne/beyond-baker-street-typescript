@@ -1,229 +1,134 @@
-import { BotTurnEffectType } from "./BotTurn";
-import { EVIDENCE_CARD_VALUE_MAX } from "./EvidenceCard";
-import { formatDecimal } from "./formatDecimal";
-import { HOLMES_MAX } from "./Game";
-import { isNumber } from "./isNumber";
-import { LEAD_TYPES } from "./LeadType";
+import { EVIDENCE_CARDS } from "./EvidenceCard";
+import { BiFunction } from "./Function";
+import { HOLMES_MAX, INVESTIGATION_MARKER_GOAL } from "./Game";
+import { TurnStart } from "./TurnStart";
 import { HasVisibleBoard } from "./VisibleBoard";
 
-export enum EffectWeightOperator {
-	Add = "Add",
-	Divide = "Divide",
-	Invert = "Invert",
-	Multiply = "Multiply",
-	Negate = "Negate",
-	Reverse = "Reverse",
-	Subtract = "Subtract",
+export enum EffectWeightModifier {
+	MinusHolmesLocation = "MinusHolmesLocation",
+	MinusImpossibleCount = "MinusImpossibleCount",
+	MinusImpossiblePastLimit = "MinusImpossiblePastLimit",
+	MinusInvestigationMarker = "MinusInvestigationMarker",
+	MinusRemainingCount = "MinusRemainingCount",
+	OverHolmesLocation = "OverHolmesLocation",
+	OverHolmesProgress = "OverHolmesProgress",
+	OverHolmesProgressReversed = "OverHolmesProgressReversed",
+	OverImpossibleCount = "OverImpossibleCount",
+	OverImpossiblePastLimit = "OverImpossiblePastLimit",
+	OverInvestigationProgress = "OverInvestigationProgress",
+	OverInvestigationProgressReversed = "OverInvestigationProgressReversed",
+	OverRemainingCount = "OverRemainingCount",
+	OverRemainingProgress = "OverRemainingProgress",
+	OverRemainingProgressReversed = "OverRemainingProgressReversed",
+	PlusHolmesLocation = "PlusHolmesLocation",
+	PlusImpossibleCount = "PlusImpossibleCount",
+	PlusImpossiblePastLimit = "PlusImpossiblePastLimit",
+	PlusInvestigationMarker = "PlusInvestigationMarker",
+	PlusRemainingCount = "PlusRemainingCount",
+	RampDownWithHolmesProgress = "RampDownWithHolmesProgress",
+	RampDownWithInvestigationProgress = "RampDownWithInvestigationProgress",
+	RampUpWithHolmesProgress = "RampUpWithHolmesProgress",
+	RampUpWithInvestigationProgress = "RampUpWithInvestigationProgress",
+	TimesHolmesProgress = "TimesHolmesProgress",
+	TimesHolmesProgressReversed = "TimesHolmesProgressReversed",
+	TimesImpossiblePastLimit = "TimesImpossiblePastLimit",
+	TimesInvestigationProgress = "TimesInvestigationProgress",
+	TimesInvestigationProgressReversed = "TimesInvestigationProgressReversed",
+	TimesRemainingProgress = "TimesRemainingProgress",
+	TimesRemainingProgressReversed = "TimesRemainingProgressReversed",
 }
 
-export const EFFECT_WEIGHT_OPERATORS: EffectWeightOperator[] = [
-	EffectWeightOperator.Add,
-	EffectWeightOperator.Divide,
-	EffectWeightOperator.Invert,
-	EffectWeightOperator.Multiply,
-	EffectWeightOperator.Negate,
-	EffectWeightOperator.Reverse,
-	EffectWeightOperator.Subtract,
-];
+export type EffectWeightFormula = [number] | [ number, EffectWeightModifier ];
 
-export enum EffectWeightOperand {
-	ConfirmedLeads = "ConfirmedLeads",
-	EvidenceValueMax = "EvidenceValueMax",
-	HolmesLocation = "HolmesLocation",
-	HolmesProgress = "HolmesProgress",
-	ImpossibleCount = "ImpossibleCount",
-	ImpossiblePastLimit = "ImpossiblePastLimit",
-	RemainingCount = "RemainingCount",
-	UnconfirmedLeads = "UnconfirmedLeads",
+export function investigationProgress(turnStart: HasVisibleBoard, reversed = false): number {
+	if (reversed) {
+		return (1 + INVESTIGATION_MARKER_GOAL - turnStart.board.investigationMarker) / (1 + INVESTIGATION_MARKER_GOAL);
+	} else {
+		return (1 + turnStart.board.investigationMarker) / (1 + INVESTIGATION_MARKER_GOAL);
+	}
 }
 
-export const EFFECT_WEIGHT_OPERANDS: EffectWeightOperand[] = [
-	EffectWeightOperand.ConfirmedLeads,
-	EffectWeightOperand.EvidenceValueMax,
-	EffectWeightOperand.HolmesLocation,
-	EffectWeightOperand.HolmesProgress,
-	EffectWeightOperand.ImpossibleCount,
-	EffectWeightOperand.ImpossiblePastLimit,
-	EffectWeightOperand.RemainingCount,
-	EffectWeightOperand.UnconfirmedLeads,
-];
-
-export type EffectWeightOp = EffectWeightOperator | EffectWeightOperand | number;
-export type EffectTurnStackConverter<S, R extends S | void> = S extends (string | number) ? (effect: BotTurnEffectType, turnStart: HasVisibleBoard, stack: S[]) => R : (effect: BotTurnEffectType, turnStart: HasVisibleBoard) => R;
-export type EffectOperandResolver = EffectTurnStackConverter<unknown, number>;
-export type EffectWeightFormatter = EffectTurnStackConverter<string, string>;
-export type EffectWeightOperation = EffectTurnStackConverter<number, void>;
-export interface EffectCalculator {
-	calculate: EffectOperandResolver;
-	format: EffectTurnStackConverter<unknown, string>;
+export function remainingProgress(turnStart: HasVisibleBoard, reversed = false): number {
+	if (reversed) {
+		return (1 + turnStart.board.remainingEvidenceCount) / (1 + EVIDENCE_CARDS.length);
+	} else {
+		return (1 + EVIDENCE_CARDS.length - turnStart.board.remainingEvidenceCount) / (1 + EVIDENCE_CARDS.length);
+	}
 }
 
-const EFFECT_WEIGHT_OPERAND_RESOLVER: Record<EffectWeightOperand, EffectOperandResolver> = {
-	[EffectWeightOperand.ConfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => t.board.leads[lt].confirmed).length,
-	[EffectWeightOperand.EvidenceValueMax]: () => EVIDENCE_CARD_VALUE_MAX,
-	[EffectWeightOperand.HolmesLocation]: (e, t) => t.board.holmesLocation,
-	[EffectWeightOperand.HolmesProgress]: (e, t) => (HOLMES_MAX - t.board.holmesLocation) / HOLMES_MAX,
-	[EffectWeightOperand.ImpossibleCount]: (e, t) => t.board.impossibleCards.length,
-	[EffectWeightOperand.ImpossiblePastLimit]: (e, t) => Math.max(0, t.board.impossibleCards.length - t.board.impossibleLimit),
-	[EffectWeightOperand.RemainingCount]: (e, t) => t.board.remainingEvidenceCount,
-	[EffectWeightOperand.UnconfirmedLeads]: (e, t) => LEAD_TYPES.filter(lt => !t.board.leads[lt].confirmed).length,
+export function impossiblePastLimit(turnStart: HasVisibleBoard): number {
+	return Math.max(0, turnStart.board.impossibleLimit - turnStart.board.impossibleCards.length);
+}
+
+export function holmesProgress(turnStart: HasVisibleBoard, reversed = false): number {
+	if (reversed) {
+		return (1 + turnStart.board.holmesLocation) / (1 + HOLMES_MAX);
+	} else {
+		return (1 + HOLMES_MAX - turnStart.board.holmesLocation) / (1 + HOLMES_MAX);
+	}
+}
+
+export function rampUpWithProgress(base: number, progress: number): number {
+	// Equivalent to -1 multiplier at 0%, 0 multiplier at 50%, and 1 multiplier at 100%;
+	return 2.0 * (progress - 0.5) * base;
+}
+
+export function rampDownWithProgress(base: number, progress: number): number {
+	// Equivalent to 1 multiplier at 0%, 0 multiplier at 50%, and -1 multiplier at 100%;
+	return 2.0 * (0.5 - progress) * base;
+}
+
+export const EFFECT_WEIGHT_CALCULATORS: Record<EffectWeightModifier, BiFunction<number, HasVisibleBoard, number>> = {
+	[EffectWeightModifier.MinusHolmesLocation]: (n, t) => n - t.board.holmesLocation,
+	[EffectWeightModifier.MinusImpossibleCount]: (n, t) => n - t.board.impossibleCards.length,
+	[EffectWeightModifier.MinusInvestigationMarker]: (n, t) => n - t.board.investigationMarker,
+	[EffectWeightModifier.MinusImpossiblePastLimit]: (n, t) => n - impossiblePastLimit(t),
+	[EffectWeightModifier.MinusRemainingCount]: (n, t) => n - t.board.remainingEvidenceCount,
+	[EffectWeightModifier.OverHolmesLocation]: (n, t) => n / (1 + t.board.holmesLocation),
+	[EffectWeightModifier.OverHolmesProgress]: (n, t) => n / holmesProgress(t),
+	[EffectWeightModifier.OverHolmesProgressReversed]: (n, t) => n / holmesProgress(t, true),
+	[EffectWeightModifier.OverImpossibleCount]: (n, t) => n / Math.max(1, t.board.impossibleCards.length),
+	[EffectWeightModifier.OverImpossiblePastLimit]: (n, t) => n / Math.max(1, impossiblePastLimit(t)),
+	[EffectWeightModifier.OverInvestigationProgress]: (n, t) => n / investigationProgress(t),
+	[EffectWeightModifier.OverInvestigationProgressReversed]: (n, t) => n / investigationProgress(t, true),
+	[EffectWeightModifier.OverRemainingCount]: (n, t) => n / (1 + t.board.remainingEvidenceCount),
+	[EffectWeightModifier.OverRemainingProgress]: (n, t) => n / remainingProgress(t),
+	[EffectWeightModifier.OverRemainingProgressReversed]: (n, t) => n / remainingProgress(t, true),
+	[EffectWeightModifier.PlusHolmesLocation]: (n, t) => n + t.board.holmesLocation,
+	[EffectWeightModifier.PlusImpossibleCount]: (n, t) => n + t.board.impossibleCards.length,
+	[EffectWeightModifier.PlusImpossiblePastLimit]: (n, t) => n + impossiblePastLimit(t),
+	[EffectWeightModifier.PlusInvestigationMarker]: (n, t) => n + t.board.investigationMarker,
+	[EffectWeightModifier.PlusRemainingCount]: (n, t) => n + t.board.remainingEvidenceCount,
+	[EffectWeightModifier.RampDownWithHolmesProgress]: (n, t) => rampDownWithProgress(n, holmesProgress(t)),
+	[EffectWeightModifier.RampDownWithInvestigationProgress]: (n, t) => rampDownWithProgress(n, investigationProgress(t)),
+	[EffectWeightModifier.RampUpWithHolmesProgress]: (n, t) => rampUpWithProgress(n, holmesProgress(t)),
+	[EffectWeightModifier.RampUpWithInvestigationProgress]: (n, t) => rampUpWithProgress(n, investigationProgress(t)),
+	[EffectWeightModifier.TimesHolmesProgress]: (n, t) => n * holmesProgress(t),
+	[EffectWeightModifier.TimesHolmesProgressReversed]: (n, t) => n * holmesProgress(t, true),
+	[EffectWeightModifier.TimesImpossiblePastLimit]: (n, t) => n * impossiblePastLimit(t),
+	[EffectWeightModifier.TimesInvestigationProgress]: (n, t) => n * investigationProgress(t),
+	[EffectWeightModifier.TimesInvestigationProgressReversed]: (n, t) => n * investigationProgress(t, true),
+	[EffectWeightModifier.TimesRemainingProgress]: (n, t) => n * remainingProgress(t),
+	[EffectWeightModifier.TimesRemainingProgressReversed]: (n, t) => n * remainingProgress(t, true),
 };
 
-export function operandResolver(operand: EffectWeightOperand): EffectOperandResolver {
-	return EFFECT_WEIGHT_OPERAND_RESOLVER[operand];
-}
-
-function unaryOp(name: string, fn: (a: number) => number): EffectWeightOperation {
-	return (e, t, s: number[]): void => {
-		const a = s.pop();
-		/* istanbul ignore if */
-		if (a === undefined) {
-			throw new Error(`${name} requires at least 1 element.`);
-		}
-		s.push(fn(a));
-	};
-}
-
-function binaryOp(name: string, fn: (a: number, b: number) => number): EffectWeightOperation {
-	return (e, t, s: number[]): void => {
-		const a = s.pop();
-		const b = s.pop();
-		/* istanbul ignore if */
-		if (a === undefined || b === undefined) {
-			throw new Error(`${name} requires at least 2 elements`);
-		}
-		s.push(fn(a, b));
-	};
-}
-
-const EFFECT_WEIGHT_OPERATION_CALC: Record<EffectWeightOperator, EffectWeightOperation> = {
-	[EffectWeightOperator.Add]: binaryOp("Add", (a, b) => a + b),
-	[EffectWeightOperator.Divide]: binaryOp("Divide", (a, b) => b / a),
-	[EffectWeightOperator.Invert]: unaryOp("Invert", a => 1 / a),
-	[EffectWeightOperator.Multiply]: binaryOp("Multiply", (a, b) => a * b),
-	[EffectWeightOperator.Negate]: unaryOp("Negate", a => 0 - a),
-	[EffectWeightOperator.Reverse]: unaryOp("Reverse", a => 1 - a),
-	[EffectWeightOperator.Subtract]: binaryOp("Subtract", (a, b) => b - a),
-};
-
-function format1(popped: (a: string) => string): EffectWeightFormatter {
-	return (e, t, s): string => {
-		const a = s.pop() as string;
-		const result = popped(a);
-		s.push(result);
-		return result;
-	};
-}
-
-function format2(popped: (a: string, b: string) => string): EffectWeightFormatter {
-	return (e, t, s): string => {
-		const [ a, b ] = [ s.pop() as string, s.pop() as string ];
-		const result = popped(a, b);
-		s.push(result);
-		return result;
-	};
-}
-
-function formatPush(op: EffectWeightOperand): EffectWeightFormatter {
-	const resolver: EffectOperandResolver = operandResolver(op);
-	return (e, t, s: string[]): string => {
-		const value = formatDecimal(resolver(e, t), 2);
-		s.push(value);
-		return value;
-	};
-}
-
-const EFFECT_WEIGHT_OPERATION_FORMAT: Record<EffectWeightOp, EffectWeightFormatter> = {
-	[EffectWeightOperator.Add]: format2((a, b) => `(${b})+(${a})`),
-	[EffectWeightOperator.Divide]: format2((a, b) => `(${b})/(${a})`),
-	[EffectWeightOperator.Invert]: format1(a => `1/(${a})`),
-	[EffectWeightOperator.Multiply]: format2((a, b) => `(${b})*(${a})`),
-	[EffectWeightOperator.Negate]: format1(a => `0-(${a})`),
-	[EffectWeightOperator.Reverse]: format1(a => `1-(${a})`),
-	[EffectWeightOperator.Subtract]: format2((a, b) => `(${b})-(${a})`),
-	[EffectWeightOperand.ConfirmedLeads]: formatPush(EffectWeightOperand.ConfirmedLeads),
-	[EffectWeightOperand.EvidenceValueMax]: formatPush(EffectWeightOperand.EvidenceValueMax),
-	[EffectWeightOperand.HolmesLocation]: formatPush(EffectWeightOperand.HolmesLocation),
-	[EffectWeightOperand.HolmesProgress]: formatPush(EffectWeightOperand.HolmesProgress),
-	[EffectWeightOperand.ImpossibleCount]: formatPush(EffectWeightOperand.ImpossibleCount),
-	[EffectWeightOperand.ImpossiblePastLimit]: formatPush(EffectWeightOperand.ImpossiblePastLimit),
-	[EffectWeightOperand.RemainingCount]: formatPush(EffectWeightOperand.RemainingCount),
-	[EffectWeightOperand.UnconfirmedLeads]: formatPush(EffectWeightOperand.UnconfirmedLeads),
-};
-
-export function isEffectWeightOperand(maybe: unknown): maybe is EffectWeightOperand {
-	return typeof maybe === "string" && EFFECT_WEIGHT_OPERANDS.includes(maybe as EffectWeightOperand);
-}
-
-export function isEffectWeightOperator(maybe: unknown): maybe is EffectWeightOperator {
-	return typeof maybe === "string" && EFFECT_WEIGHT_OPERATORS.includes(maybe as EffectWeightOperator);
-}
+export type EffectWeightFromTurn = (turn: HasVisibleBoard) => number;
 
 export function compileEffectWeight(
-	ops: EffectWeightOp[],
-	type: BotTurnEffectType,
-	wantFormatter = true,
-): EffectCalculator {
+	ops: EffectWeightFormula,
+): EffectWeightFromTurn {
 	if (ops.length < 1) {
 		/* istanbul ignore next */
 		throw new Error(`No ops for effectWeight`);
 	}
-	const math: EffectWeightOperation = ops.reduce((p, c): EffectWeightOperation => {
-		if (isEffectWeightOperand(c)) {
-			return function push(e, t, s): void {
-				if (p != null) {
-					p(e, t, s);
-				}
-				const resolver = operandResolver(c);
-				const value = resolver(e, t);
-				s.push(value);
-			};
-		} else if (isEffectWeightOperator(c)) {
-			return function op(e, t, s): void {
-				if (p != null) {
-					p(e, t, s);
-				}
-				const operation = EFFECT_WEIGHT_OPERATION_CALC[c];
-				operation(e, t, s);
-			};
-		} else {
-			return function pushNumber(e, t, s): void {
-				if (p != null) {
-					p(e, t, s);
-				}
-				s.push(c);
-			};
-		}
-	}, undefined as unknown as EffectWeightOperation);
-	const formats: EffectWeightFormatter = wantFormatter ? ops.reduce((p, c): EffectWeightFormatter => {
-		return (e, t, s): string => {
-			if (p != null) {
-				p(e, t, s);
-			}
-			if (isNumber(c)) {
-				const constant = formatDecimal(c, 2);
-				s.push(constant);
-				return constant;
-			}
-			const opFormatter = EFFECT_WEIGHT_OPERATION_FORMAT[c];
-			return opFormatter(e, t, s);
+	const [ base, modifier ] = ops;
+	if (modifier == null) {
+		return function noModifier(): number {
+			return base;
 		};
-	}, undefined as unknown as EffectWeightFormatter) : (e, t, s) => { s.push(""); return ""; };
-	function doIt<T>(effect: BotTurnEffectType, turnStart: HasVisibleBoard, fn: (effect: BotTurnEffectType, turnStart: HasVisibleBoard, stack: T[]) => void): T {
-		const s: T[] = [];
-		fn(effect, turnStart, s);
-		const value = s.pop();
-		if (value === undefined) {
-			/* istanbul ignore next */
-			throw new Error(`Undefined result from ${type}`);
-		} else if (s.length > 0) {
-			/* istanbul ignore next */
-			throw new Error(`Dirty stack for ${type}`);
-		}
-		return value;
 	}
-	return {
-		calculate: (e: BotTurnEffectType, t: HasVisibleBoard): number => doIt(e, t, math),
-		format: (e: BotTurnEffectType, t: HasVisibleBoard): string => wantFormatter ? doIt(e, t, formats) : "",
+	const calculator = EFFECT_WEIGHT_CALCULATORS[modifier];
+	return function calculate(turn: HasVisibleBoard): number {
+		return calculator(base, turn);
 	};
 }

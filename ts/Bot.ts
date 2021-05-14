@@ -163,8 +163,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 			}
 			const eliminateEffects = buildEliminateEffects(mysteryCard, leads.map(l => l.leadCard.evidenceType), otherCards, blackwellTurn, undefined, false);
 			effects.push(...eliminateEffects);
-			const score = this.evaluator.scoreEffects(effects, blackwellTurn);
-			votes[i] = score.score;
+			votes[i] = this.evaluator.scoreEffects(effects, blackwellTurn);
 		}
 		const keepIndex = votes[0] > votes[1] ? 0 : 1;
 		const buryIndex = 1 - keepIndex;

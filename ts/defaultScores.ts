@@ -1,8 +1,8 @@
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
-import { EffectWeightOp } from "./EffectWeight";
+import { EffectWeightFormula } from "./EffectWeight";
 import { strictDeepEqual } from "./strictDeepEqual";
 
-export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightOp[]>;
+export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightFormula>;
 export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.AssistExactEliminate]: [13],
 	[BotTurnEffectType.AssistImpossibleType]: [-22],
@@ -55,8 +55,8 @@ export function isEffectWeightOpsFromType(maybe: unknown): maybe is EffectWeight
 
 export function formatOrderedEffectWeightOpsFromType(weights: Partial<EffectWeightOpsFromType>): string {
 	return (Object.keys(weights) as BotTurnEffectType[])
-		.sort((a, b) => ((weights[b] as EffectWeightOp[])[0] as number) - ((weights[a] as EffectWeightOp[])[0] as number))
-		.map(key => `${key}:${(weights[key] as EffectWeightOp[])[0]}`)
+		.sort((a, b) => ((weights[b] as EffectWeightFormula)[0] as number) - ((weights[a] as EffectWeightFormula)[0] as number))
+		.map(key => `${key}:${(weights[key] as EffectWeightFormula)[0]}`)
 		.join(" > ");
 }
 

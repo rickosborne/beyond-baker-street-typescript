@@ -2,7 +2,7 @@ import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnOption } from "./BotTurn";
 import { columnarNumber } from "./columnarNumber";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
-import { compileEffectWeight, EffectCalculator, EffectWeightOp } from "./EffectWeight";
+import { compileEffectWeight, EffectWeightFormula, EffectWeightFromTurn } from "./EffectWeight";
 import { formatAction } from "./formatAction";
 import { Logger, SILENT_LOGGER } from "./logger";
 import { objectMap } from "./objectMap";
@@ -13,24 +13,19 @@ import { TurnStart } from "./TurnStart";
 import { HasVisibleBoard } from "./VisibleBoard";
 
 export interface BotTurnEvaluator {
-	scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): BotEffectScore;
+	scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): number;
 	selectOption(options: BotTurnOption[], bot: Bot, hasVisibleBoard: HasVisibleBoard): BotTurnOption;
 }
 
-interface BotEffectScore {
-	formula: string;
-	score: number;
-}
-
 export class BasicBotTurnEvaluator implements BotTurnEvaluator {
-	private readonly scoreFromType: Record<BotTurnEffectType, EffectCalculator>;
+	private readonly scoreFromType: Record<BotTurnEffectType, EffectWeightFromTurn>;
 
 	constructor(
 		scoreFromTypeOverrides: Partial<EffectWeightOpsFromType> = {},
 		private readonly logger: Logger = SILENT_LOGGER,
 	) {
 		const opsFromType = Object.assign({}, DEFAULT_SCORE_FROM_TYPE, scoreFromTypeOverrides);
-		this.scoreFromType = objectMap<BotTurnEffectType, EffectWeightOp[], EffectCalculator>(opsFromType, (ops, et) => compileEffectWeight(ops, et, this.logger !== SILENT_LOGGER));
+		this.scoreFromType = objectMap<BotTurnEffectType, EffectWeightFormula, EffectWeightFromTurn>(opsFromType, (ops) => compileEffectWeight(ops));
 	}
 
 	public formatScoredOptions(scored: ScoredOption[], bot: Bot, turnStart: TurnStart): string {
@@ -43,19 +38,13 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 		return `  ${toShow.map(s => `${columnarNumber(s.score, 7, 1)}: ${formatAction(s.option.action, bot, turnStart)} [${s.option.effects.join(", ")}]`).join("\n  ")}${tail}`;
 	}
 
-	private scoreEffect(effect: BotTurnEffectType, hasVisibleBoard: HasVisibleBoard): BotEffectScore {
+	private scoreEffect(effect: BotTurnEffectType, hasVisibleBoard: HasVisibleBoard): number {
 		const operation = this.scoreFromType[effect];
-		return {
-			formula: operation.format(effect, hasVisibleBoard),
-			score: operation.calculate(effect, hasVisibleBoard),
-		};
+		return operation(hasVisibleBoard);
 	}
 
-	public scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): BotEffectScore {
-		return effects.map(e => this.scoreEffect(e, hasVisibleBoard)).reduce((p, c) => ({
-			formula: p.formula === "" ? c.formula : `${p.formula} ++ ${c.formula}`,
-			score: p.score + c.score,
-		}), { formula: "", score: 0 });
+	public scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): number {
+		return effects.map(e => this.scoreEffect(e, hasVisibleBoard)).reduce((p, c) => p + c, 0);
 	}
 
 	public scoreOptions(options: BotTurnOption[], hasVisibleBoard: HasVisibleBoard): ScoredOption[] {
@@ -63,9 +52,8 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 			.map(option => {
 				const score = this.scoreEffects(option.effects, hasVisibleBoard);
 				return {
-					formula: score.formula,
 					option,
-					score: score.score,
+					score,
 				};
 			});
 	}
@@ -91,11 +79,8 @@ export class RandomBotTurnEvaluator implements BotTurnEvaluator {
 	constructor(private readonly prng: PseudoRNG) {
 	}
 
-	scoreEffects(): BotEffectScore {
-		return {
-			formula: "random()",
-			score: Math.random(),
-		};
+	scoreEffects(): number {
+		return Math.random();
 	}
 
 	public selectOption(options: BotTurnOption[]): BotTurnOption {
