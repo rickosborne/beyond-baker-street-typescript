@@ -1,6 +1,5 @@
 import * as os from "os";
 import { mean, stddev } from "./arrayMath";
-import { formatDecimal } from "./formatDecimal";
 import { formatPercent } from "./formatPercent";
 import { randomItem } from "./randomItem";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
@@ -34,7 +33,18 @@ export async function anneal<State>(
 	params: Partial<AnnealParams<State>>,
 ): Promise<State[]> {
 	const effectiveParams: AnnealParams<State> = Object.assign({}, ANNEAL_DEFAULTS as AnnealParams<State>, params);
-	const { calculateEnergy, formatState, improvement, initialState, neighbors, prng, temperature, temperatureMax, temperatureMin, threadCount } = effectiveParams;
+	const {
+		calculateEnergy,
+		formatState,
+		improvement,
+		initialState,
+		neighbors,
+		prng,
+		temperature,
+		temperatureMax,
+		temperatureMin,
+		threadCount,
+	} = effectiveParams;
 	/* istanbul ignore if */
 	if (calculateEnergy == null || formatState == null || improvement == null || initialState == null || neighbors == null || prng == null || temperature == null || temperatureMax == null || temperatureMin == null || threadCount == null) {
 		throw new Error(`Missing some params:\n${JSON.stringify(params, null, 2)}`);
@@ -46,8 +56,19 @@ export async function anneal<State>(
 	let temp: number = temperatureMax;
 	const bestStates: State[] = initialState.slice();
 	const lastStates: State[] = initialState.slice();
-	let currentState: State = randomItem(initialState);
-	let currentEnergy: number | undefined = await calculateEnergy(currentState);
+	const initialEnergies = (await Promise
+		.all(initialState.map(currentState => calculateEnergy(currentState)
+			.then(currentEnergy => currentEnergy === undefined ? undefined : {
+				currentEnergy,
+				currentState,
+			}))))
+		.filter(o => o !== undefined) as { currentEnergy: number; currentState: State }[];
+	if (initialEnergies.length < 1) {
+		throw new Error(`None of the initial states returned an energy`);
+	}
+	let { currentEnergy, currentState } = initialEnergies.reduce((p, c) => {
+		return c.currentEnergy < p.currentEnergy ? c : p;
+	});
 	/* istanbul ignore if */
 	if (currentEnergy == null) {
 		throw new Error(`Initial energy cannot be null.`);
