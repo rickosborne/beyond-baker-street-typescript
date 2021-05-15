@@ -1,6 +1,7 @@
 /**
  * Worst knapsack implementation ever.
  */
+import { sum } from "./arrayMath";
 import { EvidenceValue } from "./EvidenceValue";
 import { range } from "./range";
 
@@ -31,7 +32,7 @@ export const summingPathsTo: (target: number, values: number[]) => number = (fun
 })();
 
 export const EVIDENCE_CARD_VALUES: EvidenceValue[] = range(1, 6);
-export const MAX_POSSIBLE_EVIDENCE_VALUE: EvidenceValue = EVIDENCE_CARD_VALUES.reduce((p, c) => p + c, 0);
+export const MAX_POSSIBLE_EVIDENCE_VALUE: EvidenceValue = sum(EVIDENCE_CARD_VALUES);
 
 const ALL_PATHS_TO: Record<number, EvidenceValue[][]> = (() => {
 	const allPaths: Record<number, EvidenceValue[][]> = {};

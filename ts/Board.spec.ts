@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { describe } from "mocha";
 import { ActionType } from "./ActionType";
+import { sum } from "./arrayMath";
 import { BaskervilleAction } from "./Baskerville";
 import { BadOrGood, Board, BoardLead } from "./Board";
 import { CASE_FILE_CARDS } from "./CaseFileCard";
@@ -306,9 +307,9 @@ describe("BoardLead", function () {
 		expect(boardLead.badValue).equals(2);
 		expect(boardLead.badCards).has.members([track2]);
 		boardLead.baskervilleSwap(leadEvidence, impossibleEvidence);
-		expect(boardLead.evidenceValue).equals(goodAfter.reduce((p, c) => p + c.evidenceValue, 0));
+		expect(boardLead.evidenceValue).equals(sum(goodAfter.map(c => c.evidenceValue)));
 		expect(boardLead.evidenceCards).has.members(goodAfter);
-		expect(boardLead.badValue).equals(badAfter.reduce((p, c) => p + c.evidenceValue, 0));
+		expect(boardLead.badValue).equals(sum(badAfter.map(c => c.evidenceValue)));
 		expect(boardLead.badCards).has.members(badAfter);
 	}
 

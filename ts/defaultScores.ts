@@ -56,7 +56,7 @@ export function isEffectWeightOpsFromType(maybe: unknown): maybe is EffectWeight
 export function formatOrderedEffectWeightOpsFromType(weights: Partial<EffectWeightOpsFromType>): string {
 	return (Object.keys(weights) as BotTurnEffectType[])
 		.sort((a, b) => ((weights[b] as EffectWeightFormula)[0] as number) - ((weights[a] as EffectWeightFormula)[0] as number))
-		.map(key => `${key}:${(weights[key] as EffectWeightFormula)[0]}`)
+		.map(key => `${key}:${(weights[key]?.join(","))}`)
 		.join(" > ");
 }
 

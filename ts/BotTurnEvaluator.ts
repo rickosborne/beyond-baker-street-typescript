@@ -1,3 +1,4 @@
+import { sum } from "./arrayMath";
 import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnOption } from "./BotTurn";
 import { columnarNumber } from "./columnarNumber";
@@ -44,7 +45,7 @@ export class BasicBotTurnEvaluator implements BotTurnEvaluator {
 	}
 
 	public scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): number {
-		return effects.map(e => this.scoreEffect(e, hasVisibleBoard)).reduce((p, c) => p + c, 0);
+		return sum(effects.map(e => this.scoreEffect(e, hasVisibleBoard)));
 	}
 
 	public scoreOptions(options: BotTurnOption[], hasVisibleBoard: HasVisibleBoard): ScoredOption[] {

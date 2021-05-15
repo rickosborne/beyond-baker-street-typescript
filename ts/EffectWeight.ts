@@ -40,7 +40,7 @@ export enum EffectWeightModifier {
 
 export const EFFECT_WEIGHT_MODIFIERS = enumKeys<EffectWeightModifier>(EffectWeightModifier);
 
-export type EffectWeightFormula = [number] | [ number, EffectWeightModifier ];
+export type EffectWeightFormula = [number] | [ number, number, EffectWeightModifier ];
 
 export function investigationProgress(turnStart: HasVisibleBoard, reversed = false, allowZero = false): number {
 	const buffer = allowZero ? 0 : 1;
@@ -120,14 +120,14 @@ export function compileEffectWeight(
 	if (ops.length < 1) {
 		throw new Error(`No ops for effectWeight`);
 	}
-	const [ base, modifier ] = ops;
-	if (modifier == null) {
+	const [ base, offset, modifier ] = ops;
+	if (modifier === undefined || offset === undefined) {
 		return function noModifier(): number {
 			return base;
 		};
 	}
 	const calculator = EFFECT_WEIGHT_CALCULATORS[modifier];
 	return function calculate(turn: HasVisibleBoard): number {
-		return calculator(base, turn);
+		return base + calculator(offset, turn);
 	};
 }

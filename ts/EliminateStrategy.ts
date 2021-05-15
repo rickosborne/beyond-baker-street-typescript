@@ -1,5 +1,6 @@
 import { ActionType } from "./ActionType";
 import { addEffectsIfNotPresent } from "./addEffect";
+import { mean } from "./arrayMath";
 import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { CardType } from "./CardType";
@@ -13,8 +14,8 @@ import { InspectorType } from "./InspectorType";
 import { MysteryCard } from "./MysteryCard";
 import { Comparator, CompareResult, reduceOptions } from "./reduceOptions";
 import { TurnStart } from "./TurnStart";
-import { HasVisibleBoard } from "./VisibleBoard";
 import { unfinishedLeads } from "./unfinishedLeads";
+import { HasVisibleBoard } from "./VisibleBoard";
 
 export interface EliminateOption extends BotTurnOption {
 	action: EliminateAction;
@@ -100,8 +101,8 @@ function compareWithHand(hand: MysteryCard[]): Comparator<EliminateAction> {
 		const firstCard = hand[firstAction.handIndex].possibleValues;
 		const secondCard = hand[secondAction.handIndex].possibleValues;
 		// in general, we want to eliminate higher-valued cards
-		const firstAvg = firstCard.reduce((p, c) => p + c, 0) / firstCard.length;
-		const secondAvg = secondCard.reduce((p, c) => p + c, 0) / secondCard.length;
+		const firstAvg = mean(firstCard);
+		const secondAvg = mean(secondCard);
 		return secondAvg > firstAvg ? CompareResult.Second : CompareResult.First;
 	};
 }

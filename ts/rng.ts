@@ -22,7 +22,7 @@ export function buildRNG(
 }
 
 export function randomInt(max = 100, min = 1): number {
-	return min + Math.round(Math.random() * (max - min + 1));
+	return Math.round(min + (Math.random() * (max - min + 1)));
 }
 
 export function randomPercent(): number {

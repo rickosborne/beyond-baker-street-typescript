@@ -1,4 +1,7 @@
 import * as os from "os";
+import { mean, stddev } from "./arrayMath";
+import { formatDecimal } from "./formatDecimal";
+import { formatPercent } from "./formatPercent";
 import { randomItem } from "./randomItem";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { strictDeepEqual } from "./strictDeepEqual";
@@ -53,10 +56,12 @@ export async function anneal<State>(
 	let bestEnergy: number = currentEnergy;
 	let energies: number[];
 	let states: State[];
+	const allEnergies: number[] = [];
 	do {
 		let lastState = randomItem(lastStates);
 		states = neighbors(threadCount, lastState, temp, prng);
 		energies = (await Promise.all(states.map(state => calculateEnergy(state)))).filter(e => e != null) as number[];
+		allEnergies.push(...energies);
 		for (let i = 0; i < states.length; i++) {
 			currentState = states[i];
 			currentEnergy = energies[i];
@@ -84,8 +89,8 @@ export async function anneal<State>(
 			}
 			if (lastEnergy < bestEnergy) {
 				const bestState = bestStates[0];
-				improvement(currentState, currentEnergy, bestState, bestEnergy, temp);
-				bestEnergy = currentEnergy;
+				improvement(lastState, lastEnergy, bestState, bestEnergy, temp);
+				bestEnergy = lastEnergy;
 				bestStates.splice(0, bestStates.length);
 				bestStates.push(...lastStates);
 				// console.log(`Best has ${bestStates.length}`);
@@ -96,5 +101,8 @@ export async function anneal<State>(
 		}
 		temp = temperature(temp);
 	} while (temp > temperatureMin && states.length > 0);
+	const avg = mean(allEnergies);
+	const sd = stddev(allEnergies, avg);
+	console.log(`Iterations: ${allEnergies.length}, mean: ${formatPercent(avg, 2)}, stddev: ${formatPercent(sd, 4)}`);
 	return bestStates;
 }
