@@ -1,7 +1,8 @@
 import { Bot } from "./Bot";
 import { CASE_FILE_CARDS } from "./CaseFileCard";
 import { EffectWeightOpsFromType } from "./defaultScores";
-import { Game, GameState } from "./Game";
+import { isDefined } from "./defined";
+import { Game, GameState, LossReason } from "./Game";
 import { INSPECTOR_TYPES, InspectorType } from "./InspectorType";
 import { CONSOLE_LOGGER_NO_JSON, Logger, SILENT_LOGGER } from "./logger";
 import { range } from "./range";
@@ -11,6 +12,7 @@ import { shuffleInPlace } from "./shuffle";
 
 export interface SingleGameOutcome {
 	readonly lossRate: number;
+	readonly lossReasons: Partial<Record<LossReason, number>>;
 	readonly losses: number;
 	readonly plays: number;
 	readonly turns: number;
@@ -28,6 +30,7 @@ export function playSingleGame(
 ): SingleGameOutcome {
 	let losses = 0;
 	let turns = 0;
+	const lossReasons: Partial<Record<LossReason, number>> = {};
 	for (let i = 0; i < plays; i++) {
 		const inspectors = shuffleInPlace(availableInspectors.slice(), prng);
 		forceInspectors.forEach(f => {
@@ -42,6 +45,11 @@ export function playSingleGame(
 		}
 		if (game.state === GameState.Lost) {
 			losses++;
+			const lossReason = game.lossReason;
+			if (isDefined(lossReason)) {
+				const existing = lossReasons[lossReason];
+				lossReasons[lossReason] = (isDefined(existing) ? existing : 0) + 1;
+			}
 		}
 		turns += game.turns;
 	}
@@ -49,6 +57,7 @@ export function playSingleGame(
 	const turnsAvg = turns / plays;
 	return {
 		lossRate,
+		lossReasons,
 		losses,
 		plays,
 		turns,

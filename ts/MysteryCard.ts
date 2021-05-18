@@ -119,12 +119,18 @@ export class MysteryCard implements UnknownCard {
 		return this.valueCounts[value] > 0;
 	}
 
-	public eliminateCard(evidenceCard: EvidenceCard): void {
-		if (this.possibleCount > 1) {
+	/**
+	 * @returns {number} The number of possibilities eliminated.
+	 */
+	public eliminateCard(evidenceCard: EvidenceCard): number {
+		const possibleBefore = this.possibleCount;
+		if (possibleBefore > 1) {
 			const evidenceType = evidenceCard.evidenceType;
 			const evidenceValue = evidenceCard.evidenceValue;
 			this.eliminateTypeAndValue(evidenceType, evidenceValue);
+			return possibleBefore - this.possibleCount;
 		}
+		return 0;
 	}
 
 	public eliminateType(evidenceType: EvidenceType): void {

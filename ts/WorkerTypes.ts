@@ -1,4 +1,5 @@
 import { EffectWeightOpsFromType, isEffectWeightOpsFromType } from "./defaultScores";
+import { LossReason } from "./Game";
 import { isNumber } from "./isNumber";
 
 export interface PlayGameRequest {
@@ -15,6 +16,7 @@ export function isPlayGameRequest(maybe: unknown): maybe is PlayGameRequest {
 export interface PlayGameResult {
 	readonly errors: string | undefined;
 	readonly lossRate: number | undefined;
+	readonly lossReasons: Partial<Record<LossReason, number>>;
 	readonly request: PlayGameRequest;
 }
 

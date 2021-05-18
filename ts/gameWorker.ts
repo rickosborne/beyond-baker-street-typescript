@@ -1,6 +1,7 @@
 import { isMainThread, parentPort, workerData } from "worker_threads";
 import { formatThrowable } from "./formatThrowable";
 import { formatTimestamp } from "./formatTimestamp";
+import { LossReason } from "./Game";
 import { cachingLoggerFactory } from "./logger";
 import { playSingleGame } from "./playSingleGame";
 import { isPlayGameRequest, PlayGameResult } from "./WorkerTypes";
@@ -21,15 +22,18 @@ if (isMainThread || parentPort == null) {
 			});
 			let lossRate: number | undefined = undefined;
 			let errors: string | undefined = undefined;
+			let lossReasons: Partial<Record<LossReason, number>> = {};
 			try {
 				const outcome = playSingleGame(request.weights, request.iterations, undefined, logger);
 				lossRate = outcome.lossRate;
+				lossReasons = outcome.lossReasons;
 			} catch (e) {
 				errors = `Worker crashed:\n${logger.messages.map(m => `${formatTimestamp(m.time)} [${m.level}] ${m.message}`).join("\n")}\n${formatThrowable(e)}`;
 			}
 			const result: PlayGameResult = {
 				errors,
 				lossRate,
+				lossReasons,
 				request,
 			};
 			pp.postMessage(result);

@@ -61,6 +61,13 @@ export enum GameState {
 	Won = "Won",
 }
 
+export enum LossReason {
+	HolmesWon = "HolmesWon",
+	NotEnoughInvestigation = "NotEnoughInvestigation",
+	OutOfLeads = "OutOfLeads",
+	TooMuchInvestigation = "TooMuchInvestigation",
+}
+
 export class GamePlayer implements OtherPlayer, ActivePlayer {
 	constructor(
 		public readonly player: ActivePlayer,
@@ -107,8 +114,8 @@ export class GamePlayer implements OtherPlayer, ActivePlayer {
 		return card;
 	}
 
-	public sawEvidenceDealt(player: Player): void {
-		this.player.sawEvidenceDealt(player);
+	public sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined): void {
+		this.player.sawEvidenceDealt(player, evidenceCard);
 	}
 
 	public sawEvidenceReturned(evidenceCards: EvidenceCard[], bottomOrTop: BottomOrTop, shuffle: boolean): void {
@@ -172,7 +179,7 @@ export enum ReturnEvidenceVisibility {
 }
 
 export class Game {
-	// noinspection JSMismatchedCollectionQueryUpdate
+	private _lossReason: LossReason | undefined;
 	private _state: GameState = GameState.Playing;
 	private readonly actionHandlers: Record<ActionType, BiFunction<Action, GamePlayer, Outcome | undefined>> = {
 		[ActionType.Adler]: buildActionHandler(isAdlerAction, (a, p) => this.applyAdler(a, p)),
@@ -214,6 +221,11 @@ export class Game {
 				player.addCard(i, evidence, false, false);
 			}
 		}
+		this.players.forEach(player => {
+			player.hand.forEach(evidence => {
+				this.players.filter(p => !isSamePlayer(p, player)).forEach(p => p.sawEvidenceDealt(player, evidence));
+			});
+		});
 		this.logger.info(() => `Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
 		const gameStart: GameStart = {
 			playerNames: this.players.map(p => p.name),
@@ -246,7 +258,7 @@ export class Game {
 				turnCount: this.turnCount,
 			};
 			this.logger.json(gameEnd);
-			this.logger.info(() => this._state);
+			this.logger.info(() => this._state === GameState.Lost ? `Lost because ${this._lossReason}.` : this._state);
 		}
 		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
 			const evidence = this.dealEvidence(activePlayer);
@@ -545,9 +557,17 @@ export class Game {
 			if (this.board.investigationComplete) {
 				this._state = GameState.Won;
 			} else {
+				this._lossReason = this.board.investigationOver ? LossReason.TooMuchInvestigation : LossReason.NotEnoughInvestigation;
 				this._state = GameState.Lost;
 			}
-		} else if (this.board.anyEmptyLeads || this.board.holmesWon || this.board.investigationOver) {
+		} else if (this.board.anyEmptyLeads) {
+			this._lossReason = LossReason.OutOfLeads;
+			this._state = GameState.Lost;
+		} else if (this.board.holmesWon) {
+			this._lossReason = LossReason.HolmesWon;
+			this._state = GameState.Lost;
+		} else if (this.board.investigationOver) {
+			this._lossReason = LossReason.TooMuchInvestigation;
 			this._state = GameState.Lost;
 		}
 	}
@@ -583,7 +603,7 @@ export class Game {
 		}
 		if (evidence != null && activePlayer != null) {
 			for (const player of this.players) {
-				player.sawEvidenceDealt(activePlayer);
+				player.sawEvidenceDealt(activePlayer, isSamePlayer(player, activePlayer) ? undefined : evidence);
 			}
 		}
 		return evidence;
@@ -594,6 +614,10 @@ export class Game {
 			return player;
 		}
 		return this.players.filter(p => isSamePlayer(p, player))[0];
+	}
+
+	public get lossReason(): LossReason | undefined {
+		return this._lossReason;
 	}
 
 	private moveHolmes(delta: number): number {

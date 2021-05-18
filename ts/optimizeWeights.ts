@@ -2,6 +2,7 @@ import * as sqlite3 from "better-sqlite3";
 import * as os from "os";
 import * as process from "process";
 import { anneal, AnnealParams, StateAndEnergy } from "./anneal";
+import { sum } from "./arrayMath";
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType } from "./BotTurn";
 import {
 	EffectWeightOpsFromType,
@@ -12,6 +13,7 @@ import { isDefined } from "./defined";
 import { EFFECT_WEIGHT_MODIFIERS, EffectWeightModifier } from "./EffectWeight";
 import { formatDecimal } from "./formatDecimal";
 import { formatPercent } from "./formatPercent";
+import { LossReason } from "./Game";
 import { GameSetup, GameWorkerPool } from "./GameWorkerPool";
 import { neighborsViaFormulae } from "./neighborsViaFormulae";
 import { DEFAULT_PRNG } from "./rng";
@@ -117,6 +119,15 @@ function getAttemptSummary(): SelectAttemptSummary {
 	};
 }
 
+function formatLossReasons(lossReasons: Partial<Record<LossReason, number>>, runCount: number): string {
+	const reasons = Object.keys(lossReasons).sort() as LossReason[];
+	if (reasons.length === 0) {
+		return `none`;
+	}
+	// const runCount = sum(reasons.map(reason => lossReasons[reason] || 0));
+	return reasons.map(reason => `${reason}=${lossReasons[reason]}=${formatPercent((lossReasons[reason] || 0) / runCount)}`).join(", ");
+}
+
 async function calculateEnergy(simRuns: SimRun[]): Promise<StateAndEnergy<SimRun>[]> {
 	const setups = simRuns.map(run => {
 		const weights = run.weights;
@@ -131,7 +142,13 @@ async function calculateEnergy(simRuns: SimRun[]): Promise<StateAndEnergy<SimRun
 	});
 	const timer = msTimer();
 	const results: PlayGameResult[] = await gameWorkerPool.scoreGames(setups);
-	console.log(`Processed ${simRuns.length} games in ${Math.round(timer() / 1000)}s${timer() > 0 ? ` = ${formatDecimal(simRuns.length * 1000 / timer(), 2)} games/sec` : ""}`);
+	const losses = results.reduce((p, c) => {
+		(Object.keys(c.lossReasons) as LossReason[]).forEach(lossReason => {
+			p[lossReason] = (p[lossReason] || 0) + (c.lossReasons[lossReason] || 0);
+		});
+		return p;
+	}, {} as Partial<Record<LossReason, number>>);
+	console.log(`Processed ${simRuns.length} games in ${Math.round(timer() / 1000)}s${timer() > 0 ? ` = ${formatDecimal(simRuns.length * 1000 / timer(), 2)} games/sec` : ""}.  Losses: ${formatLossReasons(losses, simRuns.length * iterations)}.`);
 	return results.filter(isDefined).map(result => {
 		if (result.errors !== undefined) {
 			console.error(result.errors);

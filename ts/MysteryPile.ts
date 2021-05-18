@@ -13,10 +13,14 @@ export class MysteryPile {
 		return this.cards.anyMatch(c => isSameEvidenceCard(c, evidenceCard));
 	}
 
-	public eliminate(evidenceCard: EvidenceCard | undefined): void {
+	/**
+	 * @returns {number} The number of cards eliminated.
+	 */
+	public eliminate(evidenceCard: EvidenceCard | undefined): number {
 		if (evidenceCard != null) {
-			this.cards.removeIf(c => isSameEvidenceCard(evidenceCard, c));
+			return this.cards.removeIf(c => isSameEvidenceCard(evidenceCard, c));
 		}
+		return 0;
 	}
 
 	public toMysteryCard(): MysteryCard {

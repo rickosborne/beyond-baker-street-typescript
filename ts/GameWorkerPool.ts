@@ -3,6 +3,7 @@ import * as path from "path";
 import { Worker } from "worker_threads";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
+import { LossReason } from "./Game";
 import { parallelMap } from "./parallelMap";
 import { playSingleGame } from "./playSingleGame";
 import { range } from "./range";
@@ -21,8 +22,6 @@ export interface GameSetup {
 	lossRate?: number;
 	weights: Partial<EffectWeightOpsFromType>;
 }
-
-export type GameSetupIterator = Iterator<GameSetup, undefined, void>;
 
 export class GameWorkerPool {
 	private nextRequestId = 1;
@@ -90,15 +89,18 @@ export class GameWorkerPool {
 			if (this.threadCount === 0) {
 				let errors: string | undefined = undefined;
 				let lossRate: number | undefined = undefined;
+				let lossReasons: Partial<Record<LossReason, number>> = {};
 				try {
 					const outcome = playSingleGame(weights, iterations);
 					lossRate = outcome.lossRate;
+					lossReasons = outcome.lossReasons;
 				} catch (e) {
 					errors = String(e);
 				}
 				resolve({
 					errors,
-					lossRate: lossRate,
+					lossRate,
+					lossReasons,
 					request,
 				});
 				return;
@@ -127,6 +129,7 @@ export class GameWorkerPool {
 				return {
 					errors: undefined,
 					lossRate: setup.lossRate,
+					lossReasons: {},
 					request: {
 						id: -1,
 						iterations: setup.iterations,

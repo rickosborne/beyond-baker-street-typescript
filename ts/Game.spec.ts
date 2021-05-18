@@ -86,14 +86,14 @@ describe("GamePlayer", function () {
 		const p = <Player> { name: "p" };
 		let lastSaw: Player | undefined = undefined;
 		const active = <ActivePlayer> {
-			sawEvidenceDealt(player: Player): void {
+			sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined): void {
 				expect(player).equals(p);
 				lastSaw = player;
 			},
 		};
 		const gp = new GamePlayer(active);
 		expect(lastSaw).is.undefined;
-		gp.sawEvidenceDealt(p);
+		gp.sawEvidenceDealt(p, evidence(1, EvidenceType.Document));
 		expect(lastSaw).equals(p);
 	});
 	it("sawEvidenceReturned delegates", function () {

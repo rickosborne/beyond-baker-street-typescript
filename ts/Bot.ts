@@ -16,6 +16,7 @@ import { BasicBotTurnEvaluator, BotTurnEvaluator } from "./BotTurnEvaluator";
 import { isConfirmOutcome } from "./ConfirmAction";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
+import { isDefined } from "./defined";
 import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
 import { buildEliminateEffects, EliminateStrategy } from "./EliminateStrategy";
 import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
@@ -129,19 +130,23 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		this.logger.trace(() => `${this.name} took a card.  ${this.formatKnowledge(undefined)}`);
 	}
 
-	private assessGameState(turnStart: TurnStart): void {
+	private assessGameState(turnStart: TurnStart): number {
+		let eliminatedFromHands = 0;
 		for (const otherPlayer of turnStart.otherPlayers) {
-			this.sawEvidences(otherPlayer.hand);
+			eliminatedFromHands += this.sawEvidences(otherPlayer.hand);
 		}
 		const board = turnStart.board;
 		const leads = board.leads;
+		let eliminatedFromLeads = 0;
 		for (const leadType of LEAD_TYPES) {
 			const lead = leads[leadType];
-			this.sawEvidences(lead.badCards);
-			this.sawEvidences(lead.evidenceCards);
+			eliminatedFromLeads += this.sawEvidences(lead.badCards);
+			eliminatedFromLeads += this.sawEvidences(lead.evidenceCards);
 		}
 		const impossible = board.impossibleCards;
-		this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[]);
+		const eliminatedFromImpossible = this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[]);
+		console.log(`Eliminated ${eliminatedFromHands} from hands, ${eliminatedFromLeads} from leads, ${eliminatedFromImpossible} impossible.`);
+		return eliminatedFromHands + eliminatedFromLeads + eliminatedFromImpossible;
 	}
 
 	public chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice {
@@ -246,16 +251,23 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		this.sawEvidence(outcome.evidenceCard);
 	}
 
-	private sawEvidence(evidenceCard: EvidenceCard): void {
-		this.remainingEvidence.eliminate(evidenceCard);
+	/**
+	 * @returns {number} The number of cards actually eliminated.
+	 */
+	private sawEvidence(evidenceCard: EvidenceCard): number {
+		let eliminated = this.remainingEvidence.eliminate(evidenceCard);
 		for (const mysteryCard of this.hand) {
-			mysteryCard.eliminateCard(evidenceCard);
+			eliminated += mysteryCard.eliminateCard(evidenceCard);
 		}
+		return eliminated;
 	}
 
-	public sawEvidenceDealt(player: Player): void {
+	public sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined): void {
 		if (!isSamePlayer(player, this) && (this.inspectorStrategy instanceof TobyInspectorStrategy)) {
 			this.inspectorStrategy.sawEvidenceDealt();
+		}
+		if (isDefined(evidenceCard)) {
+			this.sawEvidence(evidenceCard);
 		}
 	}
 
@@ -266,10 +278,15 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		}
 	}
 
-	private sawEvidences(evidenceCards: EvidenceCard[]): void {
+	/**
+	 * @returns {number} The number of cards actually eliminated.
+	 */
+	private sawEvidences(evidenceCards: EvidenceCard[]): number {
+		let eliminated = 0;
 		for (const evidenceCard of evidenceCards) {
-			this.sawEvidence(evidenceCard);
+			eliminated += this.sawEvidence(evidenceCard);
 		}
+		return eliminated;
 	}
 
 	private sawGoodInvestigate(outcome: GoodInvestigateOutcome): void {
@@ -318,7 +335,7 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	}
 
 	public takeTurn(turnStart: TurnStart): Action {
-		this.assessGameState(turnStart);
+		// this.assessGameState(turnStart);  // No longer needed?
 		const options = this.strategies.flatMap(s => s.buildOptions(turnStart, this));
 		const removedOptions: BotTurnOption[] = [];
 		if (this.inspectorStrategy != null) {

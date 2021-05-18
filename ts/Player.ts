@@ -25,7 +25,7 @@ export interface ActivePlayer extends Player {
 	chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice;
 	readonly otherHand: OtherHand;
 	removeCardAt(index: number): void;
-	sawEvidenceDealt(player: Player): void;
+	sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined): void;
 	sawEvidenceReturned(evidenceCards: EvidenceCard[], bottomOrTop: BottomOrTop, shuffle: boolean): void;
 	sawOutcome(outcome: Outcome): void;
 	takeTurn(turnStart: TurnStart): Action;
