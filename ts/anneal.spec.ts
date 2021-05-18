@@ -1,9 +1,9 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import { anneal, AnnealParams } from "./anneal";
+import { anneal, AnnealParams, StateAndEnergy } from "./anneal";
 
 function params(partial: Partial<AnnealParams<string>>): AnnealParams<string> {
-	return Object.assign(<AnnealParams<string>> {
+	return Object.assign(<AnnealParams<string>>{
 		calculateEnergy: () => {
 			throw new Error(`No default calculateEnergy`);
 		},
@@ -26,34 +26,49 @@ function params(partial: Partial<AnnealParams<string>>): AnnealParams<string> {
 describe("anneal", function () {
 	it("follows a lower temp", async function () {
 		const annealParams: AnnealParams<string> = params({
-			calculateEnergy: state => {
-				expect([ "initial", "neighbor" ]).includes(state);
-				return Promise.resolve(state === "initial" ? 5 : 4);
+			calculateEnergy: (states): Promise<StateAndEnergy<string>[]> => {
+				states.forEach(state => expect([ "initial", "neighbor" ]).includes(state));
+				return Promise.resolve(states.map(state => state === "initial" ? {
+					energy: 5,
+					state,
+				} : {
+					energy: 4,
+					state,
+				}));
 			},
 		});
 		const best = await anneal(annealParams);
-		expect(best).deep.equals(["neighbor"]);
+		expect(best.bestStates).deep.equals(["neighbor"]);
 	});
 
 	it("does not follow a higher temp", async function () {
 		const annealParams: AnnealParams<string> = params({
-			calculateEnergy: state => {
-				expect([ "initial", "neighbor" ]).includes(state);
-				return Promise.resolve(state === "initial" ? 4 : 5);
+			calculateEnergy: (states): Promise<StateAndEnergy<string>[]> => {
+				states.forEach(state => expect([ "initial", "neighbor" ]).includes(state));
+				return Promise.resolve(states.map(state => state === "initial" ? {
+					energy: 4,
+					state,
+				} : {
+					energy: 5,
+					state,
+				}));
 			},
 		});
 		const best = await anneal(annealParams);
-		expect(best).deep.equals(["initial"]);
+		expect(best.bestStates).deep.equals(["initial"]);
 	});
 
 	it("keeps multiple best", async function () {
 		const annealParams: AnnealParams<string> = params({
-			calculateEnergy: state => {
-				expect([ "initial", "neighbor" ]).includes(state);
-				return Promise.resolve(2);
+			calculateEnergy: (states): Promise<StateAndEnergy<string>[]> => {
+				states.forEach(state => expect([ "initial", "neighbor" ]).includes(state));
+				return Promise.resolve(states.map(state => ({
+					energy: 2,
+					state,
+				})));
 			},
 		});
 		const best = await anneal(annealParams);
-		expect(best).deep.equals([ "initial", "neighbor" ]);
+		expect(best.bestStates).deep.equals([ "initial", "neighbor" ]);
 	});
 });

@@ -3,6 +3,7 @@ import * as path from "path";
 import { Worker } from "worker_threads";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
+import { parallelMap } from "./parallelMap";
 import { playSingleGame } from "./playSingleGame";
 import { range } from "./range";
 import { isPlayGameResult, PlayGameRequest, PlayGameResult } from "./WorkerTypes";
@@ -14,6 +15,14 @@ interface OnResult {
 	withResult: PlayGameResultConsumer;
 	withWorker: WorkerConsumer;
 }
+
+export interface GameSetup {
+	iterations?: number;
+	lossRate?: number;
+	weights: Partial<EffectWeightOpsFromType>;
+}
+
+export type GameSetupIterator = Iterator<GameSetup, undefined, void>;
 
 export class GameWorkerPool {
 	private nextRequestId = 1;
@@ -109,6 +118,24 @@ export class GameWorkerPool {
 				// console.log(`scoreGame sending ${id}`);
 				worker.postMessage(request);
 			});
+		});
+	}
+
+	public async scoreGames(setups: GameSetup[]): Promise<PlayGameResult[]> {
+		return await parallelMap<GameSetup, PlayGameResult>(setups, this.threadCount, (setup, context) => {
+			if (setup.lossRate !== undefined) {
+				return {
+					errors: undefined,
+					lossRate: setup.lossRate,
+					request: {
+						id: -1,
+						iterations: setup.iterations,
+						weights: setup.weights,
+					},
+				};
+			} else {
+				return this.scoreGame(setup.weights, setup.iterations);
+			}
 		});
 	}
 

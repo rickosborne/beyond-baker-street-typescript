@@ -1,4 +1,5 @@
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
+import { isDefined } from "./defined";
 import { EffectWeightFormula } from "./EffectWeight";
 import { strictDeepEqual } from "./strictDeepEqual";
 
@@ -81,6 +82,6 @@ export function formatEffectWeightOpsFromTypeDiff(
 				return `${effectType}:[${b?.join(",")}]=>[${a?.join(",")}]`;
 			}
 		})
-		.filter(s => s != null)
+		.filter(isDefined)
 		.join(" ");
 }

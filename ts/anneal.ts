@@ -1,14 +1,18 @@
 import * as os from "os";
 import { mean, stddev } from "./arrayMath";
-import { formatPercent } from "./formatPercent";
 import { randomItem } from "./randomItem";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { strictDeepEqual } from "./strictDeepEqual";
 
 export type NeighborsGenerator<State> = (count: number, state: State, temp: number, prng: PseudoRNG) => State[];
 
+export interface StateAndEnergy<State> {
+	energy: number;
+	state: State;
+}
+
 export interface AnnealParams<State> {
-	calculateEnergy: (state: State) => Promise<number | undefined>;
+	calculateEnergy: (states: State[]) => Promise<StateAndEnergy<State>[]>;
 	formatState: (state: State, energy: number) => string,
 	improvement: (afterState: State, afterEnergy: number, beforeState: State, beforeEnergy: number, temp: number) => void;
 	initialState: State[];
@@ -18,6 +22,14 @@ export interface AnnealParams<State> {
 	temperatureMax: number;
 	temperatureMin: number;
 	threadCount: number;
+}
+
+export interface AnnealResult<State> {
+	bestEnergy: number;
+	bestStates: State[];
+	iterations: number;
+	meanEnergy: number;
+	stddevEnergy: number;
 }
 
 // istanbul ignore next
@@ -31,7 +43,7 @@ const ANNEAL_DEFAULTS: Partial<AnnealParams<unknown>> = {
 
 export async function anneal<State>(
 	params: Partial<AnnealParams<State>>,
-): Promise<State[]> {
+): Promise<AnnealResult<State>> {
 	const effectiveParams: AnnealParams<State> = Object.assign({}, ANNEAL_DEFAULTS as AnnealParams<State>, params);
 	const {
 		calculateEnergy,
@@ -56,36 +68,31 @@ export async function anneal<State>(
 	let temp: number = temperatureMax;
 	const bestStates: State[] = initialState.slice();
 	const lastStates: State[] = initialState.slice();
-	const initialEnergies = (await Promise
-		.all(initialState.map(currentState => calculateEnergy(currentState)
-			.then(currentEnergy => currentEnergy === undefined ? undefined : {
-				currentEnergy,
-				currentState,
-			}))))
-		.filter(o => o !== undefined) as { currentEnergy: number; currentState: State }[];
+	const initialEnergies = await calculateEnergy(initialState);
 	if (initialEnergies.length < 1) {
 		throw new Error(`None of the initial states returned an energy`);
 	}
-	let { currentEnergy, currentState } = initialEnergies.reduce((p, c) => {
-		return c.currentEnergy < p.currentEnergy ? c : p;
+	const initialBest = initialEnergies.reduce((p, c) => {
+		return c.energy < p.energy ? c : p;
 	});
+	let currentEnergy = initialBest.energy;
+	let currentState = initialBest.state;
 	/* istanbul ignore if */
 	if (currentEnergy == null) {
 		throw new Error(`Initial energy cannot be null.`);
 	}
 	let lastEnergy: number = currentEnergy;
 	let bestEnergy: number = currentEnergy;
-	let energies: number[];
 	let states: State[];
 	const allEnergies: number[] = [];
 	do {
 		let lastState = randomItem(lastStates);
 		states = neighbors(threadCount, lastState, temp, prng);
-		energies = (await Promise.all(states.map(state => calculateEnergy(state)))).filter(e => e != null) as number[];
-		allEnergies.push(...energies);
-		for (let i = 0; i < states.length; i++) {
-			currentState = states[i];
-			currentEnergy = energies[i];
+		const statesAndEnergies = await calculateEnergy(states);
+		for (let i = 0; i < statesAndEnergies.length; i++) {
+			currentState = statesAndEnergies[i].state;
+			currentEnergy = statesAndEnergies[i].energy;
+			allEnergies.push(currentEnergy);
 			/* istanbul ignore if */
 			if (strictDeepEqual(lastState, currentState)) {
 				throw new Error(`Equal states: ${formatState(lastState, lastEnergy)}`);
@@ -124,6 +131,11 @@ export async function anneal<State>(
 	} while (temp > temperatureMin && states.length > 0);
 	const avg = mean(allEnergies);
 	const sd = stddev(allEnergies, avg);
-	console.log(`Iterations: ${allEnergies.length}, mean: ${formatPercent(avg, 2)}, stddev: ${formatPercent(sd, 4)}`);
-	return bestStates;
+	return {
+		bestEnergy,
+		bestStates,
+		iterations: allEnergies.length,
+		meanEnergy: avg,
+		stddevEnergy: sd,
+	};
 }

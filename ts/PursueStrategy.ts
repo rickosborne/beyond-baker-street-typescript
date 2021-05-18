@@ -3,6 +3,7 @@ import { addEffectsIfNotPresent } from "./addEffect";
 import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategy, BotTurnStrategyType } from "./BotTurn";
 import { CardType } from "./CardType";
+import { isDefined } from "./defined";
 import { EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
@@ -88,7 +89,7 @@ export class PursueStrategy implements BotTurnStrategy {
 		return LEAD_TYPES
 			.map(leadType => turn.board.leads[leadType])
 			.map(lead => buildPursueOption(lead.leadCard.leadType, buildPursueEffectsForLead(lead, visibleLeads, turn, bot.hand, bot.inspector)))
-			.filter(option => option != null && option.effects.length > 0) as PursueOption[]
+			.filter(option => isDefined(option) && option.effects.length > 0) as PursueOption[]
 			;
 	}
 }

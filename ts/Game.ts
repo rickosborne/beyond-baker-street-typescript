@@ -15,6 +15,7 @@ import { BadOrGood, Board } from "./Board";
 import { CardType } from "./CardType";
 import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
 import { ConfirmAction, ConfirmOutcome, formatConfirm, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
+import { isDefined } from "./defined";
 import { EliminateAction, EliminateOutcome, formatEliminateOutcome, isEliminateAction } from "./EliminateAction";
 import { EvidenceCard, formatEvidence, isEvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
 import { BiFunction } from "./Function";
@@ -555,7 +556,7 @@ export class Game {
 		const wantEvidenceCount = activePlayer?.inspector === InspectorType.Blackwell ? 2 : 1;
 		const evidences = range(1, wantEvidenceCount)
 			.map(() => this.board.dealEvidence())
-			.filter(e => e != null) as EvidenceCard[];
+			.filter(isDefined);
 		let evidence: EvidenceCard | undefined;
 		if (evidences.length === 2 && isPlayerInspector(activePlayer, InspectorType.Blackwell)) {
 			const previousPlayer = this.playerToTheRight(activePlayer);

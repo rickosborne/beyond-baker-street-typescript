@@ -1,31 +1,25 @@
 import * as sqlite3 from "better-sqlite3";
+import * as os from "os";
 import * as process from "process";
-import { anneal, AnnealParams, NeighborsGenerator } from "./anneal";
+import { anneal, AnnealParams, StateAndEnergy } from "./anneal";
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType } from "./BotTurn";
 import {
-	DEFAULT_SCORE_FROM_TYPE,
 	EffectWeightOpsFromType,
 	formatEffectWeightOpsFromTypeDiff,
 	formatOrderedEffectWeightOpsFromType,
 } from "./defaultScores";
-import { EFFECT_WEIGHT_MODIFIERS, EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
+import { isDefined } from "./defined";
+import { EFFECT_WEIGHT_MODIFIERS, EffectWeightModifier } from "./EffectWeight";
 import { formatDecimal } from "./formatDecimal";
 import { formatPercent } from "./formatPercent";
-import { GameWorkerPool } from "./GameWorkerPool";
-import { objectMap } from "./objectMap";
-import { randomItem } from "./randomItem";
-import { range } from "./range";
-import { DEFAULT_PRNG, PseudoRNG } from "./rng";
-import { shuffleInPlace } from "./shuffle";
+import { GameSetup, GameWorkerPool } from "./GameWorkerPool";
+import { neighborsViaFormulae } from "./neighborsViaFormulae";
+import { DEFAULT_PRNG } from "./rng";
+import { SimRun } from "./SimRun";
 import { stableJson } from "./stableJson";
-import { strictDeepEqual } from "./strictDeepEqual";
 import { msTimer } from "./timer";
 import { toRecord } from "./toRecord";
-
-interface SimRun {
-	lossRate?: number;
-	weights: Partial<EffectWeightOpsFromType>;
-}
+import { PlayGameResult } from "./WorkerTypes";
 
 const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = toRecord(BOT_TURN_EFFECT_TYPES, k => k, t => [t === BotTurnEffectType.Win ? 1000 : t === BotTurnEffectType.Lose ? -1000 : 0]);
 // 90.8% InvestigatePerfect:145 > InvestigateWild:77 > Confirm:75 > PursueImpossible:48 > AssistKnown:46
@@ -50,7 +44,7 @@ const historyFileNameSqlite = `${historyFileName}.sqlite`;
 const db = new sqlite3(historyFileNameSqlite);
 db.pragma("journal_mode = WAL");
 const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
-const gameWorkerPool = new GameWorkerPool(isDebug ? 0 : 6);
+const gameWorkerPool = new GameWorkerPool(isDebug ? 0 : os.cpus().length);
 
 function quit(doExit = true): void {
 	console.log(`Closing ${historyFileNameSqlite}`);
@@ -123,187 +117,39 @@ function getAttemptSummary(): SelectAttemptSummary {
 	};
 }
 
-async function calculateEnergy(simRun: SimRun): Promise<number | undefined> {
-	const attempt = stableJson(simRun.weights);
-	const existing = scoreForAttempt(attempt);
-	if (existing != null) {
-		return existing;
-	}
-	const result = await gameWorkerPool.scoreGame(simRun.weights, iterations);
-	const lossRate = result.lossRate;
-	// console.log(`${formatPercent(result.lossRate, 2)} ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
-	simRun.lossRate = lossRate;
-	if (lossRate != null) {
+async function calculateEnergy(simRuns: SimRun[]): Promise<StateAndEnergy<SimRun>[]> {
+	const setups = simRuns.map(run => {
+		const weights = run.weights;
+		const attempt = stableJson(weights);
+		const lossRate = run.lossRate || scoreForAttempt(attempt);
+		const setup: GameSetup = {
+			iterations,
+			lossRate,
+			weights,
+		};
+		return setup;
+	});
+	const timer = msTimer();
+	const results: PlayGameResult[] = await gameWorkerPool.scoreGames(setups);
+	console.log(`Processed ${simRuns.length} games in ${Math.round(timer() / 1000)}s${timer() > 0 ? ` = ${formatDecimal(simRuns.length * 1000 / timer(), 2)} games/sec` : ""}`);
+	return results.filter(isDefined).map(result => {
+		if (result.errors !== undefined) {
+			console.error(result.errors);
+		}
+		const weights = result.request.weights;
+		const lossRate = result.lossRate as number;
+		const attempt = stableJson(weights);
 		addAttemptScore(attempt, lossRate);
-	}
-	return lossRate;
+		return {
+			energy: result.lossRate as number,
+			state: { weights },
+		};
+	});
 }
-
-function neighborsViaVariance(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
-	const start = Date.now();
-	const priorWeights = simRun.weights;
-	let variability = Math.floor(temp + 1);
-	const results: SimRun[] = [];
-	while (variability < 50) {
-		variability++;
-		const mods = range(-variability, variability);
-		mods.push(...mods.map(() => 0));
-		for (let comboAttempt = 0; comboAttempt < 250; comboAttempt++) {
-			const override: Partial<EffectWeightOpsFromType> = {};
-			for (const effectType of MUTABLE_TYPES) {
-				const mod = randomItem(mods, prng);
-				const existing: EffectWeightFormula = priorWeights[effectType] || FLAT_SCORE_FROM_TYPE[effectType];
-				const updated = (existing[0] as number) + mod;
-				override[effectType] = [updated];
-			}
-			const weights = Object.assign({}, priorWeights, override);
-			if (scoreForWeights(weights) === undefined) {
-				results.push({
-					weights,
-				});
-				// console.log(formatEffectWeightOpsFromTypeDiff(weights, simRun.weights));
-				if (results.length >= count) {
-					// const endDate = Date.now();
-					// console.log(`Took ${endDate - start}ms to find ${results.length}`);
-					return results;
-				}
-			}
-		}
-	}
-	const endDate = Date.now();
-	console.log(`Gave up after ${endDate - start}ms to find ${results.length}`);
-	return results;
-}
-
-const neighborsViaSwap = (function (): NeighborsGenerator<SimRun> {
-	let previousRun: SimRun;
-	const allRuns: SimRun[] = [];
-	const maxDistance = 6;
-	return function neighborsViaSwap(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
-		function addRunIfNovel(weights: EffectWeightOpsFromType,): void {
-			if (!strictDeepEqual(weights, simRun.weights) && scoreForWeights(weights) === undefined) {
-				allRuns.push({
-					weights,
-				});
-			}
-		}
-
-		if (!strictDeepEqual(previousRun, simRun)) {
-			previousRun = simRun;
-			allRuns.splice(0, allRuns.length);
-			const weights: EffectWeightOpsFromType = MUTABLE_TYPES.reduce((w, effectType) => {
-				const ops = simRun.weights[effectType] || DEFAULT_SCORE_FROM_TYPE[effectType];
-				const base = ops[0];
-				w[effectType] = [base];
-				return w;
-			}, {} as EffectWeightOpsFromType);
-			const orderedKeys = (Object.keys(weights) as BotTurnEffectType[]).slice()
-				.sort((a, b) => (weights[a][0] as number) - (weights[b][0] as number));
-			const keyCount = orderedKeys.length;
-			const lastIndex = keyCount - 1;
-			addRunIfNovel(objectMap(weights, (ops, type, index) => [Math.floor(lastIndex / 2) - index]));
-			const smallest = orderedKeys
-				.map(type => weights[type][0] as number)
-				.filter(v => v > 0)
-				.reduce((p, c) => Math.min(p, c), 1000);
-			if (smallest > 1) {
-				addRunIfNovel(objectMap(weights, ops => [Math.round((ops[0] as number) / smallest)]));
-				addRunIfNovel(objectMap(weights, ops => [(ops[0] as number) - smallest]));
-			}
-			const rotate = (sourceIndex: number, destIndex: number, weights: EffectWeightOpsFromType): void => {
-				const direction = sourceIndex < destIndex ? 1 : -1;
-				const first = weights[orderedKeys[sourceIndex]];
-				for (let index = sourceIndex; index !== destIndex; index += direction) {
-					weights[orderedKeys[index]] = weights[orderedKeys[index + direction]];
-				}
-				weights[orderedKeys[destIndex]] = first;
-			};
-			for (let distance = -maxDistance; distance <= maxDistance; distance++) {
-				if (distance === 0) {
-					continue;
-				}
-				for (let sourceIndex = 0; sourceIndex < keyCount; sourceIndex++) {
-					const destIndex = sourceIndex + distance;
-					if (destIndex < 0 || destIndex > lastIndex) {
-						continue;
-					}
-					const farSwap = Object.assign({}, weights);
-					const destKey = orderedKeys[destIndex];
-					const sourceKey = orderedKeys[sourceIndex];
-					[ farSwap[destKey], farSwap[sourceKey] ] = [ farSwap[sourceKey], farSwap[destKey] ];
-					addRunIfNovel(farSwap);
-					if (!strictDeepEqual(farSwap, simRun.weights) && scoreForWeights(farSwap) === undefined) {
-						allRuns.push({ weights: farSwap });
-					}
-					if (distance > 1) {
-						const left = Object.assign({}, weights);
-						const right = Object.assign({}, weights);
-						rotate(sourceIndex, destIndex, right);
-						rotate(destIndex, sourceIndex, left);
-						addRunIfNovel(left);
-						addRunIfNovel(right);
-					}
-				}
-			}
-			// console.log(`Swapped neighbors: ${allRuns.length}`);
-			shuffleInPlace(allRuns, prng);
-		}
-		if (allRuns.length === 0) {
-			// console.log(`Falling back to variance`);
-			allRuns.push(...neighborsViaVariance(1000, simRun, temp, prng));
-		}
-		const runs: SimRun[] = [];
-		runs.push(...allRuns.splice(0, count));
-		return runs;
-	};
-})();
 
 const modifiersPlusUndefined: (EffectWeightModifier | undefined)[] = EFFECT_WEIGHT_MODIFIERS.slice();
 modifiersPlusUndefined.push(undefined);
 
-function neighborsViaFormulae(count: number, state: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
-	const result: SimRun[] = [];
-	const timer = msTimer();
-	for (let effectsToModify = 1; effectsToModify <= 5; effectsToModify++) {
-		const effectTypes = shuffleInPlace(MUTABLE_TYPES.slice(), prng).slice(0, effectsToModify + 2);
-		let allWeights: Partial<EffectWeightOpsFromType>[] = [{}];
-		for (let effectStart = 0; effectStart < effectTypes.length - effectsToModify; effectStart++) {
-			const weights: Partial<EffectWeightOpsFromType> = {};
-			for (let effectNum = 0; effectNum < effectsToModify; effectNum++) {
-				const effectType = effectTypes[effectStart + effectNum];
-				let weight = state.weights[effectType];
-				if (weight == null) {
-					weight = DEFAULT_SCORE_FROM_TYPE[effectType];
-				}
-				const [ base, offset, modifier ] = weight;
-				const updatedModifier = randomItem(modifiersPlusUndefined);
-				const someWeights: Partial<EffectWeightOpsFromType>[] = [];
-				for (let delta = -10; delta <= 10; delta++) {
-					if (updatedModifier == null) {
-						someWeights.push(Object.assign({}, weights, { [effectType]: [base + delta] }));
-					} else {
-						someWeights.push(Object.assign({}, weights, { [effectType]: [ base, delta, updatedModifier ] }));
-					}
-					if(offset !== undefined && modifier != undefined) {
-						someWeights.push(Object.assign({}, weights, { [effectType]: [ base, offset + delta, modifier ] }));
-						if (updatedModifier != null) {
-							someWeights.push(Object.assign({}, weights, { [effectType]: [ base, offset, updatedModifier ] }));
-						}
-					}
-				}
-				allWeights = allWeights.flatMap(a => someWeights.map(b => Object.assign({}, a, b)));
-			}
-			const novel = allWeights.filter(w => !strictDeepEqual(w, state.weights) && scoreForWeights(w) === undefined)
-				.map(w => <SimRun> { weights: w });
-			result.push(...novel);
-		}
-		if (result.length >= count) {
-			console.log(`Novel: ${result.length}/${count} in ${timer()}ms and depth ${effectsToModify}`);
-			return result;
-		}
-	}
-	return result;
-}
 
 function improvement(afterState: SimRun, afterEnergy: number, beforeState: SimRun, beforeEnergy: number, temp: number): void {
 	console.log(`${formatPercent(afterEnergy, 2)} < ${formatPercent(beforeEnergy, 2)} :: ${temp} :: ${formatEffectWeightOpsFromTypeDiff(afterState.weights, beforeState.weights)}`);
@@ -333,10 +179,10 @@ const initialState: SimRun[] = initialFromBest.length > 0 ? initialFromBest : [{
 	weights: {},
 }];
 // const initialState: SimRun[] = [
-	// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[25],"ConfirmNotBaynes":[-15],"ConfirmReady":[ -2, 0, EffectWeightModifier.PlusImpossibleCount ],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[ 0, -21, EffectWeightModifier.RampUpWithHolmesProgress ],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
-	// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[25],"ConfirmNotBaynes":[-15],"ConfirmReady":[-2],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[-21],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
-	// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[ 25, 0, EffectWeightModifier.PlusHolmesLocation ],"ConfirmNotBaynes":[-15],"ConfirmReady":[-2],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[-21],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
-	// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[25],"ConfirmNotBaynes":[-15],"ConfirmReady":[-2],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[ 0, -21, EffectWeightModifier.RampUpWithHolmesProgress ],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
+// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[25],"ConfirmNotBaynes":[-15],"ConfirmReady":[ -2, 0, EffectWeightModifier.PlusImpossibleCount ],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[ 0, -21, EffectWeightModifier.RampUpWithHolmesProgress ],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
+// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[25],"ConfirmNotBaynes":[-15],"ConfirmReady":[-2],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[-21],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
+// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[ 25, 0, EffectWeightModifier.PlusHolmesLocation ],"ConfirmNotBaynes":[-15],"ConfirmReady":[-2],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[-21],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
+// { weights: { "AssistExactEliminate":[13],"AssistImpossibleType":[-22],"AssistKnown":[8],"AssistNarrow":[14],"AssistNextPlayer":[4],"AssistNotHope":[0],"Confirm":[-20],"ConfirmEventually":[25],"ConfirmNotBaynes":[-15],"ConfirmReady":[-2],"EliminateKnownValueUnusedType":[30],"EliminateKnownValueUsedType":[4],"EliminateSetsUpExact":[10],"EliminateStompsExact":[-13],"EliminateUnknownValueUnusedType":[32],"EliminateUnknownValueUsedType":[ 0, -21, EffectWeightModifier.RampUpWithHolmesProgress ],"EliminateWild":[24],"HolmesImpeded":[7],"HolmesProgress":[-20],"ImpossibleAdded":[0],"InvestigateBadOnUnwedged":[-37],"InvestigateBadOnWedged":[-13],"InvestigateCorrectType":[12],"InvestigateCorrectValue":[-1],"InvestigateMaybeBad":[-30],"InvestigatePerfect":[30],"InvestigateUnwedgeWithBad":[30],"InvestigateWild":[-9],"InvestigateWouldWedge":[-42],"InvestigationComplete":[33],"MaybeLose":[-33],"PursueConfirmable":[4],"PursueDuplicate":[36],"PursueImpossible":[18],"PursueMaybe":[-2],"PursuePossible":[-27],"Toby":[5] } },
 // ];
 
 initialState.forEach(state => {
@@ -352,24 +198,25 @@ async function optimize(
 	console.log(`Starting with ${summary.attempts} attempts, ${state.length} best${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}.`);
 	do {
 		const start = Date.now();
-		state = await anneal(<AnnealParams<SimRun>>{
+		const annealResult = await anneal(<AnnealParams<SimRun>>{
 			calculateEnergy,
 			formatState: (simRun, lossRate) => `${formatPercent(lossRate, 2)} ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`,
 			improvement,
 			initialState: state,
-			neighbors: neighborsViaFormulae,
+			neighbors: neighborsViaFormulae(MUTABLE_TYPES, EFFECT_WEIGHT_MODIFIERS, scoreForWeights),
 			prng: DEFAULT_PRNG,
 			temperature: temp => temp - 0.5,
 			temperatureMax: TEMP_MAX,
 			temperatureMin: TEMP_MIN,
 			threadCount: Math.max(1, gameWorkerPool.threadCount),
 		});
+		state = annealResult.bestStates;
 		const elapsed = Date.now() - start;
 		const endSummary = getAttemptSummary();
 		gameCount = endSummary.attempts - summary.attempts;
 		summary = endSummary;
 		const rate = gameCount / (elapsed / 1000);
-		console.log(`Completed ${summary.attempts} attempts, ${state.length} best${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}, ${formatDecimal(rate, 2)} games/sec.`);
+		console.log(`Completed ${summary.attempts} attempts, ${state.length} best${state[0].lossRate != null ? `, ${formatPercent(state[0].lossRate || 1, 2)} loss rate` : ""}, ${formatDecimal(rate, 2)} games/sec, mean ${formatPercent(annealResult.meanEnergy, 2)}, stddev ${formatPercent(annealResult.stddevEnergy, 2)}.`);
 	} while (gameCount > 0);
 	return state;
 }
