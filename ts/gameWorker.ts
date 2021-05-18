@@ -24,7 +24,7 @@ if (isMainThread || parentPort == null) {
 			let errors: string | undefined = undefined;
 			let lossReasons: Partial<Record<LossReason, number>> = {};
 			try {
-				const outcome = playSingleGame(request.weights, request.iterations, undefined, logger);
+				const outcome = playSingleGame(request.weights, request.cheat, request.iterations, undefined, logger);
 				lossRate = outcome.lossRate;
 				lossReasons = outcome.lossReasons;
 			} catch (e) {

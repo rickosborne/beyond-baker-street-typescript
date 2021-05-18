@@ -13,13 +13,14 @@ import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
 import { BOT_STRATEGIES } from "./BotStrategies";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategy } from "./BotTurn";
 import { BasicBotTurnEvaluator, BotTurnEvaluator } from "./BotTurnEvaluator";
+import { CheatingActivePlayer } from "./Cheat";
 import { isConfirmOutcome } from "./ConfirmAction";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { isDefined } from "./defined";
 import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
 import { buildEliminateEffects, EliminateStrategy } from "./EliminateStrategy";
-import { EvidenceCard, isEvidenceCard } from "./EvidenceCard";
+import { EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
 import { MonoFunction } from "./Function";
@@ -46,7 +47,7 @@ import { OtherHand } from "./OtherHand";
 import { Outcome, OutcomeType, TypedOutcome } from "./Outcome";
 import { isPikeOutcome, PikeInspectorStrategy, PikeOutcome } from "./Pike";
 import { availableValuesByType } from "./playedEvidence";
-import { ActivePlayer, isSamePlayer, Player } from "./Player";
+import { isSamePlayer, Player } from "./Player";
 import { isPursueOutcome, PursueOutcome } from "./PursueAction";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { strategyForInspector } from "./StrategyForInspector";
@@ -85,7 +86,7 @@ function buildOutcomeHandler<T extends OutcomeType, O extends TypedOutcome<T>>(g
 	};
 }
 
-export class Bot implements ActivePlayer, HasMysteryHand {
+export class Bot implements CheatingActivePlayer, HasMysteryHand {
 	private readonly eliminateStrategy: EliminateStrategy;
 	public readonly hand: MysteryCard[] = [];
 	private readonly inspectorStrategy: InspectorStrategy | undefined;
@@ -107,7 +108,9 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 	};
 	public readonly remainingEvidence = new MysteryPile();
 
+	// noinspection JSUnusedGlobalSymbols
 	constructor(
+		public readonly cheats: boolean = false,
 		private readonly logger: Logger = SILENT_LOGGER,
 		private readonly prng: PseudoRNG = DEFAULT_PRNG,
 		scoreFromTypeOverrides: Partial<EffectWeightOpsFromType> = {},
@@ -121,32 +124,20 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		this.eliminateStrategy = strategies.find(s => s instanceof EliminateStrategy) as EliminateStrategy;
 	}
 
-	public addCard(index: number, evidenceCard: EvidenceCard | undefined, fromRemainingEvidence: boolean): void {
+	public addCard(
+		index: number,
+		evidenceCard: EvidenceCard | undefined,
+		fromRemainingEvidence: boolean
+	): void {
 		const mysteryCard = evidenceCard != null ? MysteryCard.fromEvidenceCard(evidenceCard) : fromRemainingEvidence ? this.remainingEvidence.toMysteryCard() : new MysteryCard();
+		if (evidenceCard != null && fromRemainingEvidence) {
+			this.remainingEvidence.eliminate(evidenceCard);
+		}
 		this.hand.splice(index, 0, mysteryCard);
 		if (this.inspectorStrategy instanceof TobyInspectorStrategy) {
 			this.inspectorStrategy.addCard(index, evidenceCard, fromRemainingEvidence, mysteryCard);
 		}
 		this.logger.trace(() => `${this.name} took a card.  ${this.formatKnowledge(undefined)}`);
-	}
-
-	private assessGameState(turnStart: TurnStart): number {
-		let eliminatedFromHands = 0;
-		for (const otherPlayer of turnStart.otherPlayers) {
-			eliminatedFromHands += this.sawEvidences(otherPlayer.hand);
-		}
-		const board = turnStart.board;
-		const leads = board.leads;
-		let eliminatedFromLeads = 0;
-		for (const leadType of LEAD_TYPES) {
-			const lead = leads[leadType];
-			eliminatedFromLeads += this.sawEvidences(lead.badCards);
-			eliminatedFromLeads += this.sawEvidences(lead.evidenceCards);
-		}
-		const impossible = board.impossibleCards;
-		const eliminatedFromImpossible = this.sawEvidences(impossible.filter(c => isEvidenceCard(c)) as EvidenceCard[]);
-		console.log(`Eliminated ${eliminatedFromHands} from hands, ${eliminatedFromLeads} from leads, ${eliminatedFromImpossible} impossible.`);
-		return eliminatedFromHands + eliminatedFromLeads + eliminatedFromImpossible;
 	}
 
 	public chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice {
@@ -262,12 +253,17 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		return eliminated;
 	}
 
-	public sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined): void {
+	public sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined, handIndex: number): void {
 		if (!isSamePlayer(player, this) && (this.inspectorStrategy instanceof TobyInspectorStrategy)) {
 			this.inspectorStrategy.sawEvidenceDealt();
 		}
 		if (isDefined(evidenceCard)) {
-			this.sawEvidence(evidenceCard);
+			if (isSamePlayer(player, this)) {
+				const mysteryCard = this.hand[handIndex];
+				mysteryCard.setExact(evidenceCard);
+			} else {
+				this.sawEvidence(evidenceCard);
+			}
 		}
 	}
 
@@ -276,17 +272,6 @@ export class Bot implements ActivePlayer, HasMysteryHand {
 		if (this.inspectorStrategy instanceof TobyInspectorStrategy) {
 			this.inspectorStrategy.sawEvidenceReturned(evidenceCards, bottomOrTop, shuffle);
 		}
-	}
-
-	/**
-	 * @returns {number} The number of cards actually eliminated.
-	 */
-	private sawEvidences(evidenceCards: EvidenceCard[]): number {
-		let eliminated = 0;
-		for (const evidenceCard of evidenceCards) {
-			eliminated += this.sawEvidence(evidenceCard);
-		}
-		return eliminated;
 	}
 
 	private sawGoodInvestigate(outcome: GoodInvestigateOutcome): void {

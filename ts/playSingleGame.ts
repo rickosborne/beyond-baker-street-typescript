@@ -21,6 +21,7 @@ export interface SingleGameOutcome {
 
 export function playSingleGame(
 	weights: Partial<EffectWeightOpsFromType>,
+	cheat = false,
 	plays = 200,
 	prng: PseudoRNG = DEFAULT_PRNG,
 	logger: Logger = plays === 1 ? CONSOLE_LOGGER_NO_JSON : SILENT_LOGGER,
@@ -38,7 +39,7 @@ export function playSingleGame(
 			inspectors.unshift(f);
 		});
 		const bots = range(1, botCount)
-			.map(() => new Bot(logger, prng, weights, inspectors.shift()));
+			.map(() => new Bot(cheat, logger, prng, weights, inspectors.shift()));
 		const game = new Game(CASE_FILE_CARDS[0], bots, prng, logger);
 		while (game.state === GameState.Playing) {
 			game.step();

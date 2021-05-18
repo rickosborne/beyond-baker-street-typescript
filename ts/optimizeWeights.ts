@@ -2,7 +2,6 @@ import * as sqlite3 from "better-sqlite3";
 import * as os from "os";
 import * as process from "process";
 import { anneal, AnnealParams, StateAndEnergy } from "./anneal";
-import { sum } from "./arrayMath";
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType } from "./BotTurn";
 import {
 	EffectWeightOpsFromType,
@@ -12,6 +11,7 @@ import {
 import { isDefined } from "./defined";
 import { EFFECT_WEIGHT_MODIFIERS, EffectWeightModifier } from "./EffectWeight";
 import { formatDecimal } from "./formatDecimal";
+import { formatLossReasons } from "./formatLossReasons";
 import { formatPercent } from "./formatPercent";
 import { LossReason } from "./Game";
 import { GameSetup, GameWorkerPool } from "./GameWorkerPool";
@@ -20,18 +20,7 @@ import { DEFAULT_PRNG } from "./rng";
 import { SimRun } from "./SimRun";
 import { stableJson } from "./stableJson";
 import { msTimer } from "./timer";
-import { toRecord } from "./toRecord";
 import { PlayGameResult } from "./WorkerTypes";
-
-const FLAT_SCORE_FROM_TYPE: EffectWeightOpsFromType = toRecord(BOT_TURN_EFFECT_TYPES, k => k, t => [t === BotTurnEffectType.Win ? 1000 : t === BotTurnEffectType.Lose ? -1000 : 0]);
-// 90.8% InvestigatePerfect:145 > InvestigateWild:77 > Confirm:75 > PursueImpossible:48 > AssistKnown:46
-// > EliminateSetsUpExact:42 > AssistNextPlayer:31 > AssistExactEliminate:25 > EliminateUnusedType:23
-// > EliminateUnknownValue:19 > AssistImpossibleType:18 > PursueDuplicate:16 > EliminateStompsExact:15
-// > EliminateKnownUnusedValue:10 > HolmesProgress:8 > InvestigateCorrectType:8 > HolmesImpeded:4
-// > EliminateUsedType:2 > PursueMaybe:-1 > ImpossibleAdded:-14 > InvestigateMaybeBad:-24
-// > InvestigateCorrectValue:-29 > InvestigateBad:-31 > MaybeLose:-47 > AssistNarrow:-49 > EliminateWild:-51
-// > EliminateKnownUsedValue:-59 > PursuePossible:-70
-// 92.4 InvestigatePerfect:61 > InvestigateWild:48 > InvestigateCorrectType:36 > PursueImpossible:34 > PursueDuplicate:22 > EliminateKnownUnusedValue:19 > AssistExactEliminate:17 > AssistNextPlayer:9 > EliminateUnknownValue:8 > HolmesProgress:8 > InvestigateBad:6 > InvestigateMaybeBad:5 > ImpossibleAdded:4 > EliminateKnownUsedValue:3 > HolmesImpeded:2 > AssistNarrow:2 > AssistKnown:-1 > EliminateSetsUpExact:-1 > Confirm:-1 > InvestigateCorrectValue:-4 > EliminateUnusedType:-10 > EliminateStompsExact:-10 > AssistImpossibleType:-14 > EliminateWild:-21 > PursueMaybe:-23 > MaybeLose:-36 > EliminateUsedType:-41 > PursuePossible:-52
 
 const TEMP_MAX = 10;
 const TEMP_MIN = 1;
@@ -47,6 +36,7 @@ const db = new sqlite3(historyFileNameSqlite);
 db.pragma("journal_mode = WAL");
 const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
 const gameWorkerPool = new GameWorkerPool(isDebug ? 0 : os.cpus().length);
+const cheat = true;
 
 function quit(doExit = true): void {
 	console.log(`Closing ${historyFileNameSqlite}`);
@@ -119,21 +109,13 @@ function getAttemptSummary(): SelectAttemptSummary {
 	};
 }
 
-function formatLossReasons(lossReasons: Partial<Record<LossReason, number>>, runCount: number): string {
-	const reasons = Object.keys(lossReasons).sort() as LossReason[];
-	if (reasons.length === 0) {
-		return `none`;
-	}
-	// const runCount = sum(reasons.map(reason => lossReasons[reason] || 0));
-	return reasons.map(reason => `${reason}=${lossReasons[reason]}=${formatPercent((lossReasons[reason] || 0) / runCount)}`).join(", ");
-}
-
 async function calculateEnergy(simRuns: SimRun[]): Promise<StateAndEnergy<SimRun>[]> {
 	const setups = simRuns.map(run => {
 		const weights = run.weights;
 		const attempt = stableJson(weights);
 		const lossRate = run.lossRate || scoreForAttempt(attempt);
 		const setup: GameSetup = {
+			cheat,
 			iterations,
 			lossRate,
 			weights,

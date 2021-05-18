@@ -18,6 +18,7 @@ interface OnResult {
 }
 
 export interface GameSetup {
+	cheat: boolean;
 	iterations?: number;
 	lossRate?: number;
 	weights: Partial<EffectWeightOpsFromType>;
@@ -78,9 +79,10 @@ export class GameWorkerPool {
 		this.workerAvailable(worker);
 	}
 
-	public scoreGame(weights: Partial<EffectWeightOpsFromType>, iterations?: number): Promise<PlayGameResult> {
+	public scoreGame(weights: Partial<EffectWeightOpsFromType>, cheat: boolean, iterations?: number): Promise<PlayGameResult> {
 		const id = this.nextRequestId++;
 		const request: PlayGameRequest = {
+			cheat,
 			id,
 			iterations,
 			weights,
@@ -91,7 +93,7 @@ export class GameWorkerPool {
 				let lossRate: number | undefined = undefined;
 				let lossReasons: Partial<Record<LossReason, number>> = {};
 				try {
-					const outcome = playSingleGame(weights, iterations);
+					const outcome = playSingleGame(weights, cheat, iterations);
 					lossRate = outcome.lossRate;
 					lossReasons = outcome.lossReasons;
 				} catch (e) {
@@ -124,20 +126,21 @@ export class GameWorkerPool {
 	}
 
 	public async scoreGames(setups: GameSetup[]): Promise<PlayGameResult[]> {
-		return await parallelMap<GameSetup, PlayGameResult>(setups, this.threadCount, (setup, context) => {
+		return await parallelMap<GameSetup, PlayGameResult>(setups, this.threadCount, (setup) => {
 			if (setup.lossRate !== undefined) {
 				return {
 					errors: undefined,
 					lossRate: setup.lossRate,
 					lossReasons: {},
 					request: {
+						cheat: setup.cheat,
 						id: -1,
 						iterations: setup.iterations,
 						weights: setup.weights,
 					},
 				};
 			} else {
-				return this.scoreGame(setup.weights, setup.iterations);
+				return this.scoreGame(setup.weights, setup.cheat, setup.iterations);
 			}
 		});
 	}

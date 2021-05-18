@@ -3,6 +3,7 @@ import { LossReason } from "./Game";
 import { isNumber } from "./isNumber";
 
 export interface PlayGameRequest {
+	readonly cheat: boolean;
 	readonly id: number;
 	readonly iterations?: number;
 	readonly weights: Partial<EffectWeightOpsFromType>;

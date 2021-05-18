@@ -14,6 +14,7 @@ import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
 import { BadOrGood, Board } from "./Board";
 import { CardType } from "./CardType";
 import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
+import { CheatingActivePlayer, isCheatingActivePlayer } from "./Cheat";
 import { ConfirmAction, ConfirmOutcome, formatConfirm, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
 import { isDefined } from "./defined";
 import { EliminateAction, EliminateOutcome, formatEliminateOutcome, isEliminateAction } from "./EliminateAction";
@@ -68,7 +69,9 @@ export enum LossReason {
 	TooMuchInvestigation = "TooMuchInvestigation",
 }
 
-export class GamePlayer implements OtherPlayer, ActivePlayer {
+export class GamePlayer implements OtherPlayer, CheatingActivePlayer {
+	public readonly cheats = true;
+
 	constructor(
 		public readonly player: ActivePlayer,
 		private readonly _hand: EvidenceCard[] = [],
@@ -76,7 +79,8 @@ export class GamePlayer implements OtherPlayer, ActivePlayer {
 	}
 
 	public addCard(
-		index: number, evidenceCard: EvidenceCard | undefined,
+		index: number,
+		evidenceCard: EvidenceCard | undefined,
 		fromRemainingEvidence: boolean,
 		playerSawCard = false,
 	): void {
@@ -84,7 +88,8 @@ export class GamePlayer implements OtherPlayer, ActivePlayer {
 			throw new Error(`Expected evidence card at ${index}`);
 		}
 		this._hand.splice(index, 0, evidenceCard);
-		this.player.addCard(index, playerSawCard ? evidenceCard : undefined, fromRemainingEvidence);
+		const evidence = playerSawCard || isCheatingActivePlayer(this.player) ? evidenceCard : undefined;
+		this.player.addCard(index, evidence, fromRemainingEvidence);
 	}
 
 	public chooseForBlackwell(blackwellTurn: BlackwellTurn): BlackwellChoice {
@@ -114,8 +119,12 @@ export class GamePlayer implements OtherPlayer, ActivePlayer {
 		return card;
 	}
 
-	public sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined): void {
-		this.player.sawEvidenceDealt(player, evidenceCard);
+	public sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard, handIndex: number, playerSaw = false): void {
+		let evidence: EvidenceCard | undefined = evidenceCard;
+		if (isSamePlayer(player, this.player) && !playerSaw && !isCheatingActivePlayer(this.player)) {
+			evidence = undefined;
+		}
+		this.player.sawEvidenceDealt(player, evidence, handIndex);
 	}
 
 	public sawEvidenceReturned(evidenceCards: EvidenceCard[], bottomOrTop: BottomOrTop, shuffle: boolean): void {
@@ -214,16 +223,15 @@ export class Game {
 		}
 		for (let i = 0; i < this.cardsPerPlayer; i++) {
 			for (const player of this.players) {
-				const evidence = this.dealEvidence();
+				const evidence = this.dealEvidence(player);
 				if (evidence == null) {
 					throw new Error(`Could not deal out all cards`);
 				}
-				player.addCard(i, evidence, false, false);
 			}
 		}
 		this.players.forEach(player => {
-			player.hand.forEach(evidence => {
-				this.players.filter(p => !isSamePlayer(p, player)).forEach(p => p.sawEvidenceDealt(player, evidence));
+			player.hand.forEach((evidence, handIndex) => {
+				this.players.forEach(p => p.sawEvidenceDealt(player, evidence, handIndex, false));
 			});
 		});
 		this.logger.info(() => `Game started with case file ${formatCaseFileCard(caseFile)} and players ${players.map(p => p.name).join(', ')}. Leads are: ${LEAD_TYPES.map(leadType => formatLeadCard(this.board.leads[leadType].leadCard)).join(", ")}.`);
@@ -261,10 +269,7 @@ export class Game {
 			this.logger.info(() => this._state === GameState.Lost ? `Lost because ${this._lossReason}.` : this._state);
 		}
 		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
-			const evidence = this.dealEvidence(activePlayer);
-			if (evidence != null) {
-				activePlayer.addCard(activePlayer.hand.length, evidence, true);
-			}
+			this.dealEvidence(activePlayer);
 		}
 	}
 
@@ -602,8 +607,10 @@ export class Game {
 			evidence = evidences.shift();
 		}
 		if (evidence != null && activePlayer != null) {
+			const handIndex = activePlayer.hand.length;
+			activePlayer.addCard(handIndex, evidence, true, false);
 			for (const player of this.players) {
-				player.sawEvidenceDealt(activePlayer, isSamePlayer(player, activePlayer) ? undefined : evidence);
+				player.sawEvidenceDealt(activePlayer, evidence, handIndex, false);
 			}
 		}
 		return evidence;

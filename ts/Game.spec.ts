@@ -86,14 +86,15 @@ describe("GamePlayer", function () {
 		const p = <Player> { name: "p" };
 		let lastSaw: Player | undefined = undefined;
 		const active = <ActivePlayer> {
-			sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined): void {
+			sawEvidenceDealt(player: Player, evidenceCard: EvidenceCard | undefined, handIndex: number, sawCard: boolean): void {
 				expect(player).equals(p);
+				expect(evidenceCard).is.not.undefined;
 				lastSaw = player;
 			},
 		};
 		const gp = new GamePlayer(active);
 		expect(lastSaw).is.undefined;
-		gp.sawEvidenceDealt(p, evidence(1, EvidenceType.Document));
+		gp.sawEvidenceDealt(p, evidence(1, EvidenceType.Document), 2, false);
 		expect(lastSaw).equals(p);
 	});
 	it("sawEvidenceReturned delegates", function () {
