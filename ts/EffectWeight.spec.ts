@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
+import { BotTurnEffectType } from "./BotTurn";
 import {
 	compileEffectWeight, EffectWeightFormula, EffectWeightModifier,
 	holmesProgress,
@@ -105,10 +106,10 @@ describe("EffectWeight", function () {
 	});
 	describe("compileEffectWeight", function () {
 		it("throws for bogus", function () {
-			expect(() => compileEffectWeight([] as unknown as EffectWeightFormula)).throws("No ops for effectWeight");
+			expect(() => compileEffectWeight([] as unknown as EffectWeightFormula, BotTurnEffectType.Win)).throws("No ops for effectWeight");
 		});
 		it("handles no formula", function () {
-			expect(compileEffectWeight([10])(turnHolmes(3))).equals(10);
+			expect(compileEffectWeight([10], BotTurnEffectType.Win)(turnHolmes(3), [])).equals(10);
 		});
 
 		([
@@ -172,7 +173,7 @@ describe("EffectWeight", function () {
 			[ 0, 10, EffectWeightModifier.TimesRemainingProgressReversed, turnRemain(EVIDENCE_CARDS.length), 10 ],
 		] as [number, number, EffectWeightModifier, TurnStart, number][]).forEach(([ base, offset, modifier, turn, expected ]) => {
 			it(`handles ${base} ${modifier} ${JSON.stringify(turn.board)} => ${expected}`, function () {
-				expect(roundTo(compileEffectWeight([ base, offset, modifier ])(turn), 1)).equals(expected);
+				expect(roundTo(compileEffectWeight([ base, offset, modifier ], BotTurnEffectType.Win)(turn, []), 1)).equals(expected);
 			});
 		});
 	});

@@ -1,3 +1,4 @@
+import { mean } from "./arrayMath";
 import { CardType } from "./CardType";
 import { EVIDENCE_CARD_VALUES, EVIDENCE_CARDS, EvidenceCard, formatEvidence } from "./EvidenceCard";
 import { EVIDENCE_TYPES, EvidenceType } from "./EvidenceType";
@@ -76,7 +77,7 @@ export class MysteryCard implements UnknownCard {
 		}
 	}
 
-	private asArray(): EvidenceCard[] {
+	public asArray(): EvidenceCard[] {
 		if (this._evidence != null) {
 			return [this._evidence];
 		}
@@ -93,6 +94,20 @@ export class MysteryCard implements UnknownCard {
 			possibleTypes: this.possibleTypes,
 			possibleValues: this.possibleValues,
 		};
+	}
+
+	public averageValue(): number {
+		if (this._evidence != null) {
+			return this._evidence.evidenceValue;
+		}
+		const countAndSum = EVIDENCE_CARD_VALUES.reduce((p, v) => {
+			const count = this.possibleValues[v];
+			return {
+				count: p.count + count,
+				sum: p.sum + (count * v),
+			};
+		}, { count: 0, sum: 0 });
+		return countAndSum.count === 0 ? 0 : (countAndSum.sum / countAndSum.count);
 	}
 
 	private clear(): void {

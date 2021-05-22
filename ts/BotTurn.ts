@@ -14,34 +14,98 @@ export enum BotTurnEffectType {
 	ConfirmEventually = "ConfirmEventually",
 	ConfirmNotBaynes = "ConfirmNotBaynes",
 	ConfirmReady = "ConfirmReady",
-	EliminateKnownValueUnusedType = "EliminateKnownValueUnusedType",
-	EliminateKnownValueUsedType = "EliminateKnownValueUsedType",
-	EliminateSetsUpExact = "EliminateSetsUpExact",
-	EliminateStompsExact = "EliminateStompsExact",
-	EliminateUnknownValueUnusedType = "EliminateUnknownValueUnusedType",
-	EliminateUnknownValueUsedType = "EliminateUnknownValueUsedType",
-	EliminateWild = "EliminateWild",
+	/**
+	 * This evidence could be used on a lead, but it also could complete the investigation.
+	 */
+	EliminateMaybeUsefulCompletesInvestigation = "EliminateMaybeUsefulCompletesInvestigation",
+	/**
+	 * This evidence has the potential to help with a lead.
+	 */
+	EliminateMaybeUseful = "EliminateMaybeUseful",
+	EliminateMightLose = "EliminateMightLose",
+	EliminatePossibility = "EliminatePossibility",
+	/**
+	 * This evidence could be used on a lead, but it also could set up completing the investigation.
+	 */
+	EliminateMaybeUsefulSetsUpExact = "EliminateMaybeUsefulSetsUpExact",
+	/**
+	 * This evidence does not seem to help any leads.
+	 */
+	EliminateUnused = "EliminateUnused",
+	/**
+	 * This evidence doesn't seem useful for a lead, but would complete the investigation.
+	 */
+	EliminateUnusedCompletesInvestigation = "EliminateUnusedCompletesInvestigation",
+	/**
+	 * This evidence doesn't seem useful for a lead, but may be a viable part of the investigation.
+	 */
+	EliminateUnusedSetsUpExact = "EliminateUnusedSetsUpExact",
+	/**
+	 * Eliminating this card would wedge the investigation.
+	 */
+	EliminateWedgesInvestigation = "EliminateWedgesInvestigation",
+	/**
+	 * This card is critical for confirming a lead.
+	 */
+	EliminateWedgesLead = "EliminateWedgesLead",
 	HolmesImpeded = "HolmesImpeded",
 	HolmesProgress = "HolmesProgress",
 	ImpossibleAdded = "ImpossibleAdded",
-	InvestigateBadOnWedged = "InvestigateBadOnWedged",
-	InvestigateBadOnUnwedged = "InvestigateBadOnUnwedged",
-	InvestigateCorrectType = "InvestigateCorrectType",
-	InvestigateCorrectValue = "InvestigateCorrectValue",
-	InvestigateMaybeBad = "InvestigateMaybeBad",
-	InvestigatePerfect = "InvestigatePerfect",
 	/**
-	 * An investigation is currently wedged, but adding this bad card would unwedge it.
+	 * This card is bad, but there's still a hypothetical solution.
 	 */
-	InvestigateUnwedgeWithBad = "InvestigateUnwedgeWithBad",
-	InvestigateWild = "InvestigateWild",
+	InvestigateBadButAvailable = "InvestigateBadButAvailable",
+	/**
+	 * This card is bad, but there's still a visible solution.
+	 */
+	InvestigateBadButVisible = "InvestigateBadButVisible",
+	/**
+	 * The lead is not wedged, but this adds bad evidence which would wedge it.
+	 */
+	InvestigateBadOnUnwedgedDoesWedge = "InvestigateBadOnUnwedgedDoesWedge",
+	/**
+	 * The lead is already wedged, and adding this card doesn't help.
+	 */
+	InvestigateBadOnWedged = "InvestigateBadOnWedged",
+	/**
+	 * The lead is currently confirmable, but this bad evidence breaks that.
+	 */
+	InvestigateBreaksConfirmable = "InvestigateBreaksConfirmable",
+	/**
+	 * This is the correct type, and it leads to a visible solution.
+	 */
+	InvestigateGoodAndAvailable = "InvestigateGoodAndAvailable",
+	/**
+	 * This is the correct type, and it leads to a visible solution.
+	 */
+	InvestigateGoodAndVisible = "InvestigateGoodAndVisible",
 	/**
 	 * When you put down evidence which prevents the lead from being solved due to available cards.
 	 */
-	InvestigateWouldWedge = "InvestigateWouldWedge",
+	InvestigateGoodButWouldWedge = "InvestigateGoodButWouldWedge",
+	/**
+	 * This is the correct type, and makes the lead confirmable.
+	 */
+	InvestigateGoodMakesConfirmable = "InvestigateGoodMakesConfirmable",
+	InvestigatePossibility = "InvestigatePossibility",
+	/**
+	 * This is the right type, but makes the value overshoot the target.
+	 */
+	InvestigateTooFar = "InvestigateTooFar",
+	/**
+	 * Adding this bad evidence would make the lead unreachable.
+	 */
+	InvestigateTooMuchBad = "InvestigateTooMuchBad",
+	/**
+	 * An investigation is currently wedged, but adding this bad card would unwedge it, eventually.
+	 */
+	InvestigateUnwedgeForAvailable = "InvestigateUnwedgeForAvailable",
+	/**
+	 * An investigation is currently wedged, but adding this bad card would unwedge it with visible cards.
+	 */
+	InvestigateUnwedgeForVisible = "InvestigateUnwedgeForVisible",
 	InvestigationComplete = "InvestigationComplete",
 	Lose = "Lose",
-	MaybeLose = "MaybeLose",
 	PursueConfirmable = "PursueConfirmable",
 	PursueDuplicate = "PursueDuplicate",
 	PursueImpossible = "PursueImpossible",
@@ -79,3 +143,6 @@ export enum BotTurnStrategyType {
 	Investigate = "Investigate",
 	Pursue = "Pursue",
 }
+
+export const IGNORE_EFFECT_TYPES = [ BotTurnEffectType.Win, BotTurnEffectType.Lose ];
+export const MUTABLE_EFFECT_TYPES = BOT_TURN_EFFECT_TYPES.filter((key: BotTurnEffectType) => !IGNORE_EFFECT_TYPES.includes(key));

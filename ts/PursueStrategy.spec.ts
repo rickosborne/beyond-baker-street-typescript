@@ -109,13 +109,14 @@ describe("PursueStrategy", function () {
 	});
 	describe("buildPursueOption", function () {
 		it("works", function () {
-			expect(buildPursueOption(LeadType.Opportunity, [BotTurnEffectType.PursueMaybe]))
+			expect(buildPursueOption(LeadType.Opportunity, [BotTurnEffectType.PursueMaybe], 1))
 				.deep.equals({
 				action: {
 					actionType: ActionType.Pursue,
 					leadType: LeadType.Opportunity,
 				},
 				effects: [BotTurnEffectType.PursueMaybe],
+				leadCountAfter: 1,
 				strategyType: BotTurnStrategyType.Pursue,
 			});
 		});
@@ -164,9 +165,9 @@ describe("PursueStrategy", function () {
 			const motive = options.find(o => o.action.leadType === LeadType.Motive);
 			const opportunity = options.find(o => o.action.leadType === LeadType.Opportunity);
 			const suspect = options.find(o => o.action.leadType === LeadType.Suspect);
-			expect(motive).deep.equals(buildPursueOption(LeadType.Motive, [ BotTurnEffectType.ImpossibleAdded, BotTurnEffectType.PursueMaybe ]));
-			expect(opportunity).deep.equals(buildPursueOption(LeadType.Opportunity, [ BotTurnEffectType.ImpossibleAdded, BotTurnEffectType.PursueImpossible ]));
-			expect(suspect).deep.equals(buildPursueOption(LeadType.Suspect, [ BotTurnEffectType.ImpossibleAdded, BotTurnEffectType.Lose, BotTurnEffectType.PursueMaybe ]));
+			expect(motive).deep.equals(buildPursueOption(LeadType.Motive, [ BotTurnEffectType.ImpossibleAdded, BotTurnEffectType.PursueMaybe ], 2));
+			expect(opportunity).deep.equals(buildPursueOption(LeadType.Opportunity, [ BotTurnEffectType.ImpossibleAdded, BotTurnEffectType.PursueImpossible ], 2));
+			expect(suspect).deep.equals(buildPursueOption(LeadType.Suspect, [ BotTurnEffectType.ImpossibleAdded, BotTurnEffectType.Lose, BotTurnEffectType.PursueMaybe ], 0));
 		});
 	});
 });

@@ -21,6 +21,8 @@ export interface GameSetup {
 	cheat: boolean;
 	iterations?: number;
 	lossRate?: number;
+	lossVariance?: number;
+	plays?: number;
 	weights: Partial<EffectWeightOpsFromType>;
 }
 
@@ -90,12 +92,16 @@ export class GameWorkerPool {
 		return new Promise<PlayGameResult>((resolve) => {
 			if (this.threadCount === 0) {
 				let errors: string | undefined = undefined;
-				let lossRate: number | undefined = undefined;
+				let lossRate = 1;
 				let lossReasons: Partial<Record<LossReason, number>> = {};
+				let lossVariance = 1;
+				let plays = 0;
 				try {
 					const outcome = playSingleGame(weights, cheat, iterations);
 					lossRate = outcome.lossRate;
 					lossReasons = outcome.lossReasons;
+					lossVariance = outcome.lossVariance;
+					plays = outcome.plays;
 				} catch (e) {
 					errors = String(e);
 				}
@@ -103,6 +109,8 @@ export class GameWorkerPool {
 					errors,
 					lossRate,
 					lossReasons,
+					lossVariance,
+					plays,
 					request,
 				});
 				return;
@@ -125,13 +133,18 @@ export class GameWorkerPool {
 		});
 	}
 
-	public async scoreGames(setups: GameSetup[]): Promise<PlayGameResult[]> {
-		return await parallelMap<GameSetup, PlayGameResult>(setups, this.threadCount, (setup) => {
-			if (setup.lossRate !== undefined) {
+	public async scoreGames(
+		setups: Iterator<GameSetup, undefined>,
+		eachResult?: Consumer<PlayGameResult> | undefined
+	): Promise<void> {
+		await parallelMap<GameSetup, PlayGameResult>(setups, this.threadCount, (setup) => {
+			if (setup.lossRate !== undefined && setup.lossVariance !== undefined && setup.plays !== undefined) {
 				return {
 					errors: undefined,
 					lossRate: setup.lossRate,
 					lossReasons: {},
+					lossVariance: setup.lossVariance,
+					plays: setup.plays,
 					request: {
 						cheat: setup.cheat,
 						id: -1,
@@ -142,7 +155,7 @@ export class GameWorkerPool {
 			} else {
 				return this.scoreGame(setup.weights, setup.cheat, setup.iterations);
 			}
-		});
+		}, eachResult);
 	}
 
 	public shutdown(): void {

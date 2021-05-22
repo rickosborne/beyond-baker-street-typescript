@@ -16,8 +16,10 @@ export function isPlayGameRequest(maybe: unknown): maybe is PlayGameRequest {
 
 export interface PlayGameResult {
 	readonly errors: string | undefined;
-	readonly lossRate: number | undefined;
+	readonly lossRate: number;
 	readonly lossReasons: Partial<Record<LossReason, number>>;
+	readonly lossVariance: number;
+	readonly plays: number;
 	readonly request: PlayGameRequest;
 }
 

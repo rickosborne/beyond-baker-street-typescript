@@ -1,5 +1,6 @@
 import { Bot } from "./Bot";
 import { CASE_FILE_CARDS } from "./CaseFileCard";
+import { DataSet } from "./DataSet";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { isDefined } from "./defined";
 import { Game, GameState, LossReason } from "./Game";
@@ -13,6 +14,7 @@ import { shuffleInPlace } from "./shuffle";
 export interface SingleGameOutcome {
 	readonly lossRate: number;
 	readonly lossReasons: Partial<Record<LossReason, number>>;
+	readonly lossVariance: number;
 	readonly losses: number;
 	readonly plays: number;
 	readonly turns: number;
@@ -32,6 +34,7 @@ export function playSingleGame(
 	let losses = 0;
 	let turns = 0;
 	const lossReasons: Partial<Record<LossReason, number>> = {};
+	const lossNums: number[] = [];
 	for (let i = 0; i < plays; i++) {
 		const inspectors = shuffleInPlace(availableInspectors.slice(), prng);
 		forceInspectors.forEach(f => {
@@ -44,7 +47,9 @@ export function playSingleGame(
 		while (game.state === GameState.Playing) {
 			game.step();
 		}
-		if (game.state === GameState.Lost) {
+		const didLose = game.state === GameState.Lost;
+		lossNums.push(didLose ? 0 : 1);  // the mean should equal lossRate
+		if (didLose) {
 			losses++;
 			const lossReason = game.lossReason;
 			if (isDefined(lossReason)) {
@@ -54,11 +59,13 @@ export function playSingleGame(
 		}
 		turns += game.turns;
 	}
+	const lossVariance = new DataSet(lossNums).sampleVariance;
 	const lossRate = losses / plays;
 	const turnsAvg = turns / plays;
 	return {
 		lossRate,
 		lossReasons,
+		lossVariance,
 		losses,
 		plays,
 		turns,

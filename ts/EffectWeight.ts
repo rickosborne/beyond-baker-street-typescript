@@ -1,3 +1,5 @@
+import { countOf } from "./arrayMath";
+import { BotTurnEffectType } from "./BotTurn";
 import { enumKeys } from "./enumKeys";
 import { EVIDENCE_CARDS } from "./EvidenceCard";
 import { BiFunction } from "./Function";
@@ -112,22 +114,21 @@ export const EFFECT_WEIGHT_CALCULATORS: Record<EffectWeightModifier, BiFunction<
 	[EffectWeightModifier.TimesRemainingProgressReversed]: (n, t) => n * remainingProgress(t, true, true),
 };
 
-export type EffectWeightFromTurn = (turn: HasVisibleBoard) => number;
+export type EffectWeightFromTurn = (turn: HasVisibleBoard, effects: BotTurnEffectType[]) => number;
 
 export function compileEffectWeight(
 	ops: EffectWeightFormula,
+	effectType: BotTurnEffectType,
 ): EffectWeightFromTurn {
 	if (ops.length < 1) {
 		throw new Error(`No ops for effectWeight`);
 	}
 	const [ base, offset, modifier ] = ops;
-	if (modifier === undefined || offset === undefined) {
-		return function noModifier(): number {
-			return base;
-		};
-	}
-	const calculator = EFFECT_WEIGHT_CALCULATORS[modifier];
-	return function calculate(turn: HasVisibleBoard): number {
-		return base + calculator(offset, turn);
-	};
+	const getBase: (effects: BotTurnEffectType[]) => number = effectType.startsWith("Investigate")
+		? e => base / countOf(BotTurnEffectType.InvestigatePossibility, e)
+		: effectType.startsWith("Eliminate")
+		? e => base / countOf(BotTurnEffectType.EliminatePossibility, e)
+		: () => base;
+	const getModified: (turn: HasVisibleBoard) => number = modifier === undefined || offset === undefined ? () => 0 : turn => EFFECT_WEIGHT_CALCULATORS[modifier](offset, turn);
+	return (turn, effects) => getBase(effects) + getModified(turn);
 }

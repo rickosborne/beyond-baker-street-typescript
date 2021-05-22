@@ -23,3 +23,18 @@ export function reduceOptions<O extends BotTurnOption & { action: A }, A extends
 	}, {} as Record<string, O>);
 	return Object.values(best);
 }
+
+export function reduceOptionsComparingOptions<O extends BotTurnOption>(
+	options: O[],
+	comparator: Comparator<O>,
+): O[] {
+	const best = options.reduce((state, option) => {
+		const key = option.effects.sort().join(",");
+		const existing = state[key];
+		if (existing == null || comparator(existing, option) > 0) {
+			state[key] = option;
+		}
+		return state;
+	}, {} as Record<string, O>);
+	return Object.values(best);
+}

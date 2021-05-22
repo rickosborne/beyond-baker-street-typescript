@@ -1,7 +1,10 @@
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
 import { isDefined } from "./defined";
-import { EffectWeightFormula } from "./EffectWeight";
+import { EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
 import { strictDeepEqual } from "./strictDeepEqual";
+
+// "{""EliminateWild"":[19,4,""PlusHolmesLocation""],""InvestigationComplete"":[15,1,""RampDownWithInvestigationProgress""],""PursueConfirmable"":[22,-45,""OverImpossiblePastLimit""]}"
+// "{""AssistKnown"":[4,10,""PlusImpossibleCount""],""HolmesProgress"":[-17,15,""TimesHolmesProgressReversed""],""PursueConfirmable"":[18,-35,""OverHolmesProgressReversed""]}"
 
 export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightFormula>;
 export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
@@ -15,30 +18,37 @@ export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.ConfirmEventually]: [25],
 	[BotTurnEffectType.ConfirmNotBaynes]: [-15],
 	[BotTurnEffectType.ConfirmReady]: [3],
-	[BotTurnEffectType.EliminateKnownValueUnusedType]: [30],
-	[BotTurnEffectType.EliminateKnownValueUsedType]: [4],
-	[BotTurnEffectType.EliminateSetsUpExact]: [10],
-	[BotTurnEffectType.EliminateStompsExact]: [-13],
-	[BotTurnEffectType.EliminateUnknownValueUnusedType]: [32],
-	[BotTurnEffectType.EliminateUnknownValueUsedType]: [-21],
-	[BotTurnEffectType.EliminateWild]: [-3],
 	[BotTurnEffectType.HolmesImpeded]: [7],
+	[BotTurnEffectType.EliminateMaybeUseful]: [5],
+	[BotTurnEffectType.EliminateMaybeUsefulCompletesInvestigation]: [ -6, 13, EffectWeightModifier.RampUpWithHolmesProgress ],
+	[BotTurnEffectType.EliminateMaybeUsefulSetsUpExact]: [10],
+	[BotTurnEffectType.EliminateMightLose]: [-70],
+	[BotTurnEffectType.EliminatePossibility]: [0],
+	[BotTurnEffectType.EliminateUnused]: [15],
+	[BotTurnEffectType.EliminateUnusedCompletesInvestigation]: [25],
+	[BotTurnEffectType.EliminateUnusedSetsUpExact]: [20],
+	[BotTurnEffectType.EliminateWedgesInvestigation]: [-60],
+	[BotTurnEffectType.EliminateWedgesLead]: [-40],
 	[BotTurnEffectType.HolmesProgress]: [-20],
 	[BotTurnEffectType.ImpossibleAdded]: [0],
-	[BotTurnEffectType.InvestigateBadOnUnwedged]: [-37],
+	[BotTurnEffectType.InvestigateBadButAvailable]: [1],
+	[BotTurnEffectType.InvestigateBadButVisible]: [2],
+	[BotTurnEffectType.InvestigateBadOnUnwedgedDoesWedge]: [-35],
 	[BotTurnEffectType.InvestigateBadOnWedged]: [-13],
-	[BotTurnEffectType.InvestigateCorrectType]: [12],
-	[BotTurnEffectType.InvestigateCorrectValue]: [-1],
-	[BotTurnEffectType.InvestigateMaybeBad]: [-30],
-	[BotTurnEffectType.InvestigatePerfect]: [30],
-	[BotTurnEffectType.InvestigateUnwedgeWithBad]: [30],
-	[BotTurnEffectType.InvestigateWild]: [-9],
-	[BotTurnEffectType.InvestigateWouldWedge]: [-42],
-	[BotTurnEffectType.InvestigationComplete]: [33],
+	[BotTurnEffectType.InvestigateBreaksConfirmable]: [-35],
+	[BotTurnEffectType.InvestigateGoodAndAvailable]: [15],
+	[BotTurnEffectType.InvestigateGoodAndVisible]: [30],
+	[BotTurnEffectType.InvestigateGoodButWouldWedge]: [-40],
+	[BotTurnEffectType.InvestigateGoodMakesConfirmable]: [35],
+	[BotTurnEffectType.InvestigatePossibility]: [0],
+	[BotTurnEffectType.InvestigateTooFar]: [-40],
+	[BotTurnEffectType.InvestigateTooMuchBad]: [-40],
+	[BotTurnEffectType.InvestigateUnwedgeForAvailable]: [30],
+	[BotTurnEffectType.InvestigateUnwedgeForVisible]: [40],
+	[BotTurnEffectType.InvestigationComplete]: [0],
 	[BotTurnEffectType.Lose]: [-1000],
-	[BotTurnEffectType.MaybeLose]: [-33],
-	[BotTurnEffectType.PursueConfirmable]: [-10],
-	[BotTurnEffectType.PursueDuplicate]: [36],
+	[BotTurnEffectType.PursueConfirmable]: [-40],
+	[BotTurnEffectType.PursueDuplicate]: [50],
 	[BotTurnEffectType.PursueImpossible]: [18],
 	[BotTurnEffectType.PursueMaybe]: [-11],
 	[BotTurnEffectType.PursuePossible]: [-29],
@@ -63,7 +73,7 @@ export function formatOrderedEffectWeightOpsFromType(weights: Partial<EffectWeig
 
 export function formatEffectWeightOpsFromTypeDiff(
 	after: Partial<EffectWeightOpsFromType>,
-	before: Partial<EffectWeightOpsFromType>,
+	before: Partial<EffectWeightOpsFromType> = {},
 	showEqual = true,
 ): string {
 	return BOT_TURN_EFFECT_TYPES

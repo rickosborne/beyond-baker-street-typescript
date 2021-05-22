@@ -9,14 +9,14 @@ import { msTimer } from "./ts/timer";
 
 const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
 const config = {
-	cheat: true,
+	cheat: false,
 	gamesToPlay: isDebug ? 1 : 2500,
 };
 const elapsed = msTimer();
 const infoOnly = buildLogger({
 	[LogLevel.info]: true,
 	[LogLevel.json]: false,
-	[LogLevel.trace]: false,
+	[LogLevel.trace]: isDebug,
 });
 const forceInspectors: InspectorType[] = [];  // [ InspectorType.Toby, InspectorType.Blackwell ];
 const { losses, lossReasons, lossRate, plays, turnsAvg, turns } = playSingleGame({}, config.cheat, config.gamesToPlay, undefined, config.gamesToPlay === 1 ? infoOnly : undefined, undefined, forceInspectors, []);

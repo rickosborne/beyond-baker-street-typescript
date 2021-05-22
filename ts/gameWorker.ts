@@ -20,13 +20,17 @@ if (isMainThread || parentPort == null) {
 				json: false,
 				trace: false,
 			});
-			let lossRate: number | undefined = undefined;
+			let lossRate = 1;
 			let errors: string | undefined = undefined;
 			let lossReasons: Partial<Record<LossReason, number>> = {};
+			let lossVariance = 1;
+			let plays = 0;
 			try {
 				const outcome = playSingleGame(request.weights, request.cheat, request.iterations, undefined, logger);
 				lossRate = outcome.lossRate;
 				lossReasons = outcome.lossReasons;
+				lossVariance = outcome.lossVariance;
+				plays = outcome.plays;
 			} catch (e) {
 				errors = `Worker crashed:\n${logger.messages.map(m => `${formatTimestamp(m.time)} [${m.level}] ${m.message}`).join("\n")}\n${formatThrowable(e)}`;
 			}
@@ -34,6 +38,8 @@ if (isMainThread || parentPort == null) {
 				errors,
 				lossRate,
 				lossReasons,
+				lossVariance,
+				plays,
 				request,
 			};
 			pp.postMessage(result);

@@ -9,7 +9,7 @@ import { Supplier } from "./Function";
 import { INVESTIGATION_MARKER_GOAL } from "./Game";
 import { OncePerGameInspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
-import { formatMysteryCard, formatUnknownCard, MysteryCard, UnknownCard } from "./MysteryCard";
+import { formatUnknownCard, MysteryCard, UnknownCard } from "./MysteryCard";
 import { Outcome, OutcomeType } from "./Outcome";
 import { OtherPlayer, Player, PlayerInspector } from "./Player";
 import { TurnStart } from "./TurnStart";
@@ -75,7 +75,7 @@ export function buildPikeGregsonOptions(
 					const otherUnknownCard = otherHand[otherHandIndexBefore];
 					const otherEvidence = gregson.hand[otherHandIndexBefore];
 					if (otherEvidence.evidenceValue !== evidenceValue) {
-						options.push(buildPikeOption(activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, gregson, BotTurnEffectType.EliminateSetsUpExact));
+						options.push(buildPikeOption(activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, gregson, BotTurnEffectType.EliminatePossibility, BotTurnEffectType.EliminateMaybeUsefulSetsUpExact));
 					}
 				}
 			}
@@ -136,7 +136,7 @@ export function buildPikeLestradeOptions(
 				if ((otherEvidence.evidenceValue > investigationGap) && unusedEvidenceTypes.includes(otherEvidence.evidenceType)) {
 					// do nothing
 				} else {
-					options.push(buildPikeOption(activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, lestrade, BotTurnEffectType.EliminateUnknownValueUnusedType));
+					options.push(buildPikeOption(activeHandIndexBefore, givenMysteryCard, otherEvidence, otherHandIndexBefore, otherUnknownCard, lestrade, BotTurnEffectType.EliminatePossibility, BotTurnEffectType.EliminateMaybeUseful));
 				}
 			}
 		}

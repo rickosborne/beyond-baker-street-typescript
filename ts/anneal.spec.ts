@@ -1,8 +1,12 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import { anneal, AnnealParams, StateAndEnergy } from "./anneal";
+import { BiFunction } from "./Function";
 
-function params(partial: Partial<AnnealParams<string>>): AnnealParams<string> {
+function params(
+	partial: Partial<AnnealParams<string>>,
+	onComplete: BiFunction<string, number, boolean>
+): AnnealParams<string> {
 	return Object.assign(<AnnealParams<string>>{
 		calculateEnergy: () => {
 			throw new Error(`No default calculateEnergy`);
@@ -15,6 +19,7 @@ function params(partial: Partial<AnnealParams<string>>): AnnealParams<string> {
 			expect(state).equals("initial");
 			return ["neighbor"];
 		},
+		onComplete,
 		prng: () => 0,
 		temperature: t => t - 1,
 		temperatureMax: 1,
@@ -36,6 +41,10 @@ describe("anneal", function () {
 					state,
 				}));
 			},
+		}, (state, energy) => {
+			expect(state).equals("neighbor");
+			expect(energy).equals(4);
+			return true;
 		});
 		const best = await anneal(annealParams);
 		expect(best.bestStates).deep.equals(["neighbor"]);
@@ -53,6 +62,10 @@ describe("anneal", function () {
 					state,
 				}));
 			},
+		}, (state, energy) => {
+			expect(state).equals("neighbor");
+			expect(energy).equals(5);
+			return false;
 		});
 		const best = await anneal(annealParams);
 		expect(best.bestStates).deep.equals(["initial"]);
@@ -67,6 +80,10 @@ describe("anneal", function () {
 					state,
 				})));
 			},
+		}, (state, energy) => {
+			expect(state).equals("neighbor");
+			expect(energy).equals(2);
+			return true;
 		});
 		const best = await anneal(annealParams);
 		expect(best.bestStates).deep.equals([ "initial", "neighbor" ]);

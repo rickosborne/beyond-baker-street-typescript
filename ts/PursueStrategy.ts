@@ -13,19 +13,22 @@ import { LEAD_TYPES, LeadType } from "./LeadType";
 import { MysteryCard } from "./MysteryCard";
 import { availableValuesOfType } from "./playedEvidence";
 import { PursueAction } from "./PursueAction";
+import { CompareResult, reduceOptionsComparingOptions } from "./reduceOptions";
 import { MAX_POSSIBLE_EVIDENCE_VALUE, summingPathsTo } from "./summingPathsTo";
 import { TurnStart } from "./TurnStart";
-import { VisibleLead } from "./VisibleBoard";
 import { unfinishedLeads } from "./unfinishedLeads";
+import { VisibleLead } from "./VisibleBoard";
 
 export interface PursueOption extends BotTurnOption {
 	action: PursueAction;
+	leadCountAfter: number;
 	strategyType: BotTurnStrategyType.Pursue;
 }
 
 export function buildPursueOption(
 	leadType: LeadType,
 	effects: BotTurnEffectType[],
+	leadCountAfter: number,
 ): PursueOption {
 	return {
 		action: {
@@ -33,6 +36,7 @@ export function buildPursueOption(
 			leadType,
 		},
 		effects,
+		leadCountAfter,
 		strategyType: BotTurnStrategyType.Pursue,
 	};
 }
@@ -86,10 +90,11 @@ export class PursueStrategy implements BotTurnStrategy {
 
 	public buildOptions(turn: TurnStart, bot: Bot): PursueOption[] {
 		const visibleLeads = unfinishedLeads(turn);
-		return LEAD_TYPES
+		return reduceOptionsComparingOptions(LEAD_TYPES
 			.map(leadType => turn.board.leads[leadType])
-			.map(lead => buildPursueOption(lead.leadCard.leadType, buildPursueEffectsForLead(lead, visibleLeads, turn, bot.hand, bot.inspector)))
-			.filter(option => isDefined(option) && option.effects.length > 0) as PursueOption[]
+			.map(lead => buildPursueOption(lead.leadCard.leadType, buildPursueEffectsForLead(lead, visibleLeads, turn, bot.hand, bot.inspector), lead.leadCount - 1))
+			.filter(option => isDefined(option) && option.effects.length > 0) as PursueOption[],
+			(a: PursueOption, b: PursueOption) => b.leadCountAfter > a.leadCountAfter ? CompareResult.Second : CompareResult.First)
 			;
 	}
 }

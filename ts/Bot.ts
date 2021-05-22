@@ -37,7 +37,7 @@ import {
 	isDeadLeadInvestigateOutcome,
 	isGoodInvestigateOutcome,
 } from "./InvestigateAction";
-import { buildEffectsForLeadWithCard, InvestigateStrategy } from "./InvestigateStrategy";
+import { buildInvestigateEffectsForLeadWithCard, InvestigateStrategy } from "./InvestigateStrategy";
 import { formatLeadCard } from "./LeadCard";
 import { LEAD_TYPES } from "./LeadType";
 import { Logger, SILENT_LOGGER } from "./logger";
@@ -153,11 +153,12 @@ export class Bot implements CheatingActivePlayer, HasMysteryHand {
 			const mysteryCard = MysteryCard.fromEvidenceCard(evidenceCard);
 			const { evidenceType } = evidenceCard;
 			const effects: BotTurnEffectType[] = [];
+			const visibleValues = blackwellTurn.otherPlayers.flatMap(op => op.hand).filter(c => c.evidenceType === evidenceType).map(c => c.evidenceValue);
 			for (const lead of leads.filter(l => l.leadCard.evidenceType === evidenceType)) {
-				const investigateEffects = buildEffectsForLeadWithCard(lead, mysteryCard, availableByType[evidenceType]);
+				const investigateEffects = buildInvestigateEffectsForLeadWithCard(lead, mysteryCard, availableByType[evidenceType], visibleValues);
 				effects.push(...investigateEffects);
 			}
-			const eliminateEffects = buildEliminateEffects(mysteryCard, leads.map(l => l.leadCard.evidenceType), otherCards, blackwellTurn, undefined, false);
+			const eliminateEffects = buildEliminateEffects(mysteryCard, unconfirmedLeads(blackwellTurn), otherCards, blackwellTurn, undefined, availableByType, visibleValues);
 			effects.push(...eliminateEffects);
 			votes[i] = this.evaluator.scoreEffects(effects, blackwellTurn);
 		}

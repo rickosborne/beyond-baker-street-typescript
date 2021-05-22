@@ -267,9 +267,10 @@ export class Game {
 			};
 			this.logger.json(gameEnd);
 			this.logger.info(() => this._state === GameState.Lost ? `Lost because ${this._lossReason}.` : this._state);
-		}
-		while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
-			this.dealEvidence(activePlayer);
+		} else {
+			while (activePlayer.hand.length < this.cardsPerPlayer && this.board.remainingEvidenceCount > 0) {
+				this.dealEvidence(activePlayer);
+			}
 		}
 	}
 

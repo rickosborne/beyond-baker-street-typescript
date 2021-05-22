@@ -72,7 +72,7 @@ describe("PikeInspectorStrategy", function () {
 			const unk = unknownCard([EvidenceType.Clue], [6]);
 			const gregson = otherPlayer([otherEvidence]);
 			expect(buildPikeGregsonOptions(turn([unk]), gregson, [mysteryCard], 4))
-				.deep.equals([buildPikeOption(0, mysteryCard, otherEvidence, 0, unk, gregson, BotTurnEffectType.EliminateSetsUpExact)]);
+				.deep.equals([buildPikeOption(0, mysteryCard, otherEvidence, 0, unk, gregson, BotTurnEffectType.EliminatePossibility, BotTurnEffectType.EliminateMaybeUsefulSetsUpExact)]);
 		});
 	});
 	describe("buildPikeLestradeOptions", function () {
@@ -82,7 +82,7 @@ describe("PikeInspectorStrategy", function () {
 			const unk = unknownCard([EvidenceType.Clue], [1]);
 			const lestrade = otherPlayer([otherEvidence]);
 			expect(buildPikeLestradeOptions(turn([unk]), lestrade, [mysteryCard], 4, [EvidenceType.Clue]))
-				.deep.equals([buildPikeOption(0, mysteryCard, otherEvidence, 0, unk, lestrade, BotTurnEffectType.EliminateUnknownValueUnusedType)]);
+				.deep.equals([buildPikeOption(0, mysteryCard, otherEvidence, 0, unk, lestrade, BotTurnEffectType.EliminatePossibility, BotTurnEffectType.EliminateMaybeUseful)]);
 		});
 	});
 	describe("buildPikeOtherOptions", function () {

@@ -1,4 +1,3 @@
-import { arrayIterator } from "./arrayIterator";
 import { Consumer } from "./Consumer";
 import { BiFunction } from "./Function";
 import { range } from "./range";
@@ -14,11 +13,11 @@ export function isPromiseLike<T>(maybe: unknown): maybe is PromiseLike<T> {
 }
 
 export async function parallelMap<T, U>(
-	items: T[],
+	iterator: Iterator<T, undefined>,
 	threadCount: number,
 	block: BiFunction<T, ParallelContext, U | PromiseLike<U>>,
-): Promise<U[]> {
-	const iterator = arrayIterator(items);
+	consumer: Consumer<U> = () => void(0),
+): Promise<void> {
 	const resolver = (results: U[], threadId: number, itemNumber: number): Consumer<Consumer<U[] | PromiseLike<U[]>>> => {
 		return resolve => {
 			const { done, value } = iterator.next();
@@ -27,10 +26,12 @@ export async function parallelMap<T, U>(
 				if (isPromiseLike(maybeU)) {
 					maybeU.then(u => {
 						results.push(u);
+						consumer(u);
 						resolve(new Promise<U[]>(resolver(results, threadId, itemNumber + 1)));
 					});
 				} else {
 					results.push(maybeU);
+					consumer(maybeU),
 					resolve(new Promise<U[]>(resolver(results, threadId, itemNumber + 1)));
 				}
 			} else if (done) {
@@ -42,6 +43,5 @@ export async function parallelMap<T, U>(
 	};
 	const slots = range(1, Math.max(1, threadCount));
 	const threads = slots.map(threadId => new Promise<U[]>(resolver([], threadId, 0)));
-	const threadResults = await Promise.all(threads);
-	return threadResults.flatMap(n => n);
+	await Promise.all(threads);
 }

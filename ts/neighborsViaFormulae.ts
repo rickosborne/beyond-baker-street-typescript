@@ -42,7 +42,7 @@ export function neighborsViaFormulae(
 						weights[effectType] = [ base + baseDelta, effectiveOffset, effectiveModifier ];
 					}
 				}
-				for (let fuzz = -20; fuzz <= 20; fuzz++) {
+				for (let fuzz = -20; fuzz <= 20; fuzz += 4) {
 					const fuzzed = objectMap(weights as EffectWeightOpsFromType, (v: EffectWeightFormula) => {
 						const formula = v.slice() as EffectWeightFormula;
 						if (formula[1] !== undefined) {

@@ -7,9 +7,14 @@ import { CardType } from "./CardType";
 import { evidence, EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { ImpossibleCard } from "./Impossible";
-import { buildEffectsForLeadWithCard, buildOptionForLeadWithCard, InvestigateStrategy } from "./InvestigateStrategy";
+import {
+	buildInvestigateEffectsForLeadWithCard,
+	buildOptionForLeadWithCard,
+	InvestigateStrategy,
+} from "./InvestigateStrategy";
 import { LeadType } from "./LeadType";
 import { MysteryCard } from "./MysteryCard";
+import { OtherPlayer } from "./Player";
 import { TurnStart } from "./TurnStart";
 import { VisibleLead } from "./VisibleBoard";
 
@@ -64,6 +69,7 @@ function turn(): TurnStart {
 				},
 			},
 		},
+		otherPlayers: [] as OtherPlayer[],
 	};
 }
 
@@ -84,13 +90,15 @@ function lead(evidenceType: EvidenceType, gap = 7): VisibleLead {
 describe("InvestigateStrategy", function () {
 	describe("buildOptionForLeadWithCard", function () {
 		it("", function () {
-			expect(buildOptionForLeadWithCard(LeadType.Motive, 1, [BotTurnEffectType.InvestigateBadOnUnwedged])).deep.includes({
+			const mysteryCard = new MysteryCard([], []);
+			expect(buildOptionForLeadWithCard(LeadType.Motive, 1, [BotTurnEffectType.InvestigateBadOnUnwedgedDoesWedge], mysteryCard)).deep.includes({
 				action: {
 					actionType: ActionType.Investigate,
 					handIndex: 1,
 					leadType: LeadType.Motive,
 				},
-				effects: [BotTurnEffectType.InvestigateBadOnUnwedged],
+				effects: [BotTurnEffectType.InvestigateBadOnUnwedgedDoesWedge],
+				mysteryCard,
 				strategyType: BotTurnStrategyType.Investigate,
 			});
 		});
@@ -98,53 +106,61 @@ describe("InvestigateStrategy", function () {
 
 	describe("buildEffectsForLeadWithCard", function () {
 		it("handles InvestigateBadOnWedged", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track), new MysteryCard([EvidenceType.Clue], [1]), [4]))
-				.deep.equals([BotTurnEffectType.InvestigateBadOnWedged]);
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track), new MysteryCard([EvidenceType.Clue], [1]), [4], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadOnWedged ]);
 		});
-		it("handles InvestigateUnwedgeWithBad", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 1), new MysteryCard([EvidenceType.Clue], [ 2, 3 ]), [4]))
-				.deep.equals([BotTurnEffectType.InvestigateUnwedgeWithBad]);
+		it("handles InvestigateBadOnWedged", function () {
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 1), new MysteryCard([EvidenceType.Clue], [2]), [4], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadOnWedged ]);
 		});
-		it("handles InvestigateBadOnUnwedged", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 7), new MysteryCard([EvidenceType.Clue], [ 1, 6 ]), [ 1, 6 ]))
-				.deep.equals([BotTurnEffectType.InvestigateBadOnUnwedged]);
+		it("handles InvestigateUnwedgeForAvailable", function () {
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 1), new MysteryCard([EvidenceType.Clue], [3]), [4], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateUnwedgeForAvailable ]);
+		});
+		it("handles InvestigateBadOnUnwedgedDoesWedge", function () {
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 7), new MysteryCard([EvidenceType.Clue], [1]), [ 1, 6 ], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadOnUnwedgedDoesWedge ]);
+		});
+		it("handles InvestigateBadOnUnwedgedDoesWedge", function () {
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 7), new MysteryCard([EvidenceType.Clue], [6]), [ 1, 6 ], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadOnUnwedgedDoesWedge ]);
 		});
 		it("handles InvestigateWouldWedgeLead", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 7), new MysteryCard([EvidenceType.Track], [6]), [ 4, 5 ]))
-				.deep.equals([BotTurnEffectType.InvestigateWouldWedge]);
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 7), new MysteryCard([EvidenceType.Track], [6]), [ 4, 5 ], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodButWouldWedge ]);
 		});
 		it("handles InvestigateWouldWedgeLead", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 6), new MysteryCard([EvidenceType.Track], [6]), []))
-				.deep.equals([BotTurnEffectType.InvestigatePerfect]);
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 6), new MysteryCard([EvidenceType.Track], [6]), [], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodMakesConfirmable ]);
 		});
 		it("handles InvestigateCorrectValue", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 6), new MysteryCard([ EvidenceType.Track, EvidenceType.Clue ], [6]), []))
-				.deep.equals([BotTurnEffectType.InvestigateCorrectValue]);
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 6), new MysteryCard([ EvidenceType.Track, EvidenceType.Clue ], [6]), [], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadOnWedged, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodMakesConfirmable ]);
 		});
 		it("handles InvestigateMaybeBad", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 5), new MysteryCard([ EvidenceType.Track, EvidenceType.Clue ], [ 1, 6 ]), [ 2, 3, 4 ]))
-				.deep.equals([BotTurnEffectType.InvestigateMaybeBad]);
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 5), new MysteryCard([ EvidenceType.Track, EvidenceType.Clue ], [ 1, 6 ]), [ 2, 3, 4 ], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadButAvailable, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodAndAvailable, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadOnUnwedgedDoesWedge, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateTooFar ]);
 		});
 		it("handles InvestigateCorrectType", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 5), new MysteryCard([EvidenceType.Track], [ 1, 4 ]), [ 1, 2, 3, 5, 6 ]))
-				.deep.equals([BotTurnEffectType.InvestigateCorrectType]);
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 5), new MysteryCard([EvidenceType.Track], [ 1, 4 ]), [ 1, 2, 3, 5, 6 ], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodButWouldWedge, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodAndAvailable ]);
 		});
 		it("handles InvestigateWild", function () {
-			expect(buildEffectsForLeadWithCard(lead(EvidenceType.Track, 10), new MysteryCard([ EvidenceType.Track, EvidenceType.Clue ], [ 1, 4 ]), [ 2, 3, 5, 6 ]))
-				.deep.equals([BotTurnEffectType.InvestigateWild]);
+			expect(buildInvestigateEffectsForLeadWithCard(lead(EvidenceType.Track, 10), new MysteryCard([ EvidenceType.Track, EvidenceType.Clue ], [ 1, 4 ]), [ 2, 3, 5, 6 ], []))
+				.deep.equals([ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadButAvailable, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodAndAvailable, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateBadButAvailable, BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateGoodAndAvailable ]);
 		});
 	});
 
 	describe("buildOptions", function () {
 		it("does what it says", function () {
+			const mysteryCard = new MysteryCard([EvidenceType.Track], [6]);
 			const options = strategy.buildOptions(turn(), <Bot> {
-				hand: [new MysteryCard([EvidenceType.Track], [6])] as MysteryCard[],
+				hand: [mysteryCard] as MysteryCard[],
 			});
-			expect(options).lengthOf(3);
-			expect(options).deep.includes.members([
-				buildOptionForLeadWithCard(LeadType.Motive, 0, [BotTurnEffectType.InvestigateUnwedgeWithBad]),
-				buildOptionForLeadWithCard(LeadType.Opportunity, 0, [BotTurnEffectType.InvestigateBadOnUnwedged]),
-				buildOptionForLeadWithCard(LeadType.Suspect, 0, [BotTurnEffectType.InvestigateWouldWedge]),
+			expect(options).has.deep.members([
+				buildOptionForLeadWithCard(LeadType.Motive, 0, [ BotTurnEffectType.InvestigatePossibility, BotTurnEffectType.InvestigateUnwedgeForAvailable ], mysteryCard),
+				buildOptionForLeadWithCard(LeadType.Opportunity, 0, [ BotTurnEffectType.InvestigateBadButAvailable, BotTurnEffectType.InvestigatePossibility ], mysteryCard),
+				buildOptionForLeadWithCard(LeadType.Suspect, 0, [ BotTurnEffectType.InvestigateGoodButWouldWedge, BotTurnEffectType.InvestigatePossibility ], mysteryCard),
 			]);
 		});
 	});
