@@ -63,9 +63,7 @@ function *neighborWithOneChangeIterator(
 		const prevFormula: EffectWeightFormula = simRun.weights[effectType] || scoreFromType[effectType];
 		for (const formula of formulaChangeIterator(prevFormula, temperature, modifier)) {
 			const updatedWeights = withFormula(formula);
-			if (scoreForWeights(updatedWeights) === undefined) {
-				yield { weights: updatedWeights };
-			}
+			yield { weights: updatedWeights };
 		}
 	}
 }
@@ -84,12 +82,17 @@ function *neighborIteratorForTemperature(
 	modifiers: EffectWeightModifier[] = EFFECT_WEIGHT_MODIFIERS,
 	scoreFromType: EffectWeightOpsFromType = DEFAULT_SCORE_FROM_TYPE,
 ): IterableIterator<SimRun> {
-	const changeCount = 1;
+	let changeCount = 1;
 	while (changeCount < 10) {
 		const iterators = range(1, changeCount).map(() => (r: SimRun) => neighborWithOneChangeIterator(r, temperature, scoreForWeights, effectTypes, modifiers, scoreFromType));
 		for (const neighbor of combineAndIterate(simRun, mergeRuns, iterators)) {
-			yield neighbor;
+			// console.log(`Neighbor cc${changeCount} t${temperature}: ${formatOrderedEffectWeightOpsFromType(simRun.weights)} --> ${formatOrderedEffectWeightOpsFromType(neighbor.weights)}`);
+			if (scoreForWeights(neighbor.weights) === undefined) {
+				yield neighbor;
+			}
 		}
+		changeCount++;
+		// console.log(`Change count ${changeCount} for temp ${temperature} weights: ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
 	}
 }
 
@@ -114,6 +117,7 @@ export function neighborIterator(
 						return next;
 					}
 					temp++;
+					// console.log(`Temp at ${temp} for ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
 				}
 				return { done: true, value: undefined };
 			},

@@ -79,12 +79,10 @@ VALUES (?, ?, ?, ?)
 		return insertAttemptScore.run(attempt, score, plays, variance).changes;
 	};
 })(db);
-const findBestScores: () => BestScore[] = (db => {
-	const selectLowestScore = db.prepare("SELECT MIN(score) as s FROM weights_score");
-	const selectWeightsByScore = db.prepare<number>("SELECT score, variance, plays, weights FROM weights_score WHERE (score = ?)");
-	return function findBestScores(): BestScore[] {
-		const score: number = selectLowestScore.get().s;
-		return selectWeightsByScore.all(score).map((row: SelectBestScore) => ({
+const findBestScores: (limit?: number) => BestScore[] = (db => {
+	const selectWeightsByScore = db.prepare<number>(`SELECT score, variance, plays, weights FROM weights_score ORDER BY score LIMIT ?`);
+	return function findBestScores(limit = 1): BestScore[] {
+		return selectWeightsByScore.all(limit).map((row: SelectBestScore) => ({
 			plays: row.plays,
 			score: row.score,
 			variance: row.variance,
@@ -107,8 +105,9 @@ const findAttemptSummary = (db => {
 const iterations = 250;
 const modifiersPlusUndefined: (EffectWeightModifier | undefined)[] = EFFECT_WEIGHT_MODIFIERS.slice();
 modifiersPlusUndefined.push(undefined);
+const thermocouple = new Thermocouple(scoreForWeights, 8);
 
-const initialFromBest: Required<SimRun>[] = findBestScores().map(sws => ({
+const initialFromBest: Required<SimRun>[] = findBestScores(thermocouple.preferredMaxCount).map(sws => ({
 	lossRate: sws.score,
 	lossVariance: sws.variance,
 	plays: sws.plays,
@@ -126,12 +125,11 @@ const initialState: SimRun[] = initialFromBest.length > 0 ? initialFromBest : [{
 	weights: {},
 }];
 
-const thermocouple = new Thermocouple(scoreForWeights, 8);
 initialState.forEach(state => {
 	thermocouple.register(state);
 	console.log(`${formatPercent(state.lossRate || 1, 2)} ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
 });
-let { attempts, bestScore } = findAttemptSummary() || { attempts: 0, bestScore: 1 };
+let { attempts } = findAttemptSummary() || { attempts: 0, bestScore: 1 };
 let timer = msTimer();
 gameWorkerPool.scoreGames(
 	iteratorMap<SimRun, GameSetup, undefined, undefined>(thermocouple, run => ({
@@ -156,9 +154,6 @@ gameWorkerPool.scoreGames(
 			process.stdout.write(result.lossRate === 1 ? "X" : String(Math.floor(result.lossRate * 10)));
 		}
 		attempts++;
-		if (result.lossRate < bestScore) {
-			bestScore = result.lossRate;
-		}
 		if ((attempts % 100) === 0) {
 			const ms = timer();
 			console.log(`\nRuns: ${attempts} in ${formatDecimal(ms / 1000, 3)}s for ${formatDecimal(1000 * 100 / ms, 2)} runs/s. Scores: ${thermocouple.finished.map(f => formatPercent(f.lossRate, 2)).join(", ")}.`);

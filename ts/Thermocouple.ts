@@ -3,8 +3,7 @@ import { compareTwo, DataSetCompareResult } from "./DataSet";
 import { EffectWeightOpsFromType, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
 import { MonoFunction } from "./Function";
 import { neighborIterator } from "./neighborIterator";
-import { range } from "./range";
-import { PseudoRNG, randomInt } from "./rng";
+import { randomInt } from "./rng";
 import { SimRun, SimRunStats } from "./SimRun";
 
 interface FinishedSimRun extends Required<SimRun> {
@@ -44,16 +43,6 @@ export class Thermocouple {
 		};
 	}
 
-	public get best(): Required<SimRun> | undefined {
-		const r = this.runs[0];
-		return r === undefined ? undefined : {
-			lossRate: r.lossRate,
-			lossVariance: r.lossVariance,
-			plays: r.plays,
-			weights: r.weights,
-		};
-	}
-
 	public get finished(): Required<SimRun>[] {
 		return this.runs.map(f => ({
 			lossRate: f.lossRate,
@@ -84,10 +73,6 @@ export class Thermocouple {
 			}
 		}
 		throw new Error(`Need at least 1 run`);
-	}
-
-	public neighbors(count: number, temp: number): SimRun[] {
-		return range(1, count).map(() => this.neighbor(temp));
 	}
 
 	/**
