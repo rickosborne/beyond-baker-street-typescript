@@ -24,6 +24,7 @@ db.pragma("journal_mode = WAL");
 const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
 const gameWorkerPool = new GameWorkerPool(isDebug ? 0 : 6);
 const cheat = process.env.CHEAT === "1";
+const iterations = cheat ? 1000 : 250;
 
 function quit(doExit = true): void {
 	console.log(`Closing ${historyFileNameSqlite}`);
@@ -102,7 +103,6 @@ const findAttemptSummary = (db => {
 		return selectAttemptSummary.get();
 	};
 })(db);
-const iterations = 250;
 const modifiersPlusUndefined: (EffectWeightModifier | undefined)[] = EFFECT_WEIGHT_MODIFIERS.slice();
 modifiersPlusUndefined.push(undefined);
 const thermocouple = new Thermocouple(scoreForWeights, 8);
