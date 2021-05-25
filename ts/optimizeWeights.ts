@@ -1,7 +1,12 @@
 import * as sqlite3 from "better-sqlite3";
 import * as process from "process";
 import { iteratorMap } from "./arrayIterator";
-import { EffectWeightOpsFromType, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
+import {
+	DEFAULT_SCORE_FROM_TYPE,
+	EffectWeightOpsFromType,
+	formatEffectWeightOpsFromTypeDiff,
+	formatOrderedEffectWeightOpsFromType,
+} from "./defaultScores";
 import { EFFECT_WEIGHT_MODIFIERS, EffectWeightModifier } from "./EffectWeight";
 import { formatDecimal } from "./formatDecimal";
 import { formatPercent } from "./formatPercent";
@@ -127,7 +132,7 @@ const initialState: SimRun[] = initialFromBest.length > 0 ? initialFromBest : [{
 
 initialState.forEach(state => {
 	thermocouple.register(state);
-	console.log(`${formatPercent(state.lossRate || 1, 2)} ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
+	console.log(`${formatPercent(state.lossRate || 1, 2)} ${formatEffectWeightOpsFromTypeDiff(state.weights)}`);
 });
 let { attempts } = findAttemptSummary() || { attempts: 0, bestScore: 1 };
 let timer = msTimer();
@@ -149,7 +154,7 @@ gameWorkerPool.scoreGames(
 			weights: result.request.weights,
 		});
 		if (improved) {
-			console.log(`\n${formatPercent(result.lossRate as number, 2)} ${formatPercent(result.lossVariance, 2)}: ${formatOrderedEffectWeightOpsFromType(result.request.weights)}`);
+			console.log(`\n${formatPercent(result.lossRate as number, 2)} ${formatPercent(result.lossVariance, 2)}: ${formatEffectWeightOpsFromTypeDiff(result.request.weights)}`);
 		} else {
 			process.stdout.write(result.lossRate === 1 ? "X" : String(Math.floor(result.lossRate * 10)));
 		}

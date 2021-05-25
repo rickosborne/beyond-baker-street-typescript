@@ -37,7 +37,7 @@ export class Thermocouple {
 			next: (): IteratorResult<SimRun, undefined> => {
 				return {
 					done: false,
-					value: this.neighbor(1),
+					value: this.neighbor(20),
 				};
 			},
 		};

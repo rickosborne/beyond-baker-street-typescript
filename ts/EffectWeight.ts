@@ -132,3 +132,46 @@ export function compileEffectWeight(
 	const getModified: (turn: HasVisibleBoard) => number = modifier === undefined || offset === undefined ? () => 0 : turn => EFFECT_WEIGHT_CALCULATORS[modifier](offset, turn);
 	return (turn, effects) => getBase(effects) + getModified(turn);
 }
+
+export function formatEffectWeightModifier(modifier: EffectWeightModifier | undefined): string {
+	if (modifier === undefined) {
+		return "";
+	}
+	return String(modifier)
+		.replace("Plus", "+")
+		.replace("Minus", "-")
+		.replace("Times", "*")
+		.replace("Over", "/")
+		.replace("RampUpWith", "⬆")
+		.replace("RampDownWith", "⬇")
+		.replace("Count", "#")
+		.replace("Progress", "%")
+		.replace("Marker", "@")
+		.replace("Location", "@")
+		.replace("Reversed", "↩")
+	;
+}
+
+export function formatEffectWeightFormula(formula: EffectWeightFormula | undefined): string {
+	if (formula === undefined) {
+		return "";
+	}
+	const [ base, offset, modifier ] = formula;
+	if (offset !== undefined && modifier !== undefined) {
+		return `${base}${offset < 0 ? offset : offset === 0 ? "" : `+${offset}`}${formatEffectWeightModifier(modifier)}`;
+	}
+	return String(base);
+}
+
+export function normalizeEffectWeightFormula(formula: EffectWeightFormula): EffectWeightFormula {
+	const [ base, offset, modifier ] = formula;
+	if (offset === undefined || modifier === undefined) {
+		return formula;
+	}
+	if (modifier.startsWith("Plus") || modifier.startsWith("Minus")) {
+		return [ base + offset, 0, modifier ];
+	} else if (offset === 0) {
+		return [base];
+	}
+	return formula;
+}

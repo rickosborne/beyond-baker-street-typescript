@@ -1,10 +1,7 @@
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
 import { isDefined } from "./defined";
-import { EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
+import { EffectWeightFormula, EffectWeightModifier, formatEffectWeightFormula } from "./EffectWeight";
 import { strictDeepEqual } from "./strictDeepEqual";
-
-// "{""EliminateWild"":[19,4,""PlusHolmesLocation""],""InvestigationComplete"":[15,1,""RampDownWithInvestigationProgress""],""PursueConfirmable"":[22,-45,""OverImpossiblePastLimit""]}"
-// "{""AssistKnown"":[4,10,""PlusImpossibleCount""],""HolmesProgress"":[-17,15,""TimesHolmesProgressReversed""],""PursueConfirmable"":[18,-35,""OverHolmesProgressReversed""]}"
 
 export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightFormula>;
 export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
@@ -19,6 +16,8 @@ export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.ConfirmNotBaynes]: [-15],
 	[BotTurnEffectType.ConfirmReady]: [3],
 	[BotTurnEffectType.HolmesImpeded]: [7],
+	[BotTurnEffectType.ElimAssistedType]: [0],
+	[BotTurnEffectType.ElimAssistedValue]: [0],
 	[BotTurnEffectType.EliminateMaybeUseful]: [5],
 	[BotTurnEffectType.EliminateMaybeUsefulCompletesInvestigation]: [ -6, 13, EffectWeightModifier.RampUpWithHolmesProgress ],
 	[BotTurnEffectType.EliminateMaybeUsefulSetsUpExact]: [10],
@@ -31,6 +30,8 @@ export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {
 	[BotTurnEffectType.EliminateWedgesLead]: [-40],
 	[BotTurnEffectType.HolmesProgress]: [-20],
 	[BotTurnEffectType.ImpossibleAdded]: [0],
+	[BotTurnEffectType.InvAssistedType]: [0],
+	[BotTurnEffectType.InvAssistedValue]: [0],
 	[BotTurnEffectType.InvestigateBadButAvailable]: [1],
 	[BotTurnEffectType.InvestigateBadButVisible]: [2],
 	[BotTurnEffectType.InvestigateBadOnUnwedgedDoesWedge]: [-35],
@@ -71,9 +72,11 @@ export function formatOrderedEffectWeightOpsFromType(weights: Partial<EffectWeig
 		.join(" > ");
 }
 
+const EMPTY_BEFORE: Partial<EffectWeightOpsFromType> = {};
+
 export function formatEffectWeightOpsFromTypeDiff(
 	after: Partial<EffectWeightOpsFromType>,
-	before: Partial<EffectWeightOpsFromType> = {},
+	before: Partial<EffectWeightOpsFromType> = EMPTY_BEFORE,
 	showEqual = true,
 ): string {
 	return BOT_TURN_EFFECT_TYPES
@@ -83,13 +86,13 @@ export function formatEffectWeightOpsFromTypeDiff(
 			if (a == null && b == null) {
 				return undefined;  // `!${effectType}`;
 			} else if (a == null && b != null) {
-				return `-${effectType}:[${b?.join(",")}]`;
+				return `-${effectType}:[${formatEffectWeightFormula(b)}]`;
 			} else if (b == null && a != null) {
-				return `+${effectType}:[${a?.join(",")}]`;
+				return `${before === EMPTY_BEFORE ? "" : "+"}${effectType}:[${formatEffectWeightFormula(a)}]`;
 			} else if (strictDeepEqual(a, b)) {
-				return showEqual ? `=${effectType}:[${a?.join(",")}]` : undefined;
+				return showEqual ? `=${effectType}:[${formatEffectWeightFormula(a)}]` : undefined;
 			} else {
-				return `${effectType}:[${b?.join(",")}]=>[${a?.join(",")}]`;
+				return `${effectType}:[${formatEffectWeightFormula(b)}]=>[${formatEffectWeightFormula(a)}]`;
 			}
 		})
 		.filter(isDefined)

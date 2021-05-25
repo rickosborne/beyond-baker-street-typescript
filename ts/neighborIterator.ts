@@ -1,6 +1,11 @@
 import { BotTurnEffectType, MUTABLE_EFFECT_TYPES } from "./BotTurn";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
-import { EFFECT_WEIGHT_MODIFIERS, EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
+import {
+	EFFECT_WEIGHT_MODIFIERS,
+	EffectWeightFormula,
+	EffectWeightModifier,
+	normalizeEffectWeightFormula,
+} from "./EffectWeight";
 import { TriFunction } from "./Function";
 import { combineAndIterate, shufflingPairIterator } from "./pairedPermutations";
 import { range } from "./range";
@@ -32,11 +37,13 @@ function *formulaChangeIterator(
 	modifier: EffectWeightModifier,
 ): IterableIterator<EffectWeightFormula> {
 	const seen: EffectWeightFormula[] = [];
-	for (const change of FORMULA_CHANGES) {
-		const updated = change(formula, temperature, modifier);
-		if (seen.findIndex(p => strictDeepEqual(p, updated)) < 0) {
-			seen.push(updated);
-			yield updated;
+	for (let t = temperature; t >= 0; t -= 2) {
+		for (const change of FORMULA_CHANGES) {
+			const updated = normalizeEffectWeightFormula(change(formula, t, modifier));
+			if (seen.findIndex(p => strictDeepEqual(p, updated)) < 0) {
+				seen.push(updated);
+				yield updated;
+			}
 		}
 	}
 }
@@ -107,7 +114,7 @@ export function neighborIterator(
 		return {
 			next: (temperature: number): IteratorResult<SimRun, undefined> => {
 				let temp = Math.round(temperature);
-				while (temp < 20) {
+				while (temp > 0) {
 					let generator = generators[temp];
 					if (generator === undefined) {
 						generator = neighborIteratorForTemperature(simRun, temp, scoreForWeights, effectTypes, modifiers, scoreFromType);
@@ -116,7 +123,7 @@ export function neighborIterator(
 					if (next.value !== undefined) {
 						return next;
 					}
-					temp++;
+					temp--;
 					// console.log(`Temp at ${temp} for ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
 				}
 				return { done: true, value: undefined };

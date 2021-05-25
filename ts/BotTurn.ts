@@ -14,6 +14,8 @@ export enum BotTurnEffectType {
 	ConfirmEventually = "ConfirmEventually",
 	ConfirmNotBaynes = "ConfirmNotBaynes",
 	ConfirmReady = "ConfirmReady",
+	ElimAssistedType = "ElimAssistedType",
+	ElimAssistedValue = "ElimAssistedValue",
 	/**
 	 * This evidence could be used on a lead, but it also could complete the investigation.
 	 */
@@ -51,6 +53,8 @@ export enum BotTurnEffectType {
 	HolmesImpeded = "HolmesImpeded",
 	HolmesProgress = "HolmesProgress",
 	ImpossibleAdded = "ImpossibleAdded",
+	InvAssistedType = "InvAssistedType",
+	InvAssistedValue = "InvAssistedValue",
 	/**
 	 * This card is bad, but there's still a hypothetical solution.
 	 */

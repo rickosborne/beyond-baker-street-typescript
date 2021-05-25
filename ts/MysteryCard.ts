@@ -1,4 +1,3 @@
-import { mean } from "./arrayMath";
 import { CardType } from "./CardType";
 import { EVIDENCE_CARD_VALUES, EVIDENCE_CARDS, EvidenceCard, formatEvidence } from "./EvidenceCard";
 import { EVIDENCE_TYPES, EvidenceType } from "./EvidenceType";
@@ -15,6 +14,8 @@ type ValueFlags = [boolean, boolean, boolean, boolean, boolean, boolean, boolean
 const ALL_FALSE_VALUE_FLAGS: ValueFlags = [ false, false, false, false, false, false, false ];
 
 export class MysteryCard implements UnknownCard {
+	private _assistedType: EvidenceType | undefined;
+	private _assistedValue: EvidenceValue | undefined;
 	private _evidence: EvidenceCard | undefined;
 	private readonly possible: Record<EvidenceType, ValueFlags> = {
 		[EvidenceType.Witness]: ALL_FALSE_VALUE_FLAGS.slice() as ValueFlags,
@@ -75,6 +76,14 @@ export class MysteryCard implements UnknownCard {
 				} : undefined;
 			}
 		}
+	}
+
+	public get assistedType(): EvidenceType | undefined {
+		return this._assistedType;
+	}
+
+	public get assistedValue(): EvidenceValue | undefined {
+		return this._assistedValue;
 	}
 
 	public asArray(): EvidenceCard[] {
@@ -217,12 +226,15 @@ export class MysteryCard implements UnknownCard {
 		this.uniqueTypes.add(evidenceType);
 		this.uniqueValues.add(evidenceValue);
 		this.valueCounts[evidenceValue] = 1;
+		this._assistedValue = evidenceValue;
+		this._assistedType = evidenceType;
 	}
 
 	public setType(evidenceType: EvidenceType): void {
 		if (!this.couldBeType(evidenceType)) {
 			throw new Error(`Mystery card ${formatMysteryCard(this)} cannot set type ${evidenceType}`);
 		}
+		this._assistedType = evidenceType;
 		for (const et of EVIDENCE_TYPES) {
 			if (et === evidenceType) {
 				continue;
@@ -237,6 +249,7 @@ export class MysteryCard implements UnknownCard {
 		if (!this.couldBeValue(value)) {
 			throw new Error(`Mystery card ${formatMysteryCard(this)} cannot set value ${value}`);
 		}
+		this._assistedValue = value;
 		for (const evidenceValue of EVIDENCE_CARD_VALUES) {
 			if (evidenceValue === value) {
 				continue;

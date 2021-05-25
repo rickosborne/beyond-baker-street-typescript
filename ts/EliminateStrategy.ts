@@ -82,6 +82,12 @@ export function buildEliminateEffects(
 			}
 		}
 	}
+	if (mysteryCard.assistedType != null) {
+		effects.push(BotTurnEffectType.ElimAssistedType);
+	}
+	if (mysteryCard.assistedValue != null) {
+		effects.push(BotTurnEffectType.ElimAssistedValue);
+	}
 	return effects;
 }
 

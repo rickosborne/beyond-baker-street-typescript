@@ -83,6 +83,12 @@ export function buildInvestigateEffectsForLeadWithCard(
 			}
 		}
 	}
+	if (mysteryCard.assistedType != null) {
+		effects.push(BotTurnEffectType.InvAssistedType);
+	}
+	if (mysteryCard.assistedValue != null) {
+		effects.push(BotTurnEffectType.InvAssistedValue);
+	}
 	return effects;
 }
 
