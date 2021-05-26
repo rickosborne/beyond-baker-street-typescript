@@ -1,4 +1,4 @@
-import { isDefined } from "./defined";
+import { isDefined } from "./util/defined";
 import { ActivePlayer } from "./Player";
 
 export interface MightCheat {

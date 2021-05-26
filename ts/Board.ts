@@ -1,4 +1,4 @@
-import { BaskervilleAction } from "./Baskerville";
+import { BaskervilleAction } from "./inspector/Baskerville";
 import { CASE_FILE_CARDS, CaseFileCard } from "./CaseFileCard";
 import { EVIDENCE_CARDS, EvidenceCard, formatEvidence, isEvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
 import { EvidenceValue } from "./EvidenceValue";
@@ -8,8 +8,8 @@ import { LeadCard, randomLeadCards } from "./LeadCard";
 import { LEAD_COUNT, LEAD_TYPES, LeadType } from "./LeadType";
 import { Pile } from "./Pile";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
-import { BottomOrTop } from "./Toby";
-import { toRecord } from "./toRecord";
+import { BottomOrTop } from "./inspector/Toby";
+import { toRecord } from "./util/toRecord";
 import { VisibleBoard, VisibleLead } from "./VisibleBoard";
 
 export const LEAD_PILE_START_COUNT = 3;

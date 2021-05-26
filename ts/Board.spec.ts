@@ -1,8 +1,7 @@
 import { expect } from "chai";
 import { describe } from "mocha";
 import { ActionType } from "./ActionType";
-import { sum } from "./arrayMath";
-import { BaskervilleAction } from "./Baskerville";
+import { BaskervilleAction } from "./inspector/Baskerville";
 import { BadOrGood, Board, BoardLead } from "./Board";
 import { CASE_FILE_CARDS } from "./CaseFileCard";
 import { evidence, EvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
@@ -11,8 +10,9 @@ import { HOLMES_GOAL, INVESTIGATION_MARKER_GOAL } from "./Game";
 import { leadCard } from "./LeadCard";
 import { LEAD_TYPES, LeadType } from "./LeadType";
 import { Pile } from "./Pile";
-import { allPathsTo } from "./summingPathsTo";
-import { BottomOrTop } from "./Toby";
+import { allPathsTo } from "./util/summingPathsTo";
+import { BottomOrTop } from "./inspector/Toby";
+import { sum } from "./util/sum";
 
 function buildBoard(
 	leads?: Record<LeadType, BoardLead> | undefined,

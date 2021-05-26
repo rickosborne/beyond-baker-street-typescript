@@ -1,7 +1,7 @@
 import { Predicate } from "./Predicate";
-import { removeIf } from "./removeIf";
+import { removeIf } from "./util/removeIf";
 import { PseudoRNG } from "./rng";
-import { shuffleInPlace } from "./shuffle";
+import { shuffleInPlace } from "./util/shuffle";
 
 export class Pile<C> {
 	protected readonly cards: C[] = [];

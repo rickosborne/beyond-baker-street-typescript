@@ -4,7 +4,7 @@ import { CardType } from "./CardType";
 import { EVIDENCE_CARD_VALUES, EVIDENCE_CARDS, EvidenceCard } from "./EvidenceCard";
 import { EVIDENCE_TYPES, EvidenceType } from "./EvidenceType";
 import { formatMysteryCard, MysteryCard } from "./MysteryCard";
-import { randomItem } from "./randomItem";
+import { randomItem } from "./util/randomItem";
 
 function expectSingleCard(card: MysteryCard, evidenceType: EvidenceType, evidenceValue: number): void {
 	expect(card.possibleCount).equals(1);

@@ -21,7 +21,7 @@ import { HOLMES_MOVE_PROGRESS, INVESTIGATION_MARKER_GOAL } from "./Game";
 import { addHolmesProgressEffects } from "./HolmesProgressEffect";
 import { InspectorType } from "./InspectorType";
 import { isSamePlayer, OtherPlayer, Player } from "./Player";
-import { CompareResult, reduceOptions } from "./reduceOptions";
+import { CompareResult, reduceOptions } from "./util/reduceOptions";
 import { TurnStart } from "./TurnStart";
 import { unfinishedLeads } from "./unfinishedLeads";
 import { VisibleLead } from "./VisibleBoard";

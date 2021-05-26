@@ -1,6 +1,6 @@
 import { isMainThread, parentPort, workerData } from "worker_threads";
-import { formatThrowable } from "./formatThrowable";
-import { formatTimestamp } from "./formatTimestamp";
+import { formatThrowable } from "./format/formatThrowable";
+import { formatTimestamp } from "./format/formatTimestamp";
 import { LossReason } from "./Game";
 import { cachingLoggerFactory } from "./logger";
 import { playSingleGame } from "./playSingleGame";

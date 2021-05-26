@@ -1,6 +1,6 @@
 import { Action } from "./Action";
 import { Bot } from "./Bot";
-import { enumKeys } from "./enumKeys";
+import { enumKeys } from "./util/enumKeys";
 import { TurnStart } from "./TurnStart";
 
 export enum BotTurnEffectType {

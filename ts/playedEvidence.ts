@@ -1,11 +1,11 @@
-import { BlackwellTurn } from "./Blackwell";
+import { BlackwellTurn } from "./inspector/Blackwell";
 import { EVIDENCE_CARD_VALUES, EvidenceCard, isEvidenceCard } from "./EvidenceCard";
 import { EVIDENCE_TYPES, EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
-import { groupBy } from "./groupBy";
+import { groupBy } from "./util/groupBy";
 import { invertValues } from "./InvertValues";
 import { LEAD_TYPES } from "./LeadType";
-import { objectMap } from "./objectMap";
+import { objectMap } from "./util/objectMap";
 import { TurnStart } from "./TurnStart";
 
 /**

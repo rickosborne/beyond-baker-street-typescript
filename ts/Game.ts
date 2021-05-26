@@ -1,6 +1,6 @@
 import { Action, TypedAction } from "./Action";
 import { ActionType } from "./ActionType";
-import { AdlerAction, AdlerOutcome, formatAdlerOutcome, isAdlerAction } from "./Adler";
+import { AdlerAction, AdlerOutcome, formatAdlerOutcome, isAdlerAction } from "./inspector/Adler";
 import {
 	AssistAction,
 	AssistOutcome,
@@ -9,20 +9,20 @@ import {
 	isTypeAssistAction,
 	isValueAssistAction,
 } from "./AssistAction";
-import { BaskervilleAction, BaskervilleOutcome, formatBaskervilleOutcome, isBaskervilleAction } from "./Baskerville";
-import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
+import { BaskervilleAction, BaskervilleOutcome, formatBaskervilleOutcome, isBaskervilleAction } from "./inspector/Baskerville";
+import { BlackwellChoice, BlackwellTurn } from "./inspector/Blackwell";
 import { BadOrGood, Board } from "./Board";
 import { CardType } from "./CardType";
 import { CaseFileCard, formatCaseFileCard } from "./CaseFileCard";
 import { CheatingActivePlayer, isCheatingActivePlayer } from "./Cheat";
 import { ConfirmAction, ConfirmOutcome, formatConfirm, formatConfirmOutcome, isConfirmAction } from "./ConfirmAction";
-import { isDefined } from "./defined";
+import { isDefined } from "./util/defined";
 import { EliminateAction, EliminateOutcome, formatEliminateOutcome, isEliminateAction } from "./EliminateAction";
 import { EvidenceCard, formatEvidence, isEvidenceCard, isSameEvidenceCard } from "./EvidenceCard";
 import { BiFunction } from "./Function";
 import { Guard } from "./Guard";
-import { formatHopeOutcome, HopeAction, HopeOutcome, isHopeAction } from "./Hope";
-import { formatHudsonOutcome, HudsonAction, HudsonOutcome, isHudsonAction } from "./Hudson";
+import { formatHopeOutcome, HopeAction, HopeOutcome, isHopeAction } from "./inspector/Hope";
+import { formatHudsonOutcome, HudsonAction, HudsonOutcome, isHudsonAction } from "./inspector/Hudson";
 import { InspectorType } from "./InspectorType";
 import {
 	BadInvestigateOutcome,
@@ -41,12 +41,12 @@ import { LEAD_TYPES, LeadType } from "./LeadType";
 import { Logger, SILENT_LOGGER } from "./logger";
 import { OtherHand } from "./OtherHand";
 import { Outcome, OutcomeType } from "./Outcome";
-import { formatPikeOutcome, isPikeAction, PikeAction, PikeOutcome } from "./Pike";
+import { formatPikeOutcome, isPikeAction, PikeAction, PikeOutcome } from "./inspector/Pike";
 import { ActivePlayer, formatPlayer, isPlayerInspector, isSamePlayer, OtherPlayer, Player } from "./Player";
 import { formatPursueOutcome, isPursueAction, PursueAction, PursueOutcome } from "./PursueAction";
-import { range } from "./range";
+import { range } from "./util/range";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
-import { BottomOrTop, formatTobyOutcome, isTobyAction, TobyAction, TobyOutcome } from "./Toby";
+import { BottomOrTop, formatTobyOutcome, isTobyAction, TobyAction, TobyOutcome } from "./inspector/Toby";
 import { TurnStart } from "./TurnStart";
 import { formatLeadsProgress } from "./VisibleBoard";
 

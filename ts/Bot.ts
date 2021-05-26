@@ -1,5 +1,5 @@
 import { Action } from "./Action";
-import { AdlerInspectorStrategy, isAdlerOutcome } from "./Adler";
+import { AdlerInspectorStrategy, isAdlerOutcome } from "./inspector/Adler";
 import {
 	AssistOutcome,
 	isAssistOutcome,
@@ -8,8 +8,8 @@ import {
 	TypeAssistAction,
 	ValueAssistAction,
 } from "./AssistAction";
-import { BaskervilleInspectorStrategy, isBaskervilleOutcome } from "./Baskerville";
-import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
+import { BaskervilleInspectorStrategy, isBaskervilleOutcome } from "./inspector/Baskerville";
+import { BlackwellChoice, BlackwellTurn } from "./inspector/Blackwell";
 import { BOT_STRATEGIES } from "./BotStrategies";
 import { BotTurnEffectType, BotTurnOption, BotTurnStrategy } from "./BotTurn";
 import { BasicBotTurnEvaluator, BotTurnEvaluator } from "./BotTurnEvaluator";
@@ -17,7 +17,7 @@ import { CheatingActivePlayer } from "./Cheat";
 import { isConfirmOutcome } from "./ConfirmAction";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
-import { isDefined } from "./defined";
+import { isDefined } from "./util/defined";
 import { EliminateOutcome, isEliminateOutcome } from "./EliminateAction";
 import { buildEliminateEffects, EliminateStrategy } from "./EliminateStrategy";
 import { EvidenceCard } from "./EvidenceCard";
@@ -25,8 +25,8 @@ import { EvidenceType } from "./EvidenceType";
 import { EvidenceValue } from "./EvidenceValue";
 import { MonoFunction } from "./Function";
 import { Guard } from "./Guard";
-import { HopeOutcome, isHopeOutcome } from "./Hope";
-import { HudsonOutcome, isHudsonOutcome } from "./Hudson";
+import { HopeOutcome, isHopeOutcome } from "./inspector/Hope";
+import { HudsonOutcome, isHudsonOutcome } from "./inspector/Hudson";
 import { InspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
 import {
@@ -45,13 +45,13 @@ import { formatMysteryCard, HasMysteryHand, MysteryCard } from "./MysteryCard";
 import { MysteryPile } from "./MysteryPile";
 import { OtherHand } from "./OtherHand";
 import { Outcome, OutcomeType, TypedOutcome } from "./Outcome";
-import { isPikeOutcome, PikeInspectorStrategy, PikeOutcome } from "./Pike";
+import { isPikeOutcome, PikeInspectorStrategy, PikeOutcome } from "./inspector/Pike";
 import { availableValuesByType } from "./playedEvidence";
 import { isSamePlayer, Player } from "./Player";
 import { isPursueOutcome, PursueOutcome } from "./PursueAction";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
 import { strategyForInspector } from "./StrategyForInspector";
-import { BottomOrTop, isTobyOutcome, TobyInspectorStrategy } from "./Toby";
+import { BottomOrTop, isTobyOutcome, TobyInspectorStrategy } from "./inspector/Toby";
 import { TurnStart } from "./TurnStart";
 import { unconfirmedLeads } from "./unconfirmedLeads";
 import { unfinishedLeads } from "./unfinishedLeads";

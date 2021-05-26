@@ -1,8 +1,9 @@
 import * as os from "os";
-import { mean, stddev } from "./arrayMath";
-import { randomItem } from "./randomItem";
+import { randomItem } from "./util/randomItem";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
-import { strictDeepEqual } from "./strictDeepEqual";
+import { strictDeepEqual } from "./util/strictDeepEqual";
+import { mean } from "./util/mean";
+import { stddev } from "./util/stddev";
 
 export type NeighborsGenerator<State> = (count: number, state: State, temp: number, prng: PseudoRNG) => State[];
 

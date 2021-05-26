@@ -1,4 +1,4 @@
-import { objectMap } from "./objectMap";
+import { objectMap } from "./util/objectMap";
 
 export interface Logger {
 	info(messageBuilder: () => string): void;

@@ -1,10 +1,10 @@
-import { countOf } from "./arrayMath";
 import { BotTurnEffectType } from "./BotTurn";
-import { enumKeys } from "./enumKeys";
+import { enumKeys } from "./util/enumKeys";
 import { EVIDENCE_CARDS } from "./EvidenceCard";
 import { BiFunction } from "./Function";
 import { HOLMES_MAX, INVESTIGATION_MARKER_GOAL } from "./Game";
 import { HasVisibleBoard } from "./VisibleBoard";
+import { countOf } from "./util/countOf";
 
 export enum EffectWeightModifier {
 	MinusHolmesLocation = "MinusHolmesLocation",

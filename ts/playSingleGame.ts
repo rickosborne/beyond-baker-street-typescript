@@ -2,14 +2,14 @@ import { Bot } from "./Bot";
 import { CASE_FILE_CARDS } from "./CaseFileCard";
 import { DataSet } from "./DataSet";
 import { EffectWeightOpsFromType } from "./defaultScores";
-import { isDefined } from "./defined";
+import { isDefined } from "./util/defined";
 import { Game, GameState, LossReason } from "./Game";
 import { INSPECTOR_TYPES, InspectorType } from "./InspectorType";
 import { CONSOLE_LOGGER_NO_JSON, Logger, SILENT_LOGGER } from "./logger";
-import { range } from "./range";
-import { removeIf } from "./removeIf";
+import { range } from "./util/range";
+import { removeIf } from "./util/removeIf";
 import { DEFAULT_PRNG, PseudoRNG } from "./rng";
-import { shuffleInPlace } from "./shuffle";
+import { shuffleInPlace } from "./util/shuffle";
 
 export interface SingleGameOutcome {
 	readonly lossRate: number;

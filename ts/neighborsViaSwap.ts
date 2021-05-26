@@ -2,11 +2,11 @@ import { BotTurnEffectType } from "./BotTurn";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
 import { neighborsViaVariance } from "./neighborsViaVariance";
-import { objectMap } from "./objectMap";
+import { objectMap } from "./util/objectMap";
 import { PseudoRNG } from "./rng";
-import { shuffleInPlace } from "./shuffle";
+import { shuffleInPlace } from "./util/shuffle";
 import { SimRun } from "./SimRun";
-import { strictDeepEqual } from "./strictDeepEqual";
+import { strictDeepEqual } from "./util/strictDeepEqual";
 
 export function neighborsViaSwap(
 	effectTypes: BotTurnEffectType[],

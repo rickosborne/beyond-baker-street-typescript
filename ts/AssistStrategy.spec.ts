@@ -30,7 +30,7 @@ import { LeadType } from "./LeadType";
 import { UnknownCard } from "./MysteryCard";
 import { OtherHand } from "./OtherHand";
 import { OtherPlayer, Player } from "./Player";
-import { reduceOptions } from "./reduceOptions";
+import { reduceOptions } from "./util/reduceOptions";
 import { TurnStart } from "./TurnStart";
 import { VisibleLead } from "./VisibleBoard";
 

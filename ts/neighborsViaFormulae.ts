@@ -1,11 +1,11 @@
 import { BotTurnEffectType } from "./BotTurn";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import { EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
-import { objectMap } from "./objectMap";
-import { randomItem } from "./randomItem";
+import { objectMap } from "./util/objectMap";
+import { randomItem } from "./util/randomItem";
 import { PseudoRNG, randomInt } from "./rng";
 import { SimRun } from "./SimRun";
-import { strictDeepEqual } from "./strictDeepEqual";
+import { strictDeepEqual } from "./util/strictDeepEqual";
 
 export function neighborsViaFormulae(
 	effectTypes: BotTurnEffectType[],

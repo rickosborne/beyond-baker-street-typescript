@@ -1,6 +1,6 @@
 import * as sqlite3 from "better-sqlite3";
 import * as process from "process";
-import { iteratorMap } from "./arrayIterator";
+import { iteratorMap } from "./util/iteratorMap";
 import {
 	DEFAULT_SCORE_FROM_TYPE,
 	EffectWeightOpsFromType,
@@ -8,14 +8,14 @@ import {
 	formatOrderedEffectWeightOpsFromType,
 } from "./defaultScores";
 import { EFFECT_WEIGHT_MODIFIERS, EffectWeightModifier } from "./EffectWeight";
-import { formatDecimal } from "./formatDecimal";
-import { formatPercent } from "./formatPercent";
+import { formatDecimal } from "./format/formatDecimal";
+import { formatPercent } from "./format/formatPercent";
 import { GameSetup, GameWorkerPool } from "./GameWorkerPool";
 import { playSingleGame } from "./playSingleGame";
 import { SimRun, SimRunStats } from "./SimRun";
-import { stableJson } from "./stableJson";
+import { stableJson } from "./util/stableJson";
 import { Thermocouple } from "./Thermocouple";
-import { msTimer } from "./timer";
+import { msTimer } from "./util/timer";
 
 const historyFileName = process.argv[2];
 if (historyFileName == null) {

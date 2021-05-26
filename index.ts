@@ -1,11 +1,11 @@
 import * as process from "process";
-import { formatDecimal } from "./ts/formatDecimal";
-import { formatLossReasons } from "./ts/formatLossReasons";
-import { formatPercent } from "./ts/formatPercent";
+import { formatDecimal } from "./ts/format/formatDecimal";
+import { formatLossReasons } from "./ts/format/formatLossReasons";
+import { formatPercent } from "./ts/format/formatPercent";
 import { InspectorType } from "./ts/InspectorType";
 import { buildLogger, LogLevel } from "./ts/logger";
 import { playSingleGame } from "./ts/playSingleGame";
-import { msTimer } from "./ts/timer";
+import { msTimer } from "./ts/util/timer";
 
 const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
 const config = {

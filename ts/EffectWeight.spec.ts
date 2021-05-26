@@ -11,7 +11,7 @@ import {
 } from "./EffectWeight";
 import { EVIDENCE_CARDS } from "./EvidenceCard";
 import { HOLMES_GOAL, HOLMES_MAX, INVESTIGATION_MARKER_GOAL } from "./Game";
-import { roundTo } from "./roundTo";
+import { roundTo } from "./util/roundTo";
 import { TurnStart } from "./TurnStart";
 
 function turnInvestigation(

@@ -1,7 +1,7 @@
 import { BOT_TURN_EFFECT_TYPES, BotTurnEffectType, isBotTurnEffectType } from "./BotTurn";
-import { isDefined } from "./defined";
+import { isDefined } from "./util/defined";
 import { EffectWeightFormula, EffectWeightModifier, formatEffectWeightFormula } from "./EffectWeight";
-import { strictDeepEqual } from "./strictDeepEqual";
+import { strictDeepEqual } from "./util/strictDeepEqual";
 
 export type EffectWeightOpsFromType = Record<BotTurnEffectType, EffectWeightFormula>;
 export const DEFAULT_SCORE_FROM_TYPE: EffectWeightOpsFromType = {

@@ -2,7 +2,7 @@ import { Action, isActionOfType } from "./Action";
 import { ActionType } from "./ActionType";
 import { EvidenceType, isEvidenceType } from "./EvidenceType";
 import { EvidenceValue, isEvidenceValue } from "./EvidenceValue";
-import { formatPercent } from "./formatPercent";
+import { formatPercent } from "./format/formatPercent";
 import { OutcomeType, TypedOutcome } from "./Outcome";
 import { isPlayer, Player } from "./Player";
 

@@ -2,7 +2,7 @@ import { Card, isCardOfType } from "./Card";
 import { CardType } from "./CardType";
 import { EVIDENCE_TYPES, EvidenceType, isEvidenceType } from "./EvidenceType";
 import { isEvidenceValue } from "./EvidenceValue";
-import { range } from "./range";
+import { range } from "./util/range";
 
 export interface EvidenceCard extends Card<CardType.Evidence> {
 	cardType: CardType.Evidence;

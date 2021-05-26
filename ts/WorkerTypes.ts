@@ -1,6 +1,6 @@
 import { EffectWeightOpsFromType, isEffectWeightOpsFromType } from "./defaultScores";
 import { LossReason } from "./Game";
-import { isNumber } from "./isNumber";
+import { isNumber } from "./util/isNumber";
 
 export interface PlayGameRequest {
 	readonly cheat: boolean;

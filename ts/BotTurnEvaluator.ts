@@ -1,18 +1,18 @@
-import { sum } from "./arrayMath";
 import { Bot } from "./Bot";
 import { BotTurnEffectType, BotTurnOption } from "./BotTurn";
-import { columnarNumber } from "./columnarNumber";
+import { columnarNumber } from "./format/columnarNumber";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import { compileEffectWeight, EffectWeightFormula, EffectWeightFromTurn } from "./EffectWeight";
-import { formatAction } from "./formatAction";
+import { formatAction } from "./format/formatAction";
 import { Logger, SILENT_LOGGER } from "./logger";
-import { objectMap } from "./objectMap";
-import { randomItem } from "./randomItem";
+import { objectMap } from "./util/objectMap";
+import { randomItem } from "./util/randomItem";
 import { PseudoRNG } from "./rng";
 import { ScoredOption } from "./ScoredOption";
 import { TurnStart } from "./TurnStart";
-import { unique } from "./unique";
+import { unique } from "./util/unique";
 import { HasVisibleBoard } from "./VisibleBoard";
+import { sum } from "./util/sum";
 
 export interface BotTurnEvaluator {
 	scoreEffects(effects: BotTurnEffectType[], hasVisibleBoard: HasVisibleBoard): number;

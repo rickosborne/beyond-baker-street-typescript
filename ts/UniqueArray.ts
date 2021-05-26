@@ -1,5 +1,5 @@
 import { Predicate } from "./Predicate";
-import { removeIf } from "./removeIf";
+import { removeIf } from "./util/removeIf";
 
 export type IsSame<T> = (a: T, b: T) => boolean;
 

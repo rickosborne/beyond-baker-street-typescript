@@ -3,10 +3,10 @@ import { Card, isCardOfType } from "./Card";
 import { CardType } from "./CardType";
 import { EVIDENCE_TYPES, EvidenceType, isEvidenceType } from "./EvidenceType";
 import { EvidenceValue, isEvidenceValue } from "./EvidenceValue";
-import { groupBy } from "./groupBy";
+import { groupBy } from "./util/groupBy";
 import { isLeadType, LeadType } from "./LeadType";
-import { randomItems } from "./randomItems";
-import { range } from "./range";
+import { randomItems } from "./util/randomItems";
+import { range } from "./util/range";
 import { PseudoRNG } from "./rng";
 
 export interface LeadCard extends Card<CardType.Lead> {

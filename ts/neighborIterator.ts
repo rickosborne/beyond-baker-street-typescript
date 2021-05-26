@@ -7,10 +7,11 @@ import {
 	normalizeEffectWeightFormula,
 } from "./EffectWeight";
 import { TriFunction } from "./Function";
-import { combineAndIterate, shufflingPairIterator } from "./pairedPermutations";
-import { range } from "./range";
+import { combineAndIterate } from "./util/combineAndIterate";
+import { range } from "./util/range";
 import { SimRun } from "./SimRun";
-import { strictDeepEqual } from "./strictDeepEqual";
+import { strictDeepEqual } from "./util/strictDeepEqual";
+import { shufflingPairIterator } from "./util/shufflingPairIterator";
 
 const FORMULA_CHANGES: TriFunction<EffectWeightFormula, number, EffectWeightModifier, EffectWeightFormula>[] = [
 	(f, t) => [ f[0] + t, f[1], f[2] ] as EffectWeightFormula,

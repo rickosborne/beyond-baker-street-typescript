@@ -4,9 +4,9 @@ import { Worker } from "worker_threads";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { LossReason } from "./Game";
-import { parallelMap } from "./parallelMap";
+import { parallelMap } from "./util/parallelMap";
 import { playSingleGame } from "./playSingleGame";
-import { range } from "./range";
+import { range } from "./util/range";
 import { isPlayGameResult, PlayGameRequest, PlayGameResult } from "./WorkerTypes";
 
 type WorkerConsumer = Consumer<Worker>;

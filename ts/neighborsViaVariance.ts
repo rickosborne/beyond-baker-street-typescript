@@ -1,8 +1,8 @@
 import { BotTurnEffectType } from "./BotTurn";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { EffectWeightFormula } from "./EffectWeight";
-import { randomItem } from "./randomItem";
-import { range } from "./range";
+import { randomItem } from "./util/randomItem";
+import { range } from "./util/range";
 import { PseudoRNG } from "./rng";
 import { SimRun } from "./SimRun";
 

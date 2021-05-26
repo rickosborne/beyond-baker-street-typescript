@@ -1,10 +1,10 @@
 import { Action } from "./Action";
-import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
+import { BlackwellChoice, BlackwellTurn } from "./inspector/Blackwell";
 import { EvidenceCard } from "./EvidenceCard";
 import { InspectorType } from "./InspectorType";
 import { OtherHand } from "./OtherHand";
 import { Outcome } from "./Outcome";
-import { BottomOrTop } from "./Toby";
+import { BottomOrTop } from "./inspector/Toby";
 import { TurnStart } from "./TurnStart";
 
 export interface Player {

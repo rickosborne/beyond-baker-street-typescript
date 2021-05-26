@@ -1,10 +1,10 @@
-import { mean } from "./arrayMath";
 import { compareTwo, DataSetCompareResult } from "./DataSet";
 import { EffectWeightOpsFromType, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
 import { MonoFunction } from "./Function";
 import { neighborIterator } from "./neighborIterator";
 import { randomInt } from "./rng";
 import { SimRun, SimRunStats } from "./SimRun";
+import { mean } from "./util/mean";
 
 interface FinishedSimRun extends Required<SimRun> {
 	neighbors: Iterator<SimRun, undefined, number>;

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { describe } from "mocha";
 import { Action } from "./Action";
-import { BlackwellChoice, BlackwellTurn } from "./Blackwell";
+import { BlackwellChoice, BlackwellTurn } from "./inspector/Blackwell";
 import { evidence, EvidenceCard } from "./EvidenceCard";
 import { EvidenceType } from "./EvidenceType";
 import { GamePlayer } from "./Game";
@@ -9,7 +9,7 @@ import { InspectorType } from "./InspectorType";
 import { OtherHand } from "./OtherHand";
 import { Outcome } from "./Outcome";
 import { ActivePlayer, Player } from "./Player";
-import { BottomOrTop } from "./Toby";
+import { BottomOrTop } from "./inspector/Toby";
 import { TurnStart } from "./TurnStart";
 
 const witness3 = evidence(3, EvidenceType.Witness);

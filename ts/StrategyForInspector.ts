@@ -1,13 +1,13 @@
-import { AdlerInspectorStrategy } from "./Adler";
-import { BaskervilleInspectorStrategy } from "./Baskerville";
+import { AdlerInspectorStrategy } from "./inspector/Adler";
+import { BaskervilleInspectorStrategy } from "./inspector/Baskerville";
 import { MonoFunction } from "./Function";
-import { HopeInspectorStrategy } from "./Hope";
-import { HudsonInspectorStrategy } from "./Hudson";
+import { HopeInspectorStrategy } from "./inspector/Hope";
+import { HudsonInspectorStrategy } from "./inspector/Hudson";
 import { InspectorStrategy } from "./InspectorStrategy";
 import { InspectorType } from "./InspectorType";
 import { Logger } from "./logger";
-import { PikeInspectorStrategy } from "./Pike";
-import { TobyInspectorStrategy } from "./Toby";
+import { PikeInspectorStrategy } from "./inspector/Pike";
+import { TobyInspectorStrategy } from "./inspector/Toby";
 
 export type InspectorStrategyFactory = MonoFunction<Logger, InspectorStrategy | undefined>;
 

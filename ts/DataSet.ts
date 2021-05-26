@@ -1,4 +1,4 @@
-import { T_DIST_ALPHA_DEFAULT, tScore } from "./tScore";
+import { T_DIST_ALPHA_DEFAULT, tScore } from "./util/tScore";
 
 export enum DataSetCompareResult {
 	OTHER_IS_SMALLER = -1,
