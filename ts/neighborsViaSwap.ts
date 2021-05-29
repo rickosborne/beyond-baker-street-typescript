@@ -1,6 +1,7 @@
 import { BotTurnEffectType, MUTABLE_EFFECT_TYPES } from "./BotTurn";
+import { Consumer } from "./Consumer";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
-import { EffectWeightFormula, EffectWeightModifier, normalizeEffectWeightFormula } from "./EffectWeight";
+import { effectWeightFormula, EffectWeightFormula, normalizeEffectWeightFormula } from "./EffectWeight";
 import { fillOutRun } from "./fillOutRun";
 import { BiFunction } from "./Function";
 import { mergeRuns } from "./mergeRuns";
@@ -20,13 +21,23 @@ function runWithSwappedFormulaIndex(
 	fromFormula: EffectWeightFormula,
 	toFormula: EffectWeightFormula,
 ): SimRun {
-	const updatedFrom = fromFormula.slice() as EffectWeightFormula;
-	const updatedTo = toFormula.slice() as EffectWeightFormula;
-	const defaultValue: EffectWeightModifier | number = fromIndex === 2 ? undefined as unknown as EffectWeightModifier : 0;
-	[ updatedFrom[fromIndex], updatedTo[toIndex] ] = [ updatedTo[toIndex] || defaultValue, updatedFrom[fromIndex] || defaultValue ];
+	let [ fromBase, fromOffset, fromModifier ] = fromFormula;
+	let [ toBase, toOffset, toModifier ] = toFormula;
+	if (fromIndex === 2) {
+		const originalFromModifier = fromModifier;
+		fromModifier = toModifier;
+		toModifier = originalFromModifier;
+	} else {
+		const fromSetter: Consumer<number> = fromIndex === 0 ? n => fromBase = n : n => fromOffset = n;
+		const toSetter: Consumer<number> = toIndex === 0 ? n => toBase = n : n => toOffset = n;
+		const originalFrom: number = (fromIndex === 0 ? fromBase : fromOffset) || 0;
+		const originalTo: number = (toIndex === 0 ? toBase : toOffset) || 0;
+		fromSetter(originalTo);
+		toSetter(originalFrom);
+	}
 	const swapped: Partial<EffectWeightOpsFromType> = {
-		[fromType]: normalizeEffectWeightFormula(updatedFrom),
-		[toType]: normalizeEffectWeightFormula(updatedTo),
+		[fromType]: normalizeEffectWeightFormula(effectWeightFormula(fromBase, fromOffset, fromModifier)),
+		[toType]: normalizeEffectWeightFormula(effectWeightFormula(toBase, toOffset, toModifier)),
 	};
 	const weights = Object.assign({}, run.weights, swapped);
 	return {
@@ -50,7 +61,6 @@ const FORMULA_SWAP_INDEX_PAIRS: [number, number][] = [
 export function* neighborWithOneSwapIterator(
 	simRun: SimRun,
 	effectiveFormulas: Record<BotTurnEffectType, EffectWeightFormula>,
-	scoreForWeights: (weights: Partial<EffectWeightOpsFromType>) => (number | undefined),
 	effectTypes: BotTurnEffectType[],
 ): IterableIterator<SimRun> {
 	for (const fromType of shuffleCopy(effectTypes)) {
@@ -77,7 +87,7 @@ export function* neighborsViaSwap(
 	const timer = resettableTimer();
 	const effectiveFormulas = toRecord(effectTypes, t => t, t => simRun.weights[t] || scoreFromType[t]);
 	for (let temp = 1; temp < temperature; temp++) {
-		const iterators = range(1, temp).map(() => (r: SimRun) => neighborWithOneSwapIterator(r, effectiveFormulas, scoreForWeights, effectTypes));
+		const iterators = range(1, temp).map(() => (r: SimRun) => neighborWithOneSwapIterator(r, effectiveFormulas, effectTypes));
 		const runMerger: BiFunction<SimRun, SimRun, SimRun> = (a, b) => mergeRuns(a, b, simRun, () => "", () => undefined);
 		for (const neighbor of combineAndIterate(simRun, runMerger, iterators)) {
 			if (scoreForWeights(neighbor.weights) === undefined) {

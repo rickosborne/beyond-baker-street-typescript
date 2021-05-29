@@ -8,6 +8,14 @@ export function isIterable<T>(maybe: unknown): maybe is Iterable<T> {
 	return maybe != null && (typeof (maybe as Iterable<T>)[Symbol.iterator] === "function");
 }
 
+export function asIterable<T>(iterator: Iterator<T, unknown, unknown>): Iterable<T> {
+	return Object.assign({
+		[Symbol.iterator](): Iterator<T> {
+			return iterator;
+		},
+	}, iterator);
+}
+
 export function iteratorMap<T, U, R, N>(source: Iterator<T, R, N> | Iterable<T>, mapper: MonoFunction<T, U>): Iterator<U, R, N> {
 	let done = false;
 	const sourceIterator: Iterator<T, R, N> | undefined = isIterator(source) ? source : isIterable(source) ? source[Symbol.iterator]() as Iterator<T, R, N> : undefined;

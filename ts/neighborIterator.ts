@@ -2,10 +2,11 @@ import { BotTurnEffectType, MUTABLE_EFFECT_TYPES } from "./BotTurn";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import { EFFECT_WEIGHT_MODIFIERS, EffectWeightModifier } from "./EffectWeight";
 import { fillOutRun } from "./fillOutRun";
+import { neighborsViaFormulae } from "./neighborsViaFormulae";
 import { neighborsViaRandomChanges } from "./neighborsViaRandomChanges";
 import { neighborsViaSwap } from "./neighborsViaSwap";
 import { SimRun } from "./SimRun";
-import { iteratorSwirl } from "./util/iteratorSwirl";
+import { iteratorRing } from "./util/iteratorRing";
 import { msTimer } from "./util/timer";
 
 export function neighborIterator(
@@ -23,9 +24,10 @@ export function neighborIterator(
 				while (temp > 0) {
 					let generator = generators[temp];
 					if (generator === undefined) {
-						generator = iteratorSwirl(
+						generator = iteratorRing(
 							neighborsViaRandomChanges(simRun, temp, scoreForWeights, effectTypes, modifiers, scoreFromType),
-							neighborsViaSwap(simRun, temperature, scoreForWeights, effectTypes, scoreFromType),
+							neighborsViaSwap(simRun, temp, scoreForWeights, effectTypes, scoreFromType),
+							neighborsViaFormulae(simRun, temp, scoreForWeights, effectTypes, scoreFromType),
 						);
 						generators[temp] = generator;
 					}

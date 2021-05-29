@@ -96,8 +96,9 @@ export function* neighborsViaRandomChanges(
 ): IterableIterator<SimRun> {
 	let changeCount = 1;
 	const timer = resettableTimer();
+	const temp = Math.round(temperature);
 	while (changeCount < 10) {
-		const iterators = range(1, changeCount).map(() => (r: SimRun) => neighborWithOneChangeIterator(r, temperature, scoreForWeights, effectTypes, modifiers, scoreFromType));
+		const iterators = range(1, changeCount).map(() => (r: SimRun) => neighborWithOneChangeIterator(r, temp, scoreForWeights, effectTypes, modifiers, scoreFromType));
 		const runMerger: BiFunction<SimRun, SimRun, SimRun> = (a, b) => mergeRuns(a, b, simRun, () => "", () => undefined);
 		for (const neighbor of combineAndIterate(simRun, runMerger, iterators)) {
 			// console.log(`Neighbor cc${changeCount} t${temperature}: ${formatOrderedEffectWeightOpsFromType(simRun.weights)} --> ${formatOrderedEffectWeightOpsFromType(neighbor.weights)}`);
