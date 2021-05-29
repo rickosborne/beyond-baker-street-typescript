@@ -54,6 +54,7 @@ export class Thermocouple {
 			msToFindNeighbor: f.msToFindNeighbor,
 			neighborDepth: f.neighborDepth,
 			neighborOf: f.neighborOf,
+			neighborSignature: f.neighborSignature,
 			plays: f.plays,
 			weights: f.weights,
 		}));
@@ -89,7 +90,7 @@ export class Thermocouple {
 	 * @return {boolean} Whether the run is "good enough" and kept as a source for neighbors.
 	 */
 	public register(run: SimRun): boolean {
-		const { id, lossRate, lossVariance, msToFindNeighbor, neighborDepth, neighborOf, plays, weights } = run;
+		const { id, lossRate, lossVariance, msToFindNeighbor, neighborDepth, neighborOf, neighborSignature, plays, weights } = run;
 		if (lossVariance === undefined || lossRate === undefined || plays === undefined) {
 			console.warn(`Run had no stats: ${formatOrderedEffectWeightOpsFromType(run.weights)}`);
 			return false;
@@ -131,6 +132,7 @@ export class Thermocouple {
 			msToFindNeighbor,
 			neighborDepth,
 			neighborOf,
+			neighborSignature,
 			neighbors,
 			plays,
 			weights,

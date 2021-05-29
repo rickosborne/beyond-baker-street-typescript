@@ -13,6 +13,7 @@ export interface SimRun extends Partial<SimRunStats> {
 	msToFindNeighbor: number | undefined;
 	neighborDepth: number;
 	neighborOf: SimRun | undefined;
+	neighborSignature: string;
 	weights: Partial<EffectWeightOpsFromType>;
 }
 

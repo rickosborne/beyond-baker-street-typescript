@@ -43,8 +43,10 @@ const initialFromBest: CompletedSimRun[] = runStorage.findBestScores(thermocoupl
 		msToFindNeighbor: 0,
 		neighborDepth: sws.neighborDepth - 1,
 		neighborOf: undefined,
+		neighborSignature: "initial",
 		weights: runStorage.findWeightsById(sws.neighborOf),
 	},
+	neighborSignature: sws.neighborSignature,
 	plays: sws.plays,
 	weights: sws.weights,
 }));
@@ -60,6 +62,7 @@ const initialState: CompletedSimRun[] = initialFromBest.length > 0 ? initialFrom
 	msToFindNeighbor: 0,
 	neighborDepth: 0,
 	neighborOf: undefined,
+	neighborSignature: "defaults",
 	plays: initialGame.plays,
 	weights: {},
 }];
@@ -88,12 +91,13 @@ gameWorkerPool.scoreGames(
 		msToFindNeighbor: run.msToFindNeighbor,
 		neighborDepth: run.neighborDepth,
 		neighborOf: run.neighborOf,
+		neighborSignature: run.neighborSignature,
 		plays: run.plays,
 		weights: run.weights,
 	})),
 	(result: PlayGameResult) => {
 		const { lossRate, lossVariance, plays, request } = result;
-		const { id, msToFindNeighbor, neighborDepth, neighborOf, weights } = request;
+		const { id, msToFindNeighbor, neighborDepth, neighborOf, neighborSignature, weights } = request;
 		if (neighborOf?.id == undefined) {
 			console.warn(`No neighbor: ${JSON.stringify(result, null, 2)}`);
 		}
@@ -104,6 +108,7 @@ gameWorkerPool.scoreGames(
 			msToFindNeighbor,
 			neighborDepth,
 			neighborOf,
+			neighborSignature,
 			plays,
 			weights,
 		};
@@ -114,13 +119,15 @@ gameWorkerPool.scoreGames(
 		});
 		const improved = thermocouple.register(run);
 		if (improved) {
-			console.log(`\n${formatPercent(result.lossRate as number, 2)} ${formatPercent(result.lossVariance, 2)} @${request.neighborDepth} +${request.msToFindNeighbor}ms: ${formatEffectWeightOpsFromTypeDiff(result.request.weights)}`);
+			console.log(`\n${formatPercent(result.lossRate as number, 2)} ${formatPercent(result.lossVariance, 2)} @${request.neighborDepth} +${request.msToFindNeighbor}ms via ${request.neighborSignature}: ${formatEffectWeightOpsFromTypeDiff(result.request.weights)}`);
 			optimizeInstrumentCollector.bestChanged({
 				best: thermocouple.finished,
 				type: OptimizeEventType.BestChanged,
 			});
 		} else {
-			process.stdout.write(result.lossRate === 1 ? "X" : String(Math.floor(result.lossRate * 10)));
+			const rateChar = result.lossRate === 1 ? "X" : String(Math.floor(result.lossRate * 10));
+			const sigChar = result.request.neighborSignature[0];
+			process.stdout.write(`${rateChar}${sigChar}`);
 		}
 		attempts++;
 		if ((attempts % 100) === 0) {
@@ -129,9 +136,7 @@ gameWorkerPool.scoreGames(
 			lastAttempts = attempts;
 			const secs = ms / 1000;
 			const runsPerSec = deltaAttempts / secs;
-			const msPerRun = ms / deltaAttempts;
-			const iteratorPct = iteratorsMs / msPerRun;
-			console.log(`\nRuns: ${attempts} in ${formatDecimal(secs, 2)}s for ${formatDecimal(runsPerSec, 2)} runs/s, with ${iteratorsMs}ms (${formatPercent(iteratorPct, 2)}) for neighbors. Scores: ${thermocouple.finished.map(f => formatPercent(f.lossRate, 2)).join(", ")}.`);
+			console.log(`\nRuns: ${attempts} in ${formatDecimal(secs, 2)}s for ${formatDecimal(runsPerSec, 2)} runs/s, ${iteratorsMs}ms for neighbors. Scores: ${thermocouple.finished.map(f => formatPercent(f.lossRate, 2)).join(", ")}.`);
 			iteratorsMs = 0;
 			timer = msTimer();
 		}

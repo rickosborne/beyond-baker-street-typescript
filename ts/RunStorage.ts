@@ -21,6 +21,7 @@ export interface BestScore extends SelectWeightsStats {
 	id: string;
 	neighborDepth: number;
 	neighborOf?: string | undefined;
+	neighborSignature: string;
 	weights: EffectWeightOpsFromType;
 }
 
@@ -90,6 +91,7 @@ export class RunStorage {
 			id: row.id,
 			neighborDepth: row.depth,
 			neighborOf: isDefined(row.neighbor) ? row.neighbor : undefined,
+			neighborSignature: "best",
 			plays: row.plays,
 			score: row.score,
 			variance: row.variance,

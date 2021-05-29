@@ -1,112 +1,89 @@
-import { BotTurnEffectType } from "./BotTurn";
-import { EffectWeightOpsFromType } from "./defaultScores";
-import { EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
-import { neighborsViaVariance } from "./neighborsViaVariance";
-import { PseudoRNG } from "./rng";
-import { idForWeights, SimRun } from "./SimRun";
-import { objectMap } from "./util/objectMap";
-import { shuffleInPlace } from "./util/shuffle";
-import { strictDeepEqual } from "./util/strictDeepEqual";
-import { msTimer } from "./util/timer";
+import { BotTurnEffectType, MUTABLE_EFFECT_TYPES } from "./BotTurn";
+import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
+import { EffectWeightFormula, EffectWeightModifier, normalizeEffectWeightFormula } from "./EffectWeight";
+import { fillOutRun } from "./fillOutRun";
+import { BiFunction } from "./Function";
+import { mergeRuns } from "./mergeRuns";
+import { SimRun } from "./SimRun";
+import { combineAndIterate } from "./util/combineAndIterate";
+import { range } from "./util/range";
+import { shuffleCopy } from "./util/shuffle";
+import { resettableTimer } from "./util/timer";
+import { toRecord } from "./util/toRecord";
 
-export function neighborsViaSwap(
-	effectTypes: BotTurnEffectType[],
-	scoreFromType: EffectWeightOpsFromType,
-	scoreForWeights: (weights: Partial<EffectWeightOpsFromType>) => number | undefined,
-): (count: number, simRun: SimRun, temp: number, prng: PseudoRNG) => SimRun[] {
-	const viaVariance = neighborsViaVariance(effectTypes, scoreFromType, scoreForWeights);
-	let previousRun: SimRun;
-	const allRuns: SimRun[] = [];
-	const maxDistance = 6;
-	const timer = msTimer();
-	return function neighborsViaSwap(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
-		function addRunIfNovel(weights: EffectWeightOpsFromType,): void {
-			if (!strictDeepEqual(weights, simRun.weights) && scoreForWeights(weights) === undefined) {
-				allRuns.push({
-					id: idForWeights(weights),
-					msToFindNeighbor: undefined,
-					neighborDepth: simRun.neighborDepth + 1,
-					neighborOf: simRun,
-					weights,
-				});
-			}
-		}
-
-		if (!strictDeepEqual(previousRun, simRun)) {
-			previousRun = simRun;
-			allRuns.splice(0, allRuns.length);
-			const weights: EffectWeightOpsFromType = effectTypes.reduce((w, effectType) => {
-				const ops = simRun.weights[effectType] || scoreFromType[effectType];
-				const base = ops[0];
-				w[effectType] = [base];
-				return w;
-			}, {} as EffectWeightOpsFromType);
-			const orderedKeys = (Object.keys(weights) as BotTurnEffectType[]).slice()
-				.sort((a, b) => (weights[a][0] as number) - (weights[b][0] as number));
-			const keyCount = orderedKeys.length;
-			const lastIndex = keyCount - 1;
-			addRunIfNovel(objectMap(weights, (ops, type, index) => [Math.floor(lastIndex / 2) - index]));
-			const smallest = orderedKeys
-				.map(type => weights[type][0] as number)
-				.filter(v => v > 0)
-				.reduce((p, c) => Math.min(p, c), 1000);
-			if (smallest > 1) {
-				addRunIfNovel(objectMap(weights, ops => ops.length < 2 ? ops : ops.map((op: number | EffectWeightModifier, index: number) => index === 0 ? Math.round((op as number) / smallest) : op) as EffectWeightFormula));
-				addRunIfNovel(objectMap(weights, ops => ops.length < 2 ? ops : ops.map((op: number | EffectWeightModifier, index: number) => index === 1 ? Math.round((op as number) / smallest) : op) as EffectWeightFormula));
-				addRunIfNovel(objectMap(weights, ops => ops.length < 2 ? ops : ops.map((op: number | EffectWeightModifier, index: number) => index === 0 ? (op as number) - smallest : op) as EffectWeightFormula));
-				addRunIfNovel(objectMap(weights, ops => ops.length < 2 ? ops : ops.map((op: number | EffectWeightModifier, index: number) => index === 1 ? (op as number) - smallest : op) as EffectWeightFormula));
-			}
-			const rotate = (sourceIndex: number, destIndex: number, weights: EffectWeightOpsFromType): void => {
-				const direction = sourceIndex < destIndex ? 1 : -1;
-				const first = weights[orderedKeys[sourceIndex]];
-				for (let index = sourceIndex; index !== destIndex; index += direction) {
-					weights[orderedKeys[index]] = weights[orderedKeys[index + direction]];
-				}
-				weights[orderedKeys[destIndex]] = first;
-			};
-			for (let distance = -maxDistance; distance <= maxDistance; distance++) {
-				if (distance === 0) {
-					continue;
-				}
-				for (let sourceIndex = 0; sourceIndex < keyCount; sourceIndex++) {
-					const destIndex = sourceIndex + distance;
-					if (destIndex < 0 || destIndex > lastIndex) {
-						continue;
-					}
-					const farSwap = Object.assign({}, weights);
-					const destKey = orderedKeys[destIndex];
-					const sourceKey = orderedKeys[sourceIndex];
-					[ farSwap[destKey], farSwap[sourceKey] ] = [ farSwap[sourceKey], farSwap[destKey] ];
-					addRunIfNovel(farSwap);
-					if (!strictDeepEqual(farSwap, simRun.weights) && scoreForWeights(farSwap) === undefined) {
-						allRuns.push({
-							id: idForWeights(farSwap),
-							msToFindNeighbor: undefined,
-							neighborDepth: simRun.neighborDepth + 1,
-							neighborOf: simRun,
-							weights: farSwap,
-						});
-					}
-					if (distance > 1) {
-						const left = Object.assign({}, weights);
-						const right = Object.assign({}, weights);
-						rotate(sourceIndex, destIndex, right);
-						rotate(destIndex, sourceIndex, left);
-						addRunIfNovel(left);
-						addRunIfNovel(right);
-					}
-				}
-			}
-			// console.log(`Swapped neighbors: ${allRuns.length}`);
-			shuffleInPlace(allRuns, prng);
-		}
-		if (allRuns.length === 0) {
-			// console.log(`Falling back to variance`);
-			allRuns.push(...viaVariance(1000, simRun, temp, prng));
-		}
-		const runs: SimRun[] = [];
-		runs.push(...allRuns.splice(0, count));
-		runs.forEach(r => r.msToFindNeighbor = timer());
-		return runs;
+function runWithSwappedFormulaIndex(
+	run: SimRun,
+	fromIndex: number,
+	toIndex: number,
+	fromType: BotTurnEffectType,
+	toType: BotTurnEffectType,
+	fromFormula: EffectWeightFormula,
+	toFormula: EffectWeightFormula,
+): SimRun {
+	const updatedFrom = fromFormula.slice() as EffectWeightFormula;
+	const updatedTo = toFormula.slice() as EffectWeightFormula;
+	const defaultValue: EffectWeightModifier | number = fromIndex === 2 ? undefined as unknown as EffectWeightModifier : 0;
+	[ updatedFrom[fromIndex], updatedTo[toIndex] ] = [ updatedTo[toIndex] || defaultValue, updatedFrom[fromIndex] || defaultValue ];
+	const swapped: Partial<EffectWeightOpsFromType> = {
+		[fromType]: normalizeEffectWeightFormula(updatedFrom),
+		[toType]: normalizeEffectWeightFormula(updatedTo),
 	};
+	const weights = Object.assign({}, run.weights, swapped);
+	return {
+		id: "",
+		msToFindNeighbor: undefined,
+		neighborDepth: run.neighborDepth + 1,
+		neighborOf: run,
+		neighborSignature: `swap(${fromType}[${fromIndex}], ${toType}[${toIndex}])`,
+		weights,
+	};
+}
+
+const FORMULA_SWAP_INDEX_PAIRS: [number, number][] = [
+	[ 0, 0 ], // bases
+	[ 1, 1 ], // offsets
+	[ 2, 2 ], // modifiers
+	[ 0, 1 ], // base <=> offset
+	[ 1, 0 ], // offset <=> base
+];
+
+export function* neighborWithOneSwapIterator(
+	simRun: SimRun,
+	effectiveFormulas: Record<BotTurnEffectType, EffectWeightFormula>,
+	scoreForWeights: (weights: Partial<EffectWeightOpsFromType>) => (number | undefined),
+	effectTypes: BotTurnEffectType[],
+): IterableIterator<SimRun> {
+	for (const fromType of shuffleCopy(effectTypes)) {
+		for (const toType of shuffleCopy(effectTypes)) {
+			if (toType === fromType) {
+				continue;
+			}
+			const fromFormula = effectiveFormulas[fromType];
+			const toFormula = effectiveFormulas[toType];
+			for (const [ fromIndex, toIndex ] of FORMULA_SWAP_INDEX_PAIRS) {
+				yield runWithSwappedFormulaIndex(simRun, fromIndex, toIndex, fromType, toType, fromFormula, toFormula);
+			}
+		}
+	}
+}
+
+export function* neighborsViaSwap(
+	simRun: SimRun,
+	temperature: number,
+	scoreForWeights: (weights: Partial<EffectWeightOpsFromType>) => number | undefined,
+	effectTypes: BotTurnEffectType[] = MUTABLE_EFFECT_TYPES,
+	scoreFromType: EffectWeightOpsFromType = DEFAULT_SCORE_FROM_TYPE,
+): IterableIterator<SimRun> {
+	const timer = resettableTimer();
+	const effectiveFormulas = toRecord(effectTypes, t => t, t => simRun.weights[t] || scoreFromType[t]);
+	for (let temp = 1; temp < temperature; temp++) {
+		const iterators = range(1, temp).map(() => (r: SimRun) => neighborWithOneSwapIterator(r, effectiveFormulas, scoreForWeights, effectTypes));
+		const runMerger: BiFunction<SimRun, SimRun, SimRun> = (a, b) => mergeRuns(a, b, simRun, () => "", () => undefined);
+		for (const neighbor of combineAndIterate(simRun, runMerger, iterators)) {
+			if (scoreForWeights(neighbor.weights) === undefined) {
+				yield fillOutRun(neighbor, simRun, timer);
+				timer.reset();
+			}
+		}
+	}
 }

@@ -1,6 +1,6 @@
 function stableUnknown(obj: unknown): unknown {
 	const type = typeof obj;
-	if ((type === "undefined") || (type === "boolean") || (type === "string") || (type === "number") || (type === "bigint") || (type === "symbol")) {
+	if (obj === null || (type === "undefined") || (type === "boolean") || (type === "string") || (type === "number") || (type === "bigint") || (type === "symbol")) {
 		return obj;
 	} else if (Array.isArray(obj)) {
 		return obj.map(item => stableUnknown(item));

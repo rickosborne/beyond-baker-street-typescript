@@ -44,6 +44,10 @@ export const EFFECT_WEIGHT_MODIFIERS = enumKeys<EffectWeightModifier>(EffectWeig
 
 export type EffectWeightFormula = [number] | [ number, number, EffectWeightModifier ];
 
+export function effectWeightFormula(base: number, offset?: number | undefined, modifier?: EffectWeightModifier | undefined): EffectWeightFormula {
+	return offset === undefined || modifier === undefined ? [base] : [ base, offset, modifier ];
+}
+
 export function investigationProgress(turnStart: HasVisibleBoard, reversed = false, allowZero = false): number {
 	const buffer = allowZero ? 0 : 1;
 	if (reversed) {

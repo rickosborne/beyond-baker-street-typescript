@@ -10,3 +10,7 @@ export function shuffleInPlace<T>(items: T[], prng: PseudoRNG = DEFAULT_PRNG): T
 	}
 	return items;
 }
+
+export function shuffleCopy<T>(items: T[], prng: PseudoRNG = DEFAULT_PRNG): T[] {
+	return shuffleInPlace(items.slice(), prng);
+}

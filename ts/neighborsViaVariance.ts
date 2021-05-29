@@ -37,6 +37,7 @@ export function neighborsViaVariance(
 						msToFindNeighbor: undefined,
 						neighborDepth: simRun.neighborDepth + 1,
 						neighborOf: simRun,
+						neighborSignature: `vary(${temp}, ${variability}, ${comboAttempt})`,
 						weights,
 					});
 					// console.log(formatEffectWeightOpsFromTypeDiff(weights, simRun.weights));

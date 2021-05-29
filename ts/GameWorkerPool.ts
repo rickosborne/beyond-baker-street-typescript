@@ -86,6 +86,7 @@ export class GameWorkerPool {
 		neighborOf: SimRun | undefined,
 		msToFindNeighbor: number | undefined,
 		neighborDepth: number,
+		neighborSignature: string,
 	): Promise<PlayGameResult> {
 		const sequenceId = this.nextRequestId++;
 		const request: PlayGameRequest = {
@@ -95,6 +96,7 @@ export class GameWorkerPool {
 			msToFindNeighbor,
 			neighborDepth,
 			neighborOf,
+			neighborSignature,
 			sequenceId,
 			weights,
 		};
@@ -161,12 +163,13 @@ export class GameWorkerPool {
 						msToFindNeighbor: setup.msToFindNeighbor,
 						neighborDepth: setup.neighborDepth,
 						neighborOf: setup.neighborOf,
+						neighborSignature: setup.neighborSignature,
 						sequenceId: -1,
 						weights: setup.weights,
 					},
 				};
 			} else {
-				return this.scoreGame(setup.id, setup.weights, setup.cheat, setup.iterations, setup.neighborOf, setup.msToFindNeighbor, setup.neighborDepth);
+				return this.scoreGame(setup.id, setup.weights, setup.cheat, setup.iterations, setup.neighborOf, setup.msToFindNeighbor, setup.neighborDepth, setup.neighborSignature);
 			}
 		}, eachResult);
 	}
