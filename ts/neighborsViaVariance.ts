@@ -4,7 +4,8 @@ import { EffectWeightFormula } from "./EffectWeight";
 import { randomItem } from "./util/randomItem";
 import { range } from "./util/range";
 import { PseudoRNG } from "./rng";
-import { SimRun } from "./SimRun";
+import { idForWeights, SimRun } from "./SimRun";
+import { msTimer } from "./util/timer";
 
 export function neighborsViaVariance(
 	effectTypes: BotTurnEffectType[],
@@ -16,6 +17,7 @@ export function neighborsViaVariance(
 		const priorWeights = simRun.weights;
 		let variability = Math.floor(temp + 1);
 		const results: SimRun[] = [];
+		const timer = msTimer();
 		while (variability < 50) {
 			variability++;
 			const mods = range(-variability, variability);
@@ -31,12 +33,17 @@ export function neighborsViaVariance(
 				const weights = Object.assign({}, priorWeights, override);
 				if (scoreForWeights(weights) === undefined) {
 					results.push({
+						id: idForWeights(weights),
+						msToFindNeighbor: undefined,
+						neighborDepth: simRun.neighborDepth + 1,
+						neighborOf: simRun,
 						weights,
 					});
 					// console.log(formatEffectWeightOpsFromTypeDiff(weights, simRun.weights));
 					if (results.length >= count) {
 						// const endDate = Date.now();
 						// console.log(`Took ${endDate - start}ms to find ${results.length}`);
+						results.forEach(r => r.msToFindNeighbor = timer());
 						return results;
 					}
 				}
@@ -44,6 +51,7 @@ export function neighborsViaVariance(
 		}
 		const endDate = Date.now();
 		console.log(`Gave up after ${endDate - start}ms to find ${results.length}`);
+		results.forEach(r => r.msToFindNeighbor = timer());
 		return results;
 	};
 }

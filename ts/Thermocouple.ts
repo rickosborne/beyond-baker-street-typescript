@@ -1,12 +1,15 @@
 import { compareTwo, DataSetCompareResult } from "./DataSet";
-import { EffectWeightOpsFromType, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
+import { formatOrderedEffectWeightOpsFromType } from "./defaultScores";
 import { MonoFunction } from "./Function";
 import { neighborIterator } from "./neighborIterator";
 import { randomInt } from "./rng";
-import { SimRun, SimRunStats } from "./SimRun";
+import { RunStorage } from "./RunStorage";
+import { CompletedSimRun, SimRun, SimRunStats } from "./SimRun";
 import { mean } from "./util/mean";
+import { stableJson } from "./util/stableJson";
+import { msTimer } from "./util/timer";
 
-interface FinishedSimRun extends Required<SimRun> {
+interface FinishedSimRun extends CompletedSimRun {
 	neighbors: Iterator<SimRun, undefined, number>;
 }
 
@@ -26,9 +29,9 @@ export class Thermocouple {
 	private readonly runs: FinishedSimRun[] = [];  // Sorted best (lowest) to worst (highest)
 
 	constructor(
-		statLookup: MonoFunction<Partial<EffectWeightOpsFromType>, number | undefined>,
+		private readonly storage: RunStorage,
 		public readonly preferredMaxCount = 5,
-		private readonly neighborIteratorFactory: MonoFunction<SimRun, Iterator<SimRun, undefined, number>> = neighborIterator(statLookup),
+		private readonly neighborIteratorFactory: MonoFunction<SimRun, Iterator<SimRun, undefined, number>> = neighborIterator(weights => storage.scoreForWeights(weights)),
 	) {
 	}
 
@@ -43,10 +46,14 @@ export class Thermocouple {
 		};
 	}
 
-	public get finished(): Required<SimRun>[] {
+	public get finished(): CompletedSimRun[] {
 		return this.runs.map(f => ({
+			id: f.id,
 			lossRate: f.lossRate,
 			lossVariance: f.lossVariance,
+			msToFindNeighbor: f.msToFindNeighbor,
+			neighborDepth: f.neighborDepth,
+			neighborOf: f.neighborOf,
 			plays: f.plays,
 			weights: f.weights,
 		}));
@@ -61,6 +68,7 @@ export class Thermocouple {
 	}
 
 	public neighbor(temperature: number): SimRun {
+		const timer = msTimer();
 		while (this.runs.length > 0) {
 			const index = weightedRandomIndex(this.runs.length);
 			const finished = this.runs[index];
@@ -69,7 +77,9 @@ export class Thermocouple {
 				console.warn(`Iterator for weights ran out of neighbors: ${formatOrderedEffectWeightOpsFromType(finished.weights)}`);
 				this.runs.splice(index, 1);
 			} else {
-				return neighbor.value;
+				const withTime: SimRun = Object.create(neighbor.value);
+				withTime.msToFindNeighbor = timer();
+				return withTime;
 			}
 		}
 		throw new Error(`Need at least 1 run`);
@@ -79,11 +89,12 @@ export class Thermocouple {
 	 * @return {boolean} Whether the run is "good enough" and kept as a source for neighbors.
 	 */
 	public register(run: SimRun): boolean {
-		const { lossRate, lossVariance, plays, weights } = run;
+		const { id, lossRate, lossVariance, msToFindNeighbor, neighborDepth, neighborOf, plays, weights } = run;
 		if (lossVariance === undefined || lossRate === undefined || plays === undefined) {
 			console.warn(`Run had no stats: ${formatOrderedEffectWeightOpsFromType(run.weights)}`);
 			return false;
 		}
+		this.storage.addAttemptScore(id, stableJson(weights), lossRate, plays, lossVariance, neighborOf?.id, neighborDepth);
 		let afterIndex: number | undefined = undefined;
 		let beforeIndex: number | undefined = undefined;
 		for (let i = this.runs.length - 1; i >= 0 && afterIndex === undefined; i--) {
@@ -114,8 +125,12 @@ export class Thermocouple {
 		const index = randomInt(beforeIndex, afterIndex + 1);
 		const neighbors = this.neighborIteratorFactory(run);
 		const finished: FinishedSimRun = {
+			id,
 			lossRate,
 			lossVariance,
+			msToFindNeighbor,
+			neighborDepth,
+			neighborOf,
 			neighbors,
 			plays,
 			weights,

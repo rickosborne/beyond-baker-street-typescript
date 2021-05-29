@@ -1,12 +1,12 @@
-import { EffectWeightOpsFromType, isEffectWeightOpsFromType } from "./defaultScores";
+import { isEffectWeightOpsFromType } from "./defaultScores";
 import { LossReason } from "./Game";
+import { SimRun } from "./SimRun";
 import { isNumber } from "./util/isNumber";
 
-export interface PlayGameRequest {
+export interface PlayGameRequest extends SimRun {
 	readonly cheat: boolean;
-	readonly id: number;
 	readonly iterations?: number;
-	readonly weights: Partial<EffectWeightOpsFromType>;
+	readonly sequenceId: number;
 }
 
 export function isPlayGameRequest(maybe: unknown): maybe is PlayGameRequest {

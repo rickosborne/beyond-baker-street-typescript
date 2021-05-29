@@ -1,120 +1,50 @@
-import * as sqlite3 from "better-sqlite3";
 import * as process from "process";
-import { iteratorMap } from "./util/iteratorMap";
-import {
-	DEFAULT_SCORE_FROM_TYPE,
-	EffectWeightOpsFromType,
-	formatEffectWeightOpsFromTypeDiff,
-	formatOrderedEffectWeightOpsFromType,
-} from "./defaultScores";
+import { formatEffectWeightOpsFromTypeDiff, formatOrderedEffectWeightOpsFromType } from "./defaultScores";
 import { EFFECT_WEIGHT_MODIFIERS, EffectWeightModifier } from "./EffectWeight";
 import { formatDecimal } from "./format/formatDecimal";
 import { formatPercent } from "./format/formatPercent";
 import { GameSetup, GameWorkerPool } from "./GameWorkerPool";
 import { playSingleGame } from "./playSingleGame";
-import { SimRun, SimRunStats } from "./SimRun";
-import { stableJson } from "./util/stableJson";
+import { RunStorage } from "./RunStorage";
+import { getOptimizeInstrumentCollector, OptimizeEventType } from "./server/OptimizeInstrument";
+import { CompletedSimRun, idForWeights, SimRun, SimRunStats } from "./SimRun";
 import { Thermocouple } from "./Thermocouple";
+import { iteratorMap } from "./util/iteratorMap";
 import { msTimer } from "./util/timer";
+import { PlayGameResult } from "./WorkerTypes";
 
 const historyFileName = process.argv[2];
 if (historyFileName == null) {
 	throw new Error(`Usage: ts-node optimizeWeights.ts "history.json"`);
 }
-// const historyFileNameJson = `${historyFileName}.json`;
-const historyFileNameSqlite = `${historyFileName}.sqlite`;
-// const history = fs.existsSync(historyFileNameJson) ? fs.readFileSync(historyFileNameJson, { encoding: "utf8" }) : "{}";
-const db = new sqlite3(historyFileNameSqlite);
-db.pragma("journal_mode = WAL");
+
 const isDebug = (process.env.NODE_OPTIONS || "").toLowerCase().includes("debug");
 const gameWorkerPool = new GameWorkerPool(isDebug ? 0 : 6);
 const cheat = process.env.CHEAT === "1";
 const iterations = cheat ? 1000 : 250;
 
-function quit(doExit = true): void {
-	console.log(`Closing ${historyFileNameSqlite}`);
-	gameWorkerPool.shutdown();
-	db.close();
-	if (doExit) {
-		process.exit();
-	}
-}
+process.on("beforeExit", () => gameWorkerPool.shutdown());
+process.on("exit", () => gameWorkerPool.shutdown());
 
-process.on("beforeExit", () => quit(false));
-process.on("exit", () => quit(false));
-db.exec(`
-CREATE TABLE IF NOT EXISTS weights_score (
-	weights TEXT NOT NULL PRIMARY KEY,
-	score DECIMAL(8,7),
-	plays INTEGER,
-	variance DECIMAL(8,7)
-)
-`);
-
-interface SelectWeightsStats {
-	plays: number;
-	score: number;
-	variance: number;
-}
-
-interface SelectBestScore extends SelectWeightsStats {
-	weights: string;
-}
-
-interface BestScore extends SelectWeightsStats {
-	weights: EffectWeightOpsFromType;
-}
-
-const statsForAttempt = (db => {
-	const selectScore = db.prepare<string>("SELECT score, variance, plays, weights FROM weights_score WHERE (weights = ?)");
-	return function scoreForAttempt(attempt: string): SelectWeightsStats | undefined {
-		return selectScore.get(attempt);
-	};
-})(db);
-
-function scoreForWeights(weights: Partial<EffectWeightOpsFromType>): number | undefined {
-	return statsForAttempt(stableJson(weights))?.score;
-}
-
-const addAttemptScore = (db => {
-	const insertAttemptScore = db.prepare<[string, number, number, number]>(`
-INSERT OR IGNORE INTO weights_score (weights, score, plays, variance)
-VALUES (?, ?, ?, ?)
-`);
-	return function addAttemptScore(attempt: string, score: number, plays: number, variance: number): number {
-		return insertAttemptScore.run(attempt, score, plays, variance).changes;
-	};
-})(db);
-const findBestScores: (limit?: number) => BestScore[] = (db => {
-	const selectWeightsByScore = db.prepare<number>(`SELECT score, variance, plays, weights FROM weights_score ORDER BY score LIMIT ?`);
-	return function findBestScores(limit = 1): BestScore[] {
-		return selectWeightsByScore.all(limit).map((row: SelectBestScore) => ({
-			plays: row.plays,
-			score: row.score,
-			variance: row.variance,
-			weights: JSON.parse(row.weights),
-		}));
-	};
-})(db);
-
-interface SelectAttemptSummary {
-	attempts: number;
-	bestScore: number;
-}
-
-const findAttemptSummary = (db => {
-	const selectAttemptSummary = db.prepare("SELECT COUNT(*) as attempts, MIN(score) as bestScore FROM weights_score");
-	return function findAttemptSummary(): SelectAttemptSummary | undefined {
-		return selectAttemptSummary.get();
-	};
-})(db);
 const modifiersPlusUndefined: (EffectWeightModifier | undefined)[] = EFFECT_WEIGHT_MODIFIERS.slice();
 modifiersPlusUndefined.push(undefined);
-const thermocouple = new Thermocouple(scoreForWeights, 8);
+const optimizeInstrumentCollector = getOptimizeInstrumentCollector();
+const runStorage = new RunStorage(historyFileName);
+const thermocouple = new Thermocouple(runStorage, 8);
 
-const initialFromBest: Required<SimRun>[] = findBestScores(thermocouple.preferredMaxCount).map(sws => ({
+const initialFromBest: CompletedSimRun[] = runStorage.findBestScores(thermocouple.preferredMaxCount).map(sws => ({
+	id: sws.id,
 	lossRate: sws.score,
 	lossVariance: sws.variance,
+	msToFindNeighbor: 0,
+	neighborDepth: sws.neighborDepth,
+	neighborOf: sws.neighborOf == null ? undefined : {
+		id: sws.neighborOf,
+		msToFindNeighbor: 0,
+		neighborDepth: sws.neighborDepth - 1,
+		neighborOf: undefined,
+		weights: runStorage.findWeightsById(sws.neighborOf),
+	},
 	plays: sws.plays,
 	weights: sws.weights,
 }));
@@ -123,45 +53,86 @@ const initialGame: SimRunStats = initialFromBest.length > 0 ? {
 	lossVariance: initialFromBest[0].lossVariance || 1,
 	plays: initialFromBest[0].plays || iterations,
 } : playSingleGame({}, cheat, iterations);
-const initialState: SimRun[] = initialFromBest.length > 0 ? initialFromBest : [{
+const initialState: CompletedSimRun[] = initialFromBest.length > 0 ? initialFromBest : [{
+	id: idForWeights({}),
 	lossRate: initialGame.lossRate,
 	lossVariance: initialGame.lossVariance,
+	msToFindNeighbor: 0,
+	neighborDepth: 0,
+	neighborOf: undefined,
 	plays: initialGame.plays,
 	weights: {},
 }];
 
 initialState.forEach(state => {
 	thermocouple.register(state);
-	console.log(`${formatPercent(state.lossRate || 1, 2)} ${formatEffectWeightOpsFromTypeDiff(state.weights)}`);
+	console.log(`${formatPercent(state.lossRate || 1, 2)} @${state.neighborDepth} ${formatEffectWeightOpsFromTypeDiff(state.weights)}`);
 });
-let { attempts } = findAttemptSummary() || { attempts: 0, bestScore: 1 };
+optimizeInstrumentCollector.configChanged({
+	config: {
+		iterations,
+	},
+	type: OptimizeEventType.ConfigChanged,
+});
+let { attempts } = runStorage.findAttemptSummary() || { attempts: 0, bestScore: 1 };
+let lastAttempts = attempts;
+let iteratorsMs = 0;
 let timer = msTimer();
 gameWorkerPool.scoreGames(
 	iteratorMap<SimRun, GameSetup, undefined, undefined>(thermocouple, run => ({
 		cheat,
+		id: run.id,
 		iterations,
 		lossRate: run.lossRate,
 		lossVariance: run.lossVariance,
+		msToFindNeighbor: run.msToFindNeighbor,
+		neighborDepth: run.neighborDepth,
+		neighborOf: run.neighborOf,
 		plays: run.plays,
 		weights: run.weights,
 	})),
-	result => {
-		addAttemptScore(stableJson(result.request.weights), result.lossRate, result.plays, result.lossVariance);
-		const improved = thermocouple.register({
-			lossRate: result.lossRate,
-			lossVariance: result.lossVariance,
-			plays: result.plays,
-			weights: result.request.weights,
+	(result: PlayGameResult) => {
+		const { lossRate, lossVariance, plays, request } = result;
+		const { id, msToFindNeighbor, neighborDepth, neighborOf, weights } = request;
+		if (neighborOf?.id == undefined) {
+			console.warn(`No neighbor: ${JSON.stringify(result, null, 2)}`);
+		}
+		const run: CompletedSimRun = {
+			id,
+			lossRate,
+			lossVariance,
+			msToFindNeighbor,
+			neighborDepth,
+			neighborOf,
+			plays,
+			weights,
+		};
+		iteratorsMs += (msToFindNeighbor || 0);
+		optimizeInstrumentCollector.gameFinished({
+			run,
+			type: OptimizeEventType.GameFinished,
 		});
+		const improved = thermocouple.register(run);
 		if (improved) {
-			console.log(`\n${formatPercent(result.lossRate as number, 2)} ${formatPercent(result.lossVariance, 2)}: ${formatEffectWeightOpsFromTypeDiff(result.request.weights)}`);
+			console.log(`\n${formatPercent(result.lossRate as number, 2)} ${formatPercent(result.lossVariance, 2)} @${request.neighborDepth} +${request.msToFindNeighbor}ms: ${formatEffectWeightOpsFromTypeDiff(result.request.weights)}`);
+			optimizeInstrumentCollector.bestChanged({
+				best: thermocouple.finished,
+				type: OptimizeEventType.BestChanged,
+			});
 		} else {
 			process.stdout.write(result.lossRate === 1 ? "X" : String(Math.floor(result.lossRate * 10)));
 		}
 		attempts++;
 		if ((attempts % 100) === 0) {
 			const ms = timer();
-			console.log(`\nRuns: ${attempts} in ${formatDecimal(ms / 1000, 3)}s for ${formatDecimal(1000 * 100 / ms, 2)} runs/s. Scores: ${thermocouple.finished.map(f => formatPercent(f.lossRate, 2)).join(", ")}.`);
+			const deltaAttempts = attempts - lastAttempts;
+			lastAttempts = attempts;
+			const secs = ms / 1000;
+			const runsPerSec = deltaAttempts / secs;
+			const msPerRun = ms / deltaAttempts;
+			const iteratorPct = iteratorsMs / msPerRun;
+			console.log(`\nRuns: ${attempts} in ${formatDecimal(secs, 2)}s for ${formatDecimal(runsPerSec, 2)} runs/s, with ${iteratorsMs}ms (${formatPercent(iteratorPct, 2)}) for neighbors. Scores: ${thermocouple.finished.map(f => formatPercent(f.lossRate, 2)).join(", ")}.`);
+			iteratorsMs = 0;
 			timer = msTimer();
 		}
 	},
@@ -170,5 +141,5 @@ gameWorkerPool.scoreGames(
 	for (const state of thermocouple.finished.reverse()) {
 		console.log(`${formatPercent(state.lossRate as number, 2)}: ${formatOrderedEffectWeightOpsFromType(state.weights)}`);
 	}
-	quit(true);
+	process.exit(0);
 });

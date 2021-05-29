@@ -4,6 +4,7 @@ import { Worker } from "worker_threads";
 import { Consumer } from "./Consumer";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { LossReason } from "./Game";
+import { SimRun } from "./SimRun";
 import { parallelMap } from "./util/parallelMap";
 import { playSingleGame } from "./playSingleGame";
 import { range } from "./util/range";
@@ -17,13 +18,9 @@ interface OnResult {
 	withWorker: WorkerConsumer;
 }
 
-export interface GameSetup {
+export interface GameSetup extends SimRun {
 	cheat: boolean;
 	iterations?: number;
-	lossRate?: number;
-	lossVariance?: number;
-	plays?: number;
-	weights: Partial<EffectWeightOpsFromType>;
 }
 
 export class GameWorkerPool {
@@ -70,7 +67,8 @@ export class GameWorkerPool {
 				console.error(result.errors);
 			}
 			// console.log(`withResult @${workerNum} #${result.request.id}`);
-			const onResult = this.requests[result.request.id];
+			const onResult = this.requests[result.request.sequenceId];
+			delete this.requests[result.request.sequenceId];
 			onResult.withWorker(worker);
 			onResult.withResult(result);
 		} else {
@@ -81,12 +79,23 @@ export class GameWorkerPool {
 		this.workerAvailable(worker);
 	}
 
-	public scoreGame(weights: Partial<EffectWeightOpsFromType>, cheat: boolean, iterations?: number): Promise<PlayGameResult> {
-		const id = this.nextRequestId++;
+	public scoreGame(
+		id: string,
+		weights: Partial<EffectWeightOpsFromType>,
+		cheat: boolean, iterations: number | undefined,
+		neighborOf: SimRun | undefined,
+		msToFindNeighbor: number | undefined,
+		neighborDepth: number,
+	): Promise<PlayGameResult> {
+		const sequenceId = this.nextRequestId++;
 		const request: PlayGameRequest = {
 			cheat,
 			id,
 			iterations,
+			msToFindNeighbor,
+			neighborDepth,
+			neighborOf,
+			sequenceId,
 			weights,
 		};
 		return new Promise<PlayGameResult>((resolve) => {
@@ -116,7 +125,7 @@ export class GameWorkerPool {
 				return;
 			}
 			// console.log(`scoreGame registering ${id}`);
-			this.requests[id] = {
+			this.requests[sequenceId] = {
 				withResult: result => {
 					// console.log(`withResult #${id}`);
 					resolve(result);
@@ -147,13 +156,17 @@ export class GameWorkerPool {
 					plays: setup.plays,
 					request: {
 						cheat: setup.cheat,
-						id: -1,
+						id: setup.id,
 						iterations: setup.iterations,
+						msToFindNeighbor: setup.msToFindNeighbor,
+						neighborDepth: setup.neighborDepth,
+						neighborOf: setup.neighborOf,
+						sequenceId: -1,
 						weights: setup.weights,
 					},
 				};
 			} else {
-				return this.scoreGame(setup.weights, setup.cheat, setup.iterations);
+				return this.scoreGame(setup.id, setup.weights, setup.cheat, setup.iterations, setup.neighborOf, setup.msToFindNeighbor, setup.neighborDepth);
 			}
 		}, eachResult);
 	}

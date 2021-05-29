@@ -9,9 +9,10 @@ import {
 import { TriFunction } from "./Function";
 import { combineAndIterate } from "./util/combineAndIterate";
 import { range } from "./util/range";
-import { SimRun } from "./SimRun";
+import { idForWeights, SimRun } from "./SimRun";
 import { strictDeepEqual } from "./util/strictDeepEqual";
 import { shufflingPairIterator } from "./util/shufflingPairIterator";
+import { msTimer } from "./util/timer";
 
 const FORMULA_CHANGES: TriFunction<EffectWeightFormula, number, EffectWeightModifier, EffectWeightFormula>[] = [
 	(f, t) => [ f[0] + t, f[1], f[2] ] as EffectWeightFormula,
@@ -71,13 +72,17 @@ function *neighborWithOneChangeIterator(
 		const prevFormula: EffectWeightFormula = simRun.weights[effectType] || scoreFromType[effectType];
 		for (const formula of formulaChangeIterator(prevFormula, temperature, modifier)) {
 			const updatedWeights = withFormula(formula);
-			yield { weights: updatedWeights };
+			yield { id: "", msToFindNeighbor: undefined, neighborDepth: simRun.neighborDepth + 1, neighborOf: undefined, weights: updatedWeights };
 		}
 	}
 }
 
 function mergeRuns(a: SimRun, b: SimRun): SimRun {
 	return {
+		id: "",
+		msToFindNeighbor: undefined,
+		neighborDepth: a.neighborDepth,
+		neighborOf: undefined,
 		weights: Object.assign({}, a.weights, b.weights),
 	};
 }
@@ -114,6 +119,7 @@ export function neighborIterator(
 		const generators: Record<number, Iterator<SimRun, undefined>> = {};
 		return {
 			next: (temperature: number): IteratorResult<SimRun, undefined> => {
+				const timer = msTimer();
 				let temp = Math.round(temperature);
 				while (temp > 0) {
 					let generator = generators[temp];
@@ -122,6 +128,9 @@ export function neighborIterator(
 					}
 					const next = generator.next();
 					if (next.value !== undefined) {
+						next.value.id = next.value.id === "" ? idForWeights(next.value.weights) : next.value.id;
+						next.value.msToFindNeighbor = timer();
+						next.value.neighborOf = simRun;
 						return next;
 					}
 					temp--;

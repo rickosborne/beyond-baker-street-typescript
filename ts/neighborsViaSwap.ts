@@ -2,11 +2,12 @@ import { BotTurnEffectType } from "./BotTurn";
 import { EffectWeightOpsFromType } from "./defaultScores";
 import { EffectWeightFormula, EffectWeightModifier } from "./EffectWeight";
 import { neighborsViaVariance } from "./neighborsViaVariance";
-import { objectMap } from "./util/objectMap";
 import { PseudoRNG } from "./rng";
+import { idForWeights, SimRun } from "./SimRun";
+import { objectMap } from "./util/objectMap";
 import { shuffleInPlace } from "./util/shuffle";
-import { SimRun } from "./SimRun";
 import { strictDeepEqual } from "./util/strictDeepEqual";
+import { msTimer } from "./util/timer";
 
 export function neighborsViaSwap(
 	effectTypes: BotTurnEffectType[],
@@ -17,10 +18,15 @@ export function neighborsViaSwap(
 	let previousRun: SimRun;
 	const allRuns: SimRun[] = [];
 	const maxDistance = 6;
+	const timer = msTimer();
 	return function neighborsViaSwap(count: number, simRun: SimRun, temp: number, prng: PseudoRNG): SimRun[] {
 		function addRunIfNovel(weights: EffectWeightOpsFromType,): void {
 			if (!strictDeepEqual(weights, simRun.weights) && scoreForWeights(weights) === undefined) {
 				allRuns.push({
+					id: idForWeights(weights),
+					msToFindNeighbor: undefined,
+					neighborDepth: simRun.neighborDepth + 1,
+					neighborOf: simRun,
 					weights,
 				});
 			}
@@ -73,7 +79,13 @@ export function neighborsViaSwap(
 					[ farSwap[destKey], farSwap[sourceKey] ] = [ farSwap[sourceKey], farSwap[destKey] ];
 					addRunIfNovel(farSwap);
 					if (!strictDeepEqual(farSwap, simRun.weights) && scoreForWeights(farSwap) === undefined) {
-						allRuns.push({ weights: farSwap });
+						allRuns.push({
+							id: idForWeights(farSwap),
+							msToFindNeighbor: undefined,
+							neighborDepth: simRun.neighborDepth + 1,
+							neighborOf: simRun,
+							weights: farSwap,
+						});
 					}
 					if (distance > 1) {
 						const left = Object.assign({}, weights);
@@ -94,6 +106,7 @@ export function neighborsViaSwap(
 		}
 		const runs: SimRun[] = [];
 		runs.push(...allRuns.splice(0, count));
+		runs.forEach(r => r.msToFindNeighbor = timer());
 		return runs;
 	};
 }
