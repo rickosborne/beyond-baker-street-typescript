@@ -1,12 +1,7 @@
-import { formatEffectWeightOpsFromTypeDiff } from "../defaultScores";
-import { fillOutRun } from "../fillOutRun";
-import { BiFunction, MonoFunction, Supplier, TriFunction } from "../Function";
-import { mergeRuns } from "../mergeRuns";
+import { BiFunction, MonoFunction, Supplier } from "../Function";
 import { Predicate } from "../Predicate";
-import { SimRun } from "../SimRun";
 import { combineAndIterate } from "./combineAndIterate";
 import { range } from "./range";
-import { resettableTimer } from "./timer";
 
 export function *scalingIterator<T>(
 	initialValue: T,
@@ -27,7 +22,7 @@ export function *scalingIterator<T>(
 			} else {
 				misses++;
 				if (misses > maxMisses) {
-					console.warn(abandonMessageBuilder());
+					console.warn(`\n${abandonMessageBuilder()}`);
 					return;
 				}
 			}

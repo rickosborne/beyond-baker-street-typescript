@@ -29,6 +29,7 @@ function weightedRandomIndex(count: number): number {
 export class Thermocouple {
 	private readonly ignoreIds: Set<string> = new Set<string>();
 	private readonly runs: FinishedSimRun[] = [];  // Sorted best (lowest) to worst (highest)
+	private temperature = 10;
 
 	constructor(
 		private readonly storage: RunStorage,
@@ -40,7 +41,7 @@ export class Thermocouple {
 	public [Symbol.iterator](): Iterator<SimRun, undefined> {
 		return {
 			next: (): IteratorResult<SimRun, undefined> => {
-				const value = this.neighbor(20);
+				const value = this.neighbor(this.temperature);
 				if (value === undefined) {
 					return {
 						done: true,
@@ -84,9 +85,10 @@ export class Thermocouple {
 			const finished = this.runs[index];
 			const neighbor = finished.neighbors.next(temperature);
 			if (neighbor.value === undefined) {
-				console.warn(`Iterator for ${finished.id} ran out of neighbors.`);
+				console.warn(`\nIterator for ${finished.id} ran out of neighbors.`);
 				this.runs.splice(index, 1);
 				this.ignoreIds.add(finished.id);
+				this.temperature++;
 				// try to add the parent
 				if (finished.neighborOf !== undefined && this.runs.findIndex(r => r.id === finished.neighborOf?.id) < 0) {
 					const parent = this.storage.findAttemptById(finished.neighborOf.id);
