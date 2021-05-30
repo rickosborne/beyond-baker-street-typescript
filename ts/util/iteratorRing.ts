@@ -6,7 +6,12 @@ export function iteratorRing<T, R, N>(...iterators: (Iterator<T, R, N> | Iterabl
 	const its: Iterator<T, R, N>[] = iterators.map(i => isIterable(i) ? i[Symbol.iterator]() as Iterator<T, R, N> : i);
 	const resultIterator: Iterator<T, R, N> = {
 		next(arg: N): IteratorResult<T, R> {
+			let attempts = 0;
 			while (keepGoing && its.length > 0) {
+				attempts++;
+				if (attempts > 50) {
+					throw new Error(`iteratorRing went too long: ${its.length} ${index} ${keepGoing}`);
+				}
 				index = (index + 1) % its.length;
 				const iterator = its[index];
 				const next = iterator.next(arg);

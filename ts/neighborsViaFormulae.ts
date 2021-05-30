@@ -2,14 +2,16 @@ import { BotTurnEffectType, MUTABLE_EFFECT_TYPES } from "./BotTurn";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import { effectWeightFormula } from "./EffectWeight";
 import { fillOutRun } from "./fillOutRun";
-import { BiFunction } from "./Function";
+import { formatDecimal } from "./format/formatDecimal";
 import { mergeRuns } from "./mergeRuns";
 import { SimRun } from "./SimRun";
-import { combineAndIterate } from "./util/combineAndIterate";
 import { asIterable } from "./util/iteratorMap";
 import { iteratorRing } from "./util/iteratorRing";
 import { objectMap } from "./util/objectMap";
 import { range } from "./util/range";
+import { scalingIterator } from "./util/scalingIterator";
+import { shuffleCopy } from "./util/shuffle";
+import { strictDeepEqual } from "./util/strictDeepEqual";
 import { resettableTimer } from "./util/timer";
 import { toRecord } from "./util/toRecord";
 
@@ -44,7 +46,7 @@ export function runMagnifiedBy(
 		msToFindNeighbor: undefined,
 		neighborDepth: neighborOf.neighborDepth + 1,
 		neighborOf,
-		neighborSignature: `magnify(${baseMag}, ${offsetMag})`,
+		neighborSignature: `magnify(${formatDecimal(baseMag, 2)}, ${formatDecimal(offsetMag, 2)})`,
 		weights,
 	};
 }
@@ -54,8 +56,9 @@ export function* neighborWithOneTranslation(
 	temperature: number,
 	effectiveFormulas: EffectWeightOpsFromType,
 ): IterableIterator<SimRun> {
-	for (let baseDelta = -temperature; baseDelta <= temperature; baseDelta++) {
-		for (let offsetDelta = -temperature; offsetDelta <= temperature; offsetDelta++) {
+	const deltas = range(-temperature, temperature);
+	for (const baseDelta of shuffleCopy(deltas)) {
+		for (const offsetDelta of shuffleCopy(deltas)) {
 			yield runTranslatedBy(simRun, baseDelta, offsetDelta, effectiveFormulas);
 		}
 	}
@@ -66,8 +69,8 @@ export function* neighborWithOneMagnification(
 	temperature: number,
 	effectiveFormulas: EffectWeightOpsFromType,
 ): IterableIterator<SimRun> {
-	for (const baseMag of MAGNIFICATIONS) {
-		for (const offsetMag of MAGNIFICATIONS) {
+	for (const baseMag of shuffleCopy(MAGNIFICATIONS)) {
+		for (const offsetMag of shuffleCopy(MAGNIFICATIONS)) {
 			yield runMagnifiedBy(simRun, temperature * baseMag, temperature * offsetMag, effectiveFormulas);
 		}
 	}
@@ -83,11 +86,13 @@ export function* neighborWithOneProjection(
 		neighborWithOneMagnification(simRun, temperature, effectiveFormulas),
 	);
 	for (const projected of asIterable(iterator)) {
-		yield projected;
+		if (!strictDeepEqual(projected.weights, simRun.weights)) {
+			yield projected;
+		}
 	}
 }
 
-export function* neighborsViaFormulae(
+export function neighborsViaFormulae(
 	simRun: SimRun,
 	temperature: number,
 	scoreForWeights: (weights: Partial<EffectWeightOpsFromType>) => number | undefined,
@@ -96,14 +101,17 @@ export function* neighborsViaFormulae(
 ): IterableIterator<SimRun> {
 	const timer = resettableTimer();
 	const effectiveFormulas = toRecord(effectTypes, t => t, t => simRun.weights[t] || scoreFromType[t]);
-	for (let temp = 1; temp < temperature; temp++) {
-		const iterators = range(1, temp).map(() => (r: SimRun) => neighborWithOneProjection(r, temp, effectiveFormulas));
-		const runMerger: BiFunction<SimRun, SimRun, SimRun> = (a, b) => mergeRuns(a, b, simRun, () => "", () => undefined);
-		for (const neighbor of combineAndIterate(simRun, runMerger, iterators)) {
-			if (scoreForWeights(neighbor.weights) === undefined) {
-				yield fillOutRun(neighbor, simRun, timer);
-				timer.reset();
-			}
-		}
-	}
+	return scalingIterator<SimRun>(
+		simRun,
+		temperature,
+		(temp: number) => (r: SimRun) => neighborWithOneProjection(r, temp, effectiveFormulas),
+		(a: SimRun, b: SimRun) => mergeRuns(a, b, simRun, () => "", () => undefined),
+		(r: SimRun) => scoreForWeights(r.weights) === undefined,
+		(r: SimRun) => {
+			const elapsed = timer();
+			timer.reset();
+			return fillOutRun(r, simRun, elapsed);
+		},
+		() => `neighborsViaFormulae giving up on ${simRun.id} at temp ${formatDecimal(temperature, 2)}.`
+	);
 }

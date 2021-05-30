@@ -7,11 +7,11 @@ import {
 	normalizeEffectWeightFormula,
 } from "./EffectWeight";
 import { fillOutRun } from "./fillOutRun";
-import { BiFunction, TriFunction } from "./Function";
+import { formatDecimal } from "./format/formatDecimal";
+import { TriFunction } from "./Function";
 import { mergeRuns } from "./mergeRuns";
 import { SimRun } from "./SimRun";
-import { combineAndIterate } from "./util/combineAndIterate";
-import { range } from "./util/range";
+import { scalingIterator } from "./util/scalingIterator";
 import { shufflingPairIterator } from "./util/shufflingPairIterator";
 import { strictDeepEqual } from "./util/strictDeepEqual";
 import { resettableTimer } from "./util/timer";
@@ -86,7 +86,7 @@ function* neighborWithOneChangeIterator(
 	}
 }
 
-export function* neighborsViaRandomChanges(
+export function neighborsViaRandomChanges(
 	simRun: SimRun,
 	temperature: number,
 	scoreForWeights: (weights: Partial<EffectWeightOpsFromType>) => number | undefined,
@@ -94,20 +94,18 @@ export function* neighborsViaRandomChanges(
 	modifiers: EffectWeightModifier[] = EFFECT_WEIGHT_MODIFIERS,
 	scoreFromType: EffectWeightOpsFromType = DEFAULT_SCORE_FROM_TYPE,
 ): IterableIterator<SimRun> {
-	let changeCount = 1;
 	const timer = resettableTimer();
-	const temp = Math.round(temperature);
-	while (changeCount < 10) {
-		const iterators = range(1, changeCount).map(() => (r: SimRun) => neighborWithOneChangeIterator(r, temp, scoreForWeights, effectTypes, modifiers, scoreFromType));
-		const runMerger: BiFunction<SimRun, SimRun, SimRun> = (a, b) => mergeRuns(a, b, simRun, () => "", () => undefined);
-		for (const neighbor of combineAndIterate(simRun, runMerger, iterators)) {
-			// console.log(`Neighbor cc${changeCount} t${temperature}: ${formatOrderedEffectWeightOpsFromType(simRun.weights)} --> ${formatOrderedEffectWeightOpsFromType(neighbor.weights)}`);
-			if (scoreForWeights(neighbor.weights) === undefined) {
-				yield fillOutRun(neighbor, simRun, timer);
-				timer.reset();
-			}
-		}
-		changeCount++;
-		// console.log(`Change count ${changeCount} for temp ${temperature} weights: ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
-	}
+	return scalingIterator<SimRun>(
+		simRun,
+		temperature,
+		t => (r: SimRun) => neighborWithOneChangeIterator(r, t, scoreForWeights, effectTypes, modifiers, scoreFromType),
+		(a: SimRun, b: SimRun) => mergeRuns(a, b, simRun, () => "", () => undefined),
+		(r: SimRun) => scoreForWeights(r.weights) === undefined,
+		(r: SimRun) => {
+			const elapsed = timer();
+			timer.reset();
+			return fillOutRun(r, simRun, elapsed);
+		},
+		() => `neighborsViaRandomChanges giving up on ${simRun.id} at temp ${formatDecimal(temperature, 2)}.`,
+	);
 }

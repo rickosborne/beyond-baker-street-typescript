@@ -20,25 +20,22 @@ export function neighborIterator(
 		return {
 			next: (temperature: number): IteratorResult<SimRun, undefined> => {
 				const timer = msTimer();
-				let temp = Math.round(temperature);
-				while (temp > 0) {
-					let generator = generators[temp];
-					if (generator === undefined) {
-						generator = iteratorRing(
-							neighborsViaRandomChanges(simRun, temp, scoreForWeights, effectTypes, modifiers, scoreFromType),
-							neighborsViaSwap(simRun, temp, scoreForWeights, effectTypes, scoreFromType),
-							neighborsViaFormulae(simRun, temp, scoreForWeights, effectTypes, scoreFromType),
-						);
-						generators[temp] = generator;
-					}
-					const next = generator.next();
-					if (next.value !== undefined) {
-						fillOutRun(next.value, simRun, timer);
-						return next;
-					}
-					temp--;
-					// console.log(`Temp at ${temp} for ${formatOrderedEffectWeightOpsFromType(simRun.weights)}`);
+				const temp = Math.round(temperature);
+				let generator = generators[temp];
+				if (generator === undefined) {
+					generator = iteratorRing(
+						neighborsViaRandomChanges(simRun, temp, scoreForWeights, effectTypes, modifiers, scoreFromType),
+						neighborsViaSwap(simRun, temp, scoreForWeights, effectTypes, scoreFromType),
+						neighborsViaFormulae(simRun, temp, scoreForWeights, effectTypes, scoreFromType),
+					);
+					generators[temp] = generator;
 				}
+				const next = generator.next();
+				if (next.value !== undefined) {
+					fillOutRun(next.value, simRun, timer);
+					return next;
+				}
+				console.log(`neighborIterator giving up on ${simRun.id}`);
 				return { done: true, value: undefined };
 			},
 		};

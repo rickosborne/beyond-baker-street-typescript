@@ -17,7 +17,8 @@ export function* combineAndIterate<T>(
 		const rest = iterators.slice(1);
 		for (const t of iterator(starter)) {
 			for (const u of combineAndIterate(t, combiner, rest)) {
-				yield combiner(t, u);
+				const combined = combiner(t, u);
+				yield combined;
 			}
 		}
 	}

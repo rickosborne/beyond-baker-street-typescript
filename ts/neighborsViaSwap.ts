@@ -3,11 +3,10 @@ import { Consumer } from "./Consumer";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import { effectWeightFormula, EffectWeightFormula, normalizeEffectWeightFormula } from "./EffectWeight";
 import { fillOutRun } from "./fillOutRun";
-import { BiFunction } from "./Function";
+import { formatDecimal } from "./format/formatDecimal";
 import { mergeRuns } from "./mergeRuns";
 import { SimRun } from "./SimRun";
-import { combineAndIterate } from "./util/combineAndIterate";
-import { range } from "./util/range";
+import { scalingIterator } from "./util/scalingIterator";
 import { shuffleCopy } from "./util/shuffle";
 import { resettableTimer } from "./util/timer";
 import { toRecord } from "./util/toRecord";
@@ -77,7 +76,7 @@ export function* neighborWithOneSwapIterator(
 	}
 }
 
-export function* neighborsViaSwap(
+export function neighborsViaSwap(
 	simRun: SimRun,
 	temperature: number,
 	scoreForWeights: (weights: Partial<EffectWeightOpsFromType>) => number | undefined,
@@ -86,14 +85,17 @@ export function* neighborsViaSwap(
 ): IterableIterator<SimRun> {
 	const timer = resettableTimer();
 	const effectiveFormulas = toRecord(effectTypes, t => t, t => simRun.weights[t] || scoreFromType[t]);
-	for (let temp = 1; temp < temperature; temp++) {
-		const iterators = range(1, temp).map(() => (r: SimRun) => neighborWithOneSwapIterator(r, effectiveFormulas, effectTypes));
-		const runMerger: BiFunction<SimRun, SimRun, SimRun> = (a, b) => mergeRuns(a, b, simRun, () => "", () => undefined);
-		for (const neighbor of combineAndIterate(simRun, runMerger, iterators)) {
-			if (scoreForWeights(neighbor.weights) === undefined) {
-				yield fillOutRun(neighbor, simRun, timer);
-				timer.reset();
-			}
-		}
-	}
+	return scalingIterator<SimRun>(
+		simRun,
+		temperature,
+		() => (r: SimRun) => neighborWithOneSwapIterator(r, effectiveFormulas, effectTypes),
+		(a: SimRun, b: SimRun) => mergeRuns(a, b, simRun, () => "", () => undefined),
+		(r: SimRun) => scoreForWeights(r.weights) === undefined,
+		(r: SimRun) => {
+			const elapsed = timer();
+			timer.reset();
+			return fillOutRun(r, simRun, elapsed);
+		},
+		() => `neighborsViaSwap giving up on ${simRun.id} at temp ${formatDecimal(temperature, 2)}.`,
+	);
 }

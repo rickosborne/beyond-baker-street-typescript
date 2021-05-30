@@ -1,6 +1,7 @@
 import * as sqlite3 from "better-sqlite3";
 import * as process from "process";
 import { EffectWeightOpsFromType } from "./defaultScores";
+import { CompletedSimRun, SimRun } from "./SimRun";
 import { isDefined } from "./util/defined";
 import { stableJson } from "./util/stableJson";
 
@@ -67,7 +68,7 @@ export class RunStorage {
 		`);
 		this.selectAttemptSummary = this.db.prepare("SELECT COUNT(*) as attempts, MIN(score) as bestScore FROM weights_score");
 		this.selectScore = this.db.prepare<string>("SELECT id, score, variance, plays, weights, neighbor, depth FROM weights_score WHERE (weights = ?)");
-		this.selectWeightsById = this.db.prepare<string>(`SELECT weights FROM weights_score WHERE id = ?`);
+		this.selectWeightsById = this.db.prepare<string>(`SELECT id, score, variance, plays, weights, neighbor, depth FROM weights_score WHERE id = ?`);
 		this.selectWeightsByScore = this.db.prepare<number>(`SELECT id, score, variance, plays, weights, neighbor, depth FROM weights_score ORDER BY score LIMIT ?`);
 		this.insertAttemptScore = this.db.prepare<[string, string, number, number, number, string | undefined, number]>(`
 			INSERT OR IGNORE INTO weights_score (id, weights, score, plays, variance, neighbor, depth)
@@ -80,6 +81,24 @@ export class RunStorage {
 			console.warn(`Empty neighbor: ${JSON.stringify(id)} ${attempt}`);
 		}
 		return this.insertAttemptScore.run(id, attempt, score, plays, variance, neighbor, neighborDepth).changes;
+	}
+
+	public findAttemptById(id: string): CompletedSimRun | undefined {
+		const attempt: SelectBestScore | undefined = this.selectWeightsById.get(id);
+		if (attempt == null) {
+			return undefined;
+		}
+		return {
+			id,
+			lossRate: attempt.score,
+			lossVariance: attempt.variance,
+			msToFindNeighbor: undefined,
+			neighborDepth: attempt.depth,
+			neighborOf: attempt.neighbor == null ? undefined : this.findAttemptById(attempt.neighbor),
+			neighborSignature: "findAttemptById",
+			plays: attempt.plays,
+			weights: JSON.parse(attempt.weights),
+		};
 	}
 
 	public findAttemptSummary(): SelectAttemptSummary | undefined {

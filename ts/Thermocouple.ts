@@ -1,5 +1,6 @@
 import { compareTwo, DataSetCompareResult } from "./DataSet";
 import { formatOrderedEffectWeightOpsFromType } from "./defaultScores";
+import { formatPercent } from "./format/formatPercent";
 import { MonoFunction } from "./Function";
 import { neighborIterator } from "./neighborIterator";
 import { randomInt } from "./rng";
@@ -26,6 +27,7 @@ function weightedRandomIndex(count: number): number {
  * It keeps a pool of candidates, sorted by energy, and provides neighbors based on those.
  */
 export class Thermocouple {
+	private readonly ignoreIds: Set<string> = new Set<string>();
 	private readonly runs: FinishedSimRun[] = [];  // Sorted best (lowest) to worst (highest)
 
 	constructor(
@@ -38,9 +40,16 @@ export class Thermocouple {
 	public [Symbol.iterator](): Iterator<SimRun, undefined> {
 		return {
 			next: (): IteratorResult<SimRun, undefined> => {
+				const value = this.neighbor(20);
+				if (value === undefined) {
+					return {
+						done: true,
+						value,
+					};
+				}
 				return {
 					done: false,
-					value: this.neighbor(20),
+					value: value,
 				};
 			},
 		};
@@ -68,22 +77,30 @@ export class Thermocouple {
 		};
 	}
 
-	public neighbor(temperature: number): SimRun {
+	public neighbor(temperature: number): SimRun | undefined {
 		const timer = msTimer();
 		while (this.runs.length > 0) {
 			const index = weightedRandomIndex(this.runs.length);
 			const finished = this.runs[index];
 			const neighbor = finished.neighbors.next(temperature);
 			if (neighbor.value === undefined) {
-				console.warn(`Iterator for weights ran out of neighbors: ${formatOrderedEffectWeightOpsFromType(finished.weights)}`);
+				console.warn(`Iterator for ${finished.id} ran out of neighbors.`);
 				this.runs.splice(index, 1);
+				this.ignoreIds.add(finished.id);
+				// try to add the parent
+				if (finished.neighborOf !== undefined && this.runs.findIndex(r => r.id === finished.neighborOf?.id) < 0) {
+					const parent = this.storage.findAttemptById(finished.neighborOf.id);
+					if (parent != null && this.register(parent)) {
+						console.log(`Backing up to ${parent.id} at ${formatPercent(parent.lossRate, 2)}.`);
+					}
+				}
 			} else {
 				const withTime: SimRun = Object.create(neighbor.value);
 				withTime.msToFindNeighbor = timer();
 				return withTime;
 			}
 		}
-		throw new Error(`Need at least 1 run`);
+		return undefined;
 	}
 
 	/**
@@ -93,6 +110,9 @@ export class Thermocouple {
 		const { id, lossRate, lossVariance, msToFindNeighbor, neighborDepth, neighborOf, neighborSignature, plays, weights } = run;
 		if (lossVariance === undefined || lossRate === undefined || plays === undefined) {
 			console.warn(`Run had no stats: ${formatOrderedEffectWeightOpsFromType(run.weights)}`);
+			return false;
+		}
+		if (this.ignoreIds.has(id)) {
 			return false;
 		}
 		this.storage.addAttemptScore(id, stableJson(weights), lossRate, plays, lossVariance, neighborOf?.id, neighborDepth);
