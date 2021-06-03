@@ -19,7 +19,7 @@ interface FinishedSimRun extends CompletedSimRun {
  * @param {number} count
  */
 function weightedRandomIndex(count: number): number {
-	return (count - 1) - Math.floor(count * Math.pow(Math.random(), 1 / count));
+	return (count - 1) - Math.floor(count * Math.sqrt(Math.random()));
 }
 
 /**

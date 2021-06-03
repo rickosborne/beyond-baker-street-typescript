@@ -1,7 +1,7 @@
 import { BotTurnEffectType, MUTABLE_EFFECT_TYPES } from "./BotTurn";
 import { DEFAULT_SCORE_FROM_TYPE, EffectWeightOpsFromType } from "./defaultScores";
 import {
-	EFFECT_WEIGHT_MODIFIERS,
+	EFFECT_WEIGHT_MODIFIERS, effectWeightFormula,
 	EffectWeightFormula,
 	EffectWeightModifier,
 	normalizeEffectWeightFormula,
@@ -63,13 +63,7 @@ function* neighborWithOneChangeIterator(
 	for (const [ effectType, modifier ] of shufflingPairIterator(effectTypes, modifiers)) {
 		const weights: Partial<EffectWeightOpsFromType> = Object.assign({}, simRun.weights);
 		const withFormula: (formula: EffectWeightFormula) => Partial<EffectWeightOpsFromType> = ([ base, offset, mod ]) => {
-			const w = Object.create(weights);
-			if (offset !== undefined && mod !== undefined) {
-				w[effectType] = [ base, offset, mod ];
-			} else {
-				w[effectType] = [base];
-			}
-			return w;
+			return Object.assign({}, weights, { [effectType]: effectWeightFormula(base, offset, mod) });
 		};
 		const prevFormula: EffectWeightFormula = simRun.weights[effectType] || scoreFromType[effectType];
 		for (const formula of formulaChangeIterator(prevFormula, temperature, modifier)) {
