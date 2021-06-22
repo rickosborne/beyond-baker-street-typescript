@@ -1,7 +1,7 @@
 import { isIterable } from "./iteratorMap";
 
 export function iteratorRing<T, R, N>(...iterators: (Iterator<T, R, N> | IterableIterator<T>)[]): Iterator<T, R, N> & Iterable<T> {
-	let index = 0;
+	let index = -1;
 	let keepGoing = true;
 	const its: Iterator<T, R, N>[] = iterators.map(i => isIterable(i) ? i[Symbol.iterator]() as Iterator<T, R, N> : i);
 	const resultIterator: Iterator<T, R, N> = {
@@ -10,6 +10,7 @@ export function iteratorRing<T, R, N>(...iterators: (Iterator<T, R, N> | Iterabl
 			while (keepGoing && its.length > 0) {
 				attempts++;
 				if (attempts > 50) {
+					// istanbul ignore next
 					throw new Error(`iteratorRing went too long: ${its.length} ${index} ${keepGoing}`);
 				}
 				index = (index + 1) % its.length;

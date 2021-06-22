@@ -1,7 +1,8 @@
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import { collect } from "./collect";
-import { isIterable, isIterator, iteratorMap } from "./iteratorMap";
+import { asIterable, isIterable, isIterator, iteratorMap } from "./iteratorMap";
+import { range } from "./range";
 
 describe("isIterator", function () {
 	it("detects iterator-like things", function () {
@@ -52,5 +53,28 @@ describe("iteratorMap", function () {
 			expect(r("abc")).deep.equals({ done: true, value: "abc" });
 			expect(iterator.next()).deep.equals({ done: true, value: undefined });
 		}
+	});
+});
+
+describe("asIterable", function () {
+	it("works", function () {
+		const nums = range(1, 3);
+		let index = 0;
+		const iterator: Iterator<number, undefined> = {
+			next(): IteratorResult<number> {
+				if (index < nums.length) {
+					return {
+						value: nums[index++],
+					};
+				}
+				return {
+					done: true,
+					value: undefined,
+				};
+			},
+		};
+		const iterable: Iterable<number> = asIterable(iterator);
+		const it: Iterator<number, undefined> = iterable[Symbol.iterator]();
+		expect(collect(it)).deep.equals([ 1, 2, 3 ]);
 	});
 });
