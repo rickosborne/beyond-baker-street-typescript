@@ -1,8 +1,8 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: PR CI Tests
 
-# Controls when the action will run. 
+# Controls when the action will run.
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
@@ -44,9 +44,9 @@ jobs:
           # token: # optional, default is ${{ github.token }}
           # Deprecated. Use node-version instead. Will not be supported after October 1, 2019
           # version: # optional
-      
+
       - name: npm install
         run: npm install
-      
+
       - name: npm test
         run: npm test
